@@ -7,6 +7,7 @@ import com.droidance.ui.screens.home.*
 import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageTimestampFormatterTest {
@@ -33,7 +34,8 @@ class MessageTimestampFormatterTest {
         val now = LocalDateTime.of(2026, 6, 16, 20, 30).atZone(zone).toInstant().toEpochMilli()
         val messageTime = LocalDateTime.of(2025, 5, 15, 22, 19).atZone(zone).toInstant().toEpochMilli()
 
-        assertEquals("2025年5月15日 22:19", formatMessageTimestamp(messageTime, "22:19", now, java.util.Locale.SIMPLIFIED_CHINESE).replace('\u202f', ' '))
+        // The time part follows each runtime's locale data; the date is stable across JDKs and Android.
+        assertTrue(formatMessageTimestamp(messageTime, "22:19", now, java.util.Locale.SIMPLIFIED_CHINESE).replace('\u202f', ' ').startsWith("2025年5月15日"))
     }
 
     @Test
