@@ -1,0 +1,120 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "3c91600417acf1666e1edd153b68d295",
+    "entities": [
+      {
+        "tableName": "memory_candidates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`candidate_hash` TEXT NOT NULL, `version` INTEGER NOT NULL, `candidate_json` TEXT NOT NULL, `search_text` TEXT NOT NULL, `status` TEXT NOT NULL, `occurrences` INTEGER NOT NULL, `first_seen_at` INTEGER NOT NULL, `last_seen_at` INTEGER NOT NULL, `source_through_sequence` INTEGER NOT NULL, `has_verified_state_change` INTEGER NOT NULL, PRIMARY KEY(`candidate_hash`))",
+        "fields": [
+          {
+            "fieldPath": "candidateHash",
+            "columnName": "candidate_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateJson",
+            "columnName": "candidate_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchText",
+            "columnName": "search_text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurrences",
+            "columnName": "occurrences",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSeenAt",
+            "columnName": "first_seen_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "last_seen_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceThroughSequence",
+            "columnName": "source_through_sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hasVerifiedStateChange",
+            "columnName": "has_verified_state_change",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "candidate_hash"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "memory_candidate_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`turn_id` TEXT NOT NULL, `candidate_hash` TEXT NOT NULL, `source_through_sequence` INTEGER NOT NULL, PRIMARY KEY(`turn_id`))",
+        "fields": [
+          {
+            "fieldPath": "turnId",
+            "columnName": "turn_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateHash",
+            "columnName": "candidate_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceThroughSequence",
+            "columnName": "source_through_sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "turn_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3c91600417acf1666e1edd153b68d295')"
+    ]
+  }
+}

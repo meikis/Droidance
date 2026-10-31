@@ -1,0 +1,122 @@
+{
+  "verified_on": "2026-10-08",
+  "gateways": [
+    {
+      "hosts": [
+        "openrouter.ai"
+      ],
+      "parameter": "REASONING_OBJECT",
+      "source": "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "note": "OpenRouter normalizes reasoning.effort for reasoning models and ignores it for others."
+    },
+    {
+      "hosts": [
+        "ark.cn-beijing.volces.com"
+      ],
+      "parameter": "REASONING_EFFORT",
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "source": "https://docs.volcengine.com/docs/ark/responses-api-deep-thinking",
+      "note": "Seed deep-thinking models accept reasoning effort; a rejection falls back to the model default."
+    }
+  ],
+  "models": [
+    {
+      "ids": [
+        "gpt-5",
+        "openai/gpt-5"
+      ],
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-5"
+      ]
+    },
+    {
+      "ids": [
+        "gpt-5.1",
+        "openai/gpt-5.1"
+      ],
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-5.1"
+      ]
+    },
+    {
+      "ids": [
+        "gpt-5.2",
+        "gpt-5.4",
+        "gpt-5.5",
+        "openai/gpt-5.2",
+        "openai/gpt-5.4",
+        "openai/gpt-5.5"
+      ],
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-5.2",
+        "https://developers.openai.com/api/docs/models/gpt-5.4",
+        "https://developers.openai.com/api/docs/models/gpt-5.5"
+      ]
+    },
+    {
+      "ids": [
+        "gpt-5.6-luna",
+        "openai/gpt-5.6-luna"
+      ],
+      "efforts": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-5.6-luna"
+      ]
+    },
+    {
+      "ids": [
+        "gpt-6-astra",
+        "gpt-6.1-sol",
+        "openai/gpt-6-astra",
+        "openai/gpt-6.1-sol"
+      ],
+      "efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-6-astra",
+        "https://developers.openai.com/api/docs/models/gpt-6.1-sol"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 YBBLab
+# SPDX-License-Identifier: Apache-2.0
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install NDK
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" > /dev/null
+      - name: Verify source and native inputs
+        run: python3 scripts/verify_source.py && python3 scripts/verify_native.py && python3 scripts/verify_secrets.py && python3 -m unittest discover -s scripts/tests
+      - name: Verify module architecture
+        run: ./gradlew verifyArchitecture
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest :core:model:test :core:agent:test :core:knowledge:test
+      - name: Lint
+        run: ./gradlew :app:lintDebug
+      - name: Release APK (R8)
+        run: ./gradlew :app:assembleRelease
+      - name: Verify packaged native inputs
+        run: python3 scripts/verify_native.py app/build/outputs/apk/release/app-release-unsigned.apk

@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: 2026 YBBLab
+# SPDX-License-Identifier: Apache-2.0
+name: Prepare release draft
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing public version tag, such as v0.1.0-beta.1
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate tagged source and release identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/release.py identity --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/release"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases" > "$RUNNER_TEMP/releases.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          releases = json.loads((Path(os.environ['RUNNER_TEMP']) / 'releases.json').read_text())
+          if any(release['tag_name'] == os.environ['RELEASE_TAG'] for page in releases for release in page):
+              raise SystemExit('A release or draft already exists for this tag; its assets will not be replaced')
+          PY
+      - name: Install locked Android tools
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" "ndk;27.0.12077973"'
+      - name: Validate release source and unsigned APK
+        env:
+          ORG_GRADLE_PROJECT_droidanceUpdateRepository: ${{ github.repository }}
+        run: scripts/verify.sh release
+      - name: Sign and verify final APK
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_ALIAS: ${{ secrets.SIGNING_ALIAS }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_CERT_SHA256: ${{ vars.SIGNING_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$RUNNER_TEMP/release.jks"' EXIT
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          for name in ('SIGNING_KEYSTORE_BASE64', 'SIGNING_ALIAS', 'SIGNING_STORE_PASSWORD', 'SIGNING_KEY_PASSWORD', 'SIGNING_CERT_SHA256'):
+              if not os.environ.get(name):
+                  raise SystemExit(f'Missing release configuration: {name}')
+          path = Path(os.environ['RUNNER_TEMP']) / 'release.jks'
+          path.write_bytes(base64.b64decode(os.environ['SIGNING_KEYSTORE_BASE64'], validate=True))
+          path.chmod(0o600)
+          PY
+          apk="$RUNNER_TEMP/release/droidance-${RELEASE_TAG#v}.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$SIGNING_ALIAS" --ks-pass env:SIGNING_STORE_PASSWORD --key-pass env:SIGNING_KEY_PASSWORD --out "$apk" app/build/outputs/apk/release/app-release-unsigned.apk
+          python3 scripts/release.py verify-apk --identity "$RUNNER_TEMP/release/identity.json" --apk "$apk" --sdk "$ANDROID_HOME" --certificate "$SIGNING_CERT_SHA256"
+          python3 scripts/verify_native.py "$apk"
+      - name: Create complete draft for manual acceptance and publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft "${flags[@]}" --title "Droidance ${RELEASE_TAG#v}" --notes-file "$RUNNER_TEMP/release/notes.md" "$RUNNER_TEMP/release/"*.apk "$RUNNER_TEMP/release/"*.sha256 "$RUNNER_TEMP/release/release.json"

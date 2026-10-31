@@ -1,0 +1,213 @@
+// SPDX-FileCopyrightText: 2026 YBBLab
+// SPDX-License-Identifier: Apache-2.0
+
+package com.droidance.agent.device
+
+import com.droidance.core.agent.device.*
+import com.droidance.core.knowledge.agent.device.*
+import com.droidance.core.device.agent.device.*
+
+import com.droidance.agent.device.*
+
+import android.content.ComponentName
+import android.content.Context
+import com.droidance.agent.RuntimeCapabilityRegistry
+import com.droidance.debug.DebugLogManager
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class VirtualSpaceReadiness @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val capabilityRegistry: RuntimeCapabilityRegistry,
+    private val virtualSpaceManager: VirtualSpaceManager,
+    private val sidecarBridge: VirtualSpaceSidecarBridge,
+    private val virtualSpaceRuntimePolicy: VirtualSpaceRuntimePolicy,
+    private val debugLogManager: DebugLogManager
+) {
+    private companion object {
+        const val INPUT_PROBE_ATTEMPTS = 3
+        const val INPUT_PROBE_RETRY_MS = 200L
+    }
+
+    fun ensureReadyResult(requireHealthProbe: Boolean = false): VirtualSpaceReadinessResult {
+        val mode = capabilityRegistry.currentStrategy().selection.effectiveMode
+            ?: return failed(
+                status = VirtualSpaceReadinessStatus.DISPLAY_MISSING,
+                displayId = null,
+                message = "Virtual space requires a selected runtime mode."
+            )
+        val existing = capabilityRegistry.getVirtualDisplayId()
+        if (existing != null && virtualSpaceManager.hasLiveSessionForMode(mode)) {
+            // 只有显式要求(创建/设置页自检)才跑健康探活——它会在虚拟屏上启动探针 Activity。
+            // 每个动作回合都调本方法；若这里因健康标记未 ready 就重跑探活，会把已打开的目标 App
+            // 反复盖成 Droidance 探针页(observe 里 pkg=com.droidance.debug)，导致"开了应用却无法操作"。
+            // display 已存在且 active 时直接复用，健康检查只在创建时做一次。
+            if (requireHealthProbe) {
+                return runHealthProbe(existing, mode)
+            }
+            return VirtualSpaceReadinessResult(
+                status = VirtualSpaceReadinessStatus.READY,
+                displayId = existing,
+                message = "Virtual space is ready on displayId=$existing."
+            )
+        }
+        if (existing != null) {
+            debugLogManager.appendEvent(
+                "Virtual space stale sidecar session discarded before task entry: displayId=$existing mode=${mode.name}"
+            )
+            virtualSpaceManager.discardStaleSession(
+                "stale sidecar session discarded before task entry"
+            )
+        }
+        val started = virtualSpaceManager.start(mode)
+        if (started != null) {
+            val probe = runHealthProbe(started, mode)
+            if (!probe.ready) return probe
+            if (probe.status == VirtualSpaceReadinessStatus.FRAME_PENDING) return probe
+            return VirtualSpaceReadinessResult(
+                status = VirtualSpaceReadinessStatus.READY,
+                displayId = started,
+                message = "Virtual space started and verified on displayId=$started."
+            )
+        }
+        val reason = virtualSpaceManager.lastFailureReason()
+            .ifBlank { "Virtual space is selected, but no virtual displayId is available." }
+        capabilityRegistry.markVirtualSpaceHealthFailed(reason)
+        return VirtualSpaceReadinessResult(
+            status = VirtualSpaceReadinessStatus.DISPLAY_MISSING,
+            displayId = null,
+            message = reason
+        )
+    }
+
+    fun probeReadyResult(): VirtualSpaceReadinessResult = ensureReadyResult(requireHealthProbe = true)
+
+    private fun runHealthProbe(displayId: Int, mode: RuntimeMode): VirtualSpaceReadinessResult {
+        VirtualSpaceProbeLanding.displayId = null
+        val launch = sidecarBridge.launchActivity(displayId, probeComponentName(), mode)
+        if (!launch.ok) {
+            return failed(
+                status = VirtualSpaceReadinessStatus.LAUNCH_FAILED,
+                displayId = displayId,
+                message = "[VIRTUAL_SPACE_LAUNCH_FAILED] ${launch.detail.ifBlank { "probe launch failed" }}"
+            )
+        }
+        val frameFailure = waitForNonBlackFrame(displayId, mode)
+        // 黑帧/无帧时附上探针实际落点：区分"被重定向主屏"和"虚拟屏渲染黑帧"两类真因
+        if (frameFailure != null) {
+            val (status, reason) = frameFailure
+            if (
+                status == VirtualSpaceReadinessStatus.FRAME_FAILED &&
+                VirtualSpaceProbeLanding.displayId == displayId
+            ) {
+                capabilityRegistry.markVirtualSpaceHealthReady(displayId)
+                debugLogManager.appendEvent(
+                    "virtual_space: probe reached the target display; first frame is pending displayId=$displayId"
+                )
+                VirtualSpaceProbeLanding.finishActive()
+                return VirtualSpaceReadinessResult(
+                    status = VirtualSpaceReadinessStatus.FRAME_PENDING,
+                    displayId = displayId,
+                    message = "[VIRTUAL_SPACE_FRAME_PENDING] Probe reached displayId=$displayId; " +
+                        "the first render is still pending and will be verified after target launch."
+                )
+            }
+            return failed(
+                status = status,
+                displayId = displayId,
+                message = "$reason; ${VirtualSpaceProbeLanding.describe(displayId)}"
+            )
+        }
+        // 帧可用（非黑帧）才是"能看屏幕"的真正门槛，据此标记就绪。
+        // 输入探针只做尽力而为的通道预热，不再作为就绪硬门槛：探针 Activity 刚渲染出帧、但目标窗口的
+        // input channel 尚未在 InputDispatcher 注册好的瞬间，injectInputEvent 会假阴性返回 false；而真实
+        // 操作发生在几秒后、目标 App 窗口获焦时，注入其实是通的（injectInputEvent 自带有界重试会自愈）。
+        // 之前把这段启动瞬间的假阴性判成"通道死亡"，会让门禁误报 missing=screen_frame，把帧其实可用、
+        // 真机能操作的任务在门口零操作杀掉（真机日志实证：tap probe failed → 整个设备任务直接失败）。
+        capabilityRegistry.markVirtualSpaceHealthReady(displayId)
+        warmUpInputChannel(displayId, mode)
+        // 自检做完立刻销毁探针 Activity，避免白屏残留并覆盖目标 App 的首帧。
+        VirtualSpaceProbeLanding.finishActive()
+        return VirtualSpaceReadinessResult(
+            status = VirtualSpaceReadinessStatus.READY,
+            displayId = displayId,
+            message = "Virtual space is ready on displayId=$displayId."
+        )
+    }
+
+    /**
+     * 尽力而为地用点击预热输入通道；失败不致命，真实操作时注入会自愈。
+     */
+    private fun warmUpInputChannel(displayId: Int, mode: RuntimeMode) {
+        repeat(INPUT_PROBE_ATTEMPTS) { attempt ->
+            val tap = sidecarBridge.injectNative(displayId, "tap 16 16", mode)
+            if (tap.ok) return
+            if (attempt < INPUT_PROBE_ATTEMPTS - 1) Thread.sleep(INPUT_PROBE_RETRY_MS)
+        }
+        debugLogManager.appendEvent(
+            "virtual_space: input warm-up was not confirmed; runtime injection may recover displayId=$displayId"
+        )
+    }
+
+    /** 帧探测通过返回 null；失败返回 (状态, 原因)，由调用方补充落点诊断后统一 failed()。 */
+    private fun waitForNonBlackFrame(displayId: Int, mode: RuntimeMode): Pair<VirtualSpaceReadinessStatus, String>? {
+        val deadline = System.currentTimeMillis() + virtualSpaceRuntimePolicy.renderWaitTimeoutMs()
+        var lastReason = "[VIRTUAL_SPACE_FRAME_FAILED] no probe frame returned for displayId=$displayId"
+        while (System.currentTimeMillis() < deadline) {
+            val bytes = sidecarBridge.captureLatestPng(displayId, mode = mode)
+            if (bytes != null) {
+                val blackFrame = virtualSpaceRuntimePolicy.checkBlackFrame(bytes)
+                if (!blackFrame.isBlack) return null
+                lastReason = virtualSpaceRuntimePolicy.emptyFrameFailure()
+            }
+            Thread.sleep(virtualSpaceRuntimePolicy.renderWaitPollMs())
+        }
+        val status = if (lastReason.startsWith(VirtualSpaceRuntimePolicy.EMPTY_FRAME_MARKER)) {
+            VirtualSpaceReadinessStatus.BLACK_FRAME
+        } else {
+            VirtualSpaceReadinessStatus.FRAME_FAILED
+        }
+        return status to lastReason
+    }
+
+    private fun failed(
+        status: VirtualSpaceReadinessStatus,
+        displayId: Int?,
+        message: String
+    ): VirtualSpaceReadinessResult {
+        capabilityRegistry.markVirtualSpaceHealthFailed(message)
+        // 真因落盘：之前探活失败只在设置页一闪而过，debug 包里看不到卡在哪一步
+        debugLogManager.appendEvent("virtual_space: readiness probe failed [$status] $message")
+        // 失败路径也要销毁探针（落点诊断已在上游读过静态字段），避免它作为白屏残留到下次任务
+        VirtualSpaceProbeLanding.finishActive()
+        return VirtualSpaceReadinessResult(status = status, displayId = displayId, message = message)
+    }
+
+    private fun probeComponentName(): String =
+        ComponentName(context.packageName, VirtualSpaceProbeActivity::class.java.name).flattenToString()
+}
+
+data class VirtualSpaceReadinessResult(
+    val status: VirtualSpaceReadinessStatus,
+    val displayId: Int?,
+    val message: String
+) {
+    val ready: Boolean
+        get() = (
+            status == VirtualSpaceReadinessStatus.READY ||
+                status == VirtualSpaceReadinessStatus.FRAME_PENDING
+            ) && displayId != null
+}
+
+enum class VirtualSpaceReadinessStatus {
+    READY,
+    FRAME_PENDING,
+    DISPLAY_MISSING,
+    LAUNCH_FAILED,
+    FRAME_FAILED,
+    BLACK_FRAME,
+    INPUT_FAILED,
+    TEXT_INPUT_FAILED
+}

@@ -1,0 +1,101 @@
+// SPDX-FileCopyrightText: 2026 YBBLab
+// SPDX-License-Identifier: Apache-2.0
+
+package com.droidance.ui.connection
+
+import com.droidance.core.device.air.AirModePairingManager.PairingState
+
+internal enum class DeviceConnectionAction { PAIR, WIRELESS_SETTINGS, WIFI_SETTINGS, RETRY, WAIT }
+
+internal enum class DeviceConnectionStatus(
+    val action: DeviceConnectionAction = DeviceConnectionAction.WAIT,
+    val needsAttention: Boolean = false
+) {
+    CHECKING,
+    READY,
+    RECONNECTING,
+    PAIRING(DeviceConnectionAction.PAIR),
+    UNPAIRED(DeviceConnectionAction.PAIR, true),
+    PAIRING_REQUIRED(DeviceConnectionAction.PAIR, true),
+    WIFI_UNAVAILABLE(DeviceConnectionAction.WIFI_SETTINGS, true),
+    WIRELESS_DISABLED(DeviceConnectionAction.WIRELESS_SETTINGS, true),
+    UNAVAILABLE(DeviceConnectionAction.RETRY, true)
+}
+
+internal data class DeviceConnectionSnapshot(
+    val transportAvailable: Boolean,
+    val pairingState: PairingState,
+    val previouslyPaired: Boolean,
+    val pairingRequired: Boolean,
+    val wifiAvailable: Boolean?,
+    val wirelessDebuggingEnabled: Boolean?,
+    val connectionFailed: Boolean
+) {
+    fun status(): DeviceConnectionStatus = when {
+        // A resident Binder can remain usable after Wi-Fi or the live ADB shell disappears.
+        transportAvailable -> DeviceConnectionStatus.READY
+        pairingState in setOf(PairingState.DISCOVERING, PairingState.AWAITING_CODE, PairingState.PAIRING) ->
+            DeviceConnectionStatus.PAIRING
+        pairingRequired -> DeviceConnectionStatus.PAIRING_REQUIRED
+        !previouslyPaired -> DeviceConnectionStatus.UNPAIRED
+        wifiAvailable == null -> DeviceConnectionStatus.CHECKING
+        wifiAvailable == false -> DeviceConnectionStatus.WIFI_UNAVAILABLE
+        wirelessDebuggingEnabled == false -> DeviceConnectionStatus.WIRELESS_DISABLED
+        connectionFailed -> DeviceConnectionStatus.UNAVAILABLE
+        pairingState == PairingState.CONNECTING -> DeviceConnectionStatus.RECONNECTING
+        else -> DeviceConnectionStatus.UNAVAILABLE
+    }
+}
+
+/** One prompt per outage, shared across navigation by the app-level ViewModel. */
+internal data class DeviceConnectionUiState(
+    val status: DeviceConnectionStatus = DeviceConnectionStatus.CHECKING,
+    val dialogVisible: Boolean = false,
+    val prompted: Boolean = false,
+    private val pendingStatus: DeviceConnectionStatus? = null,
+    private val pendingSinceMs: Long = 0L
+) {
+    companion object {
+        const val FAILURE_CONFIRMATION_MS = 5_000L
+    }
+
+    val noticeVisible: Boolean
+        get() = status != DeviceConnectionStatus.CHECKING && status != DeviceConnectionStatus.READY
+
+    /** Only consecutive foreground observations can confirm a failure. Recovery is immediate. */
+    fun observe(next: DeviceConnectionStatus, nowMs: Long): DeviceConnectionUiState {
+        if (next == DeviceConnectionStatus.READY) return DeviceConnectionUiState(next)
+        val sinceMs = if (pendingStatus == next) pendingSinceMs else nowMs
+        if (next.needsAttention && nowMs - sinceMs < FAILURE_CONFIRMATION_MS) {
+            return copy(
+                status = DeviceConnectionStatus.CHECKING,
+                dialogVisible = false,
+                pendingStatus = next,
+                pendingSinceMs = sinceMs
+            )
+        }
+        return copy(
+            status = next,
+            dialogVisible = when {
+                next == DeviceConnectionStatus.CHECKING -> false
+                next != status && !next.needsAttention -> false
+                else -> dialogVisible || (next.needsAttention && !prompted)
+            },
+            prompted = prompted || next.needsAttention,
+            pendingStatus = next.takeIf { it.needsAttention },
+            pendingSinceMs = if (next.needsAttention) sinceMs else 0L
+        )
+    }
+
+    fun checking(): DeviceConnectionUiState = copy(
+        status = DeviceConnectionStatus.CHECKING,
+        dialogVisible = false,
+        pendingStatus = null,
+        pendingSinceMs = 0L
+    )
+
+    fun dismiss(): DeviceConnectionUiState = copy(dialogVisible = false, prompted = true)
+
+    fun showDetails(): DeviceConnectionUiState =
+        if (noticeVisible) copy(dialogVisible = true, prompted = true) else this
+}

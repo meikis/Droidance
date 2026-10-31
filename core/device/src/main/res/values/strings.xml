@@ -1,0 +1,41 @@
+<!--
+  SPDX-FileCopyrightText: 2026 YBBLab
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="settings_air_notification_channel">Wireless debugging pairing</string>
+    <string name="settings_air_notification_input_label">Enter 6-digit pairing code</string>
+    <string name="settings_air_notification_action">Enter code</string>
+    <string name="settings_air_notification_title">Enter wireless debugging pairing code</string>
+    <string name="settings_air_notification_text">Keep the system pairing dialog open and enter the 6-digit code here.</string>
+    <string name="settings_air_notification_submitted_title">Pairing code received</string>
+    <string name="settings_air_notification_submitted_text">Submitting the pairing code to the system pairing service. Keep this screen open.</string>
+    <string name="settings_air_notification_waiting_text">Pairing code received. Waiting for the wireless debugging pairing port.</string>
+    <string name="settings_air_notification_succeeded_title">Pairing succeeded</string>
+    <string name="settings_air_notification_succeeded_text">Wireless debugging pairing is complete.</string>
+    <string name="settings_air_notification_failed_title">Wireless debugging pairing did not finish</string>
+    <string name="settings_air_notification_connection_failed_title">Wireless debugging connection failed</string>
+    <string name="settings_air_notification_pairing_required_title">Droidance needs to pair again</string>
+    <string name="settings_air_notification_pairing_required_text">The current ADB pairing authorization is no longer accepted. Tap to open Developer options, then pair again from Wireless debugging.</string>
+    <string name="settings_air_notification_invalid_code_text">The pairing code must be 6 digits. Please enter it again.</string>
+    <string name="settings_air_notification_unavailable_text">No active pairing request is available. Open wireless debugging settings again and enter the system pairing dialog.</string>
+    <string name="settings_air_notification_permission_required">Allow Droidance notifications before entering the pairing code from the notification shade.</string>
+    <string name="settings_air_notifications_disabled">Droidance notifications are disabled. Enable them in system settings first.</string>
+    <string name="settings_air_notification_channel_disabled">The Wireless debugging pairing notification category cannot pop up. Enable alerts for it in system settings first.</string>
+    <string name="settings_air_notification_post_failed">The pairing notification could not be posted. Check system notification settings and try again.</string>
+    <string name="settings_air_pairing_required_detail">Android rejected the current ADB pairing key. Open Wireless debugging › Pair device with pairing code and pair again.</string>
+    <string name="settings_air_wifi_unavailable_detail">No Wi-Fi transport is available. Pairing is still valid, and Droidance will retry when Wi-Fi returns.</string>
+    <string name="settings_air_pairing_service_not_found">No pairing service was found. Make sure Wireless debugging is on and open "Pair device with pairing code".</string>
+    <string name="settings_air_pairing_timeout">Pairing timed out. Reopen the system pairing dialog to get a new code.</string>
+    <string name="settings_air_pairing_rejected">Android rejected the pairing. Get a new pairing code and try again.</string>
+    <string name="settings_air_pairing_connection_failed">Could not connect to the system pairing service. Get a new pairing code and try again.</string>
+    <string name="settings_air_adb_health_check_failed">The wireless ADB bridge health check failed. Try again shortly.</string>
+    <string name="settings_air_adb_health_response_missing">The wireless ADB bridge did not return a valid response. Try again shortly.</string>
+    <string name="settings_air_adb_identity_check_failed">Could not verify the wireless ADB shell identity. Try again shortly.</string>
+    <string name="settings_air_adb_identity_response_missing">The wireless ADB shell identity response was invalid. Try again shortly.</string>
+    <string name="settings_air_adb_connection_failed">The wireless ADB connection failed. Make sure Wireless debugging is still on.</string>
+    <string name="settings_air_adb_endpoint_not_found">No wireless ADB endpoint was found. Make sure Wireless debugging is on.</string>
+    <string name="runtime_air_channel_lost_title">Standard control channel disconnected</string>
+    <string name="runtime_air_channel_lost_text">Open Droidance to check the connection, and enable Wi-Fi and wireless debugging. Pair again if authorization has expired.</string>
+</resources>

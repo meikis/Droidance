@@ -1,0 +1,78 @@
+Droidance
+Copyright 2026 YBBLab and Droidance contributors
+
+This product includes software developed by YBBLab and Droidance contributors.
+Project maintained by YBBLab.
+Project source: https://github.com/YbbLab/Droidance
+
+========================================================================
+Third-Party Software Attributions
+========================================================================
+
+1. Shizuku (moe.shizuku.manager.adb / libadb.so)
+   - JNI source: https://github.com/RikkaApps/Shizuku/tree/2650830c5b099ae0dd34fedf614d4f592ca05d65
+   - JNI license: Apache License 2.0; used for wireless ADB pairing.
+   - Statically linked BoringSSL source: https://github.com/google/boringssl/tree/571a7432a19592c620fa316abde47770dad4f82b
+   - BoringSSL retains its OpenSSL, original SSLeay, ISC and fiat-crypto MIT terms.
+     This product includes software developed by the OpenSSL Project for use in
+     the OpenSSL Toolkit (https://www.openssl.org/), and cryptographic software
+     written by Eric Young (eay@cryptsoft.com).
+   - Complete upstream and nested Fiat licenses, source/dependency and assembly
+     generator notices, acknowledgments and
+     the NDK runtime notice are bundled under assets/licenses/libadb/.
+   - The fixed source/build recipe and binary identities are recorded in
+     third_party/libadb/source.lock.json and third_party/libadb/provenance.json.
+     The six JNI registrations and `moe.shizuku.manager.adb.PairingContext`
+     identity are preserved.
+
+2. Android Open Source Project (AOSP) & AndroidX Libraries
+   - Copyright (C) The Android Open Source Project
+   - License: Apache License 2.0
+
+3. Kotlin & Kotlinx Coroutines / Serialization
+   - Copyright 2010-2026 JetBrains s.r.o. and Kotlin Programming Language contributors.
+   - License: Apache License 2.0
+
+4. OkHttp
+   - Copyright 2019 Square, Inc.
+   - License: Apache License 2.0
+
+5. Mozilla Rhino 1.8.0
+   - Source: https://github.com/mozilla/rhino/tree/Rhino1_8_0_Release
+   - License: Mozilla Public License 2.0 (MPL-2.0)
+   - Unmodified JavaScript interpreter, running in an isolated Android worker.
+   - Upstream source and license: https://github.com/mozilla/rhino
+
+6. dadb 1.2.7
+   - Source: https://github.com/mobile-dev-inc/dadb
+   - License: Apache License 2.0
+   - Used for the Android Debug Bridge transport.
+
+7. JetBrains Markdown, SnakeYAML Engine, Coil and Markdown Renderer
+   - Sources: https://github.com/JetBrains/markdown
+              https://bitbucket.org/snakeyaml/snakeyaml-engine
+              https://github.com/coil-kt/coil
+              https://github.com/mikepenz/multiplatform-markdown-renderer
+   - License: Apache License 2.0
+
+8. Dagger / Hilt and Javax Inject
+   - Sources: https://github.com/google/dagger
+              https://github.com/javax-inject/javax-inject
+   - License: Apache License 2.0
+
+9. Lucide functional UI icons
+   - Source: https://github.com/lucide-icons/lucide/tree/1fae58d0a9c661a338036838caf3399b5507bab6/icons
+   - License: ISC; derived Feather icons retain their MIT attribution.
+   - Vector paths adapted to a shared 1.5-unit stroke for Droidance.
+   - Full upstream license is bundled under assets/licenses/lucide-LICENSE.txt.
+
+10. Lobe Icons 1.93.0 provider brand icons
+   - Source: https://github.com/lobehub/lobe-icons
+   - License: MIT
+   - Full license is bundled under assets/licenses/lobe-icons-MIT-1.93.0.txt.
+   - Brand names and logos remain trademarks of their respective owners.
+
+This notice is an attribution summary, not a complete transitive dependency
+license inventory. Current component versions, project-produced artwork,
+removed components and distribution review boundaries are recorded in
+docs/THIRD_PARTY.md. Historical release obligations remain with each release.

@@ -1,0 +1,41 @@
+<!--
+  SPDX-FileCopyrightText: 2026 YBBLab
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<resources>
+    <string name="settings_air_notification_channel">无线调试配对</string>
+    <string name="settings_air_notification_input_label">输入 6 位配对码</string>
+    <string name="settings_air_notification_action">输入配对码</string>
+    <string name="settings_air_notification_title">输入无线调试配对码</string>
+    <string name="settings_air_notification_text">保持系统配对弹窗打开，在此输入 6 位码。</string>
+    <string name="settings_air_notification_submitted_title">已收到配对码</string>
+    <string name="settings_air_notification_submitted_text">正在向系统配对服务提交配对码，请保持当前页面不动。</string>
+    <string name="settings_air_notification_waiting_text">配对码已收到，正在等待无线调试配对端口。</string>
+    <string name="settings_air_notification_succeeded_title">配对成功</string>
+    <string name="settings_air_notification_succeeded_text">无线调试配对已完成。</string>
+    <string name="settings_air_notification_failed_title">无线调试配对未完成</string>
+    <string name="settings_air_notification_connection_failed_title">无线调试通道连接失败</string>
+    <string name="settings_air_notification_pairing_required_title">Droidance 需要重新配对</string>
+    <string name="settings_air_notification_pairing_required_text">当前 ADB 配对授权已失效。点此打开开发者选项，然后进入无线调试重新配对。</string>
+    <string name="settings_air_notification_invalid_code_text">配对码必须是 6 位数字，请重新输入。</string>
+    <string name="settings_air_notification_unavailable_text">当前没有可用的配对请求，请重新打开无线调试设置并进入系统配对弹窗。</string>
+    <string name="settings_air_notification_permission_required">需要先允许 Droidance 发送通知，才能从通知栏输入配对码。</string>
+    <string name="settings_air_notifications_disabled">Droidance 通知已关闭，请先在系统设置中开启。</string>
+    <string name="settings_air_notification_channel_disabled">“无线调试配对”通知类别未允许弹出，请先在系统设置中开启提醒。</string>
+    <string name="settings_air_notification_post_failed">配对通知发送失败，请检查系统通知设置后重试。</string>
+    <string name="settings_air_pairing_required_detail">系统已拒绝当前 ADB 配对密钥。请重新进入“无线调试 › 使用配对码配对设备”完成配对。</string>
+    <string name="settings_air_wifi_unavailable_detail">当前没有可用的 Wi-Fi；配对仍然有效，连接会在 Wi-Fi 恢复后自动重试。</string>
+    <string name="settings_air_pairing_service_not_found">未发现配对服务。请确认无线调试已开启，并打开“使用配对码配对设备”。</string>
+    <string name="settings_air_pairing_timeout">配对已超时。请重新打开系统配对弹窗，获取新的配对码。</string>
+    <string name="settings_air_pairing_rejected">系统拒绝了配对。请获取新的配对码后重试。</string>
+    <string name="settings_air_pairing_connection_failed">无法连接系统配对服务。请获取新的配对码后重试。</string>
+    <string name="settings_air_adb_health_check_failed">无线 ADB 通道健康检查失败，请稍后重试。</string>
+    <string name="settings_air_adb_health_response_missing">无线 ADB 通道没有返回有效响应，请稍后重试。</string>
+    <string name="settings_air_adb_identity_check_failed">无法验证无线调试通道身份，请稍后重试。</string>
+    <string name="settings_air_adb_identity_response_missing">无线调试通道身份响应无效，请稍后重试。</string>
+    <string name="settings_air_adb_connection_failed">无线 ADB 连接失败，请确认无线调试仍已开启。</string>
+    <string name="settings_air_adb_endpoint_not_found">未找到可连接的无线 ADB 端口，请确认无线调试已开启。</string>
+    <string name="runtime_air_channel_lost_title">普通模式控制通道已断开</string>
+    <string name="runtime_air_channel_lost_text">请打开 Droidance 检查连接，并开启 Wi-Fi 和无线调试；若配对授权已失效，请重新配对。</string>
+</resources>

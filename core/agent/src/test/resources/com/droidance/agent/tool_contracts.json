@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "tool_contracts": {
+    "android_read": {
+      "binding": "DEVICE_BOUND",
+      "effect": "READ_ONLY",
+      "requires_result_before_action": true,
+      "grounds_completion": true,
+      "required_capability": "READ_DEVICE",
+      "label": "tool.android_read",
+      "category": "PRIMARY",
+      "result_image_role": "INPUT",
+      "sensitive_field_paths": [
+        "selection_args"
+      ]
+    },
+    "android_act": {
+      "binding": "DEVICE_BOUND",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "required_capability": "OPEN_APP",
+      "label": "tool.android_act",
+      "category": "PRIMARY",
+      "result_image_role": "BEFORE_AND_AFTER"
+    },
+    "shell": {
+      "binding": "DEVICE_BOUND",
+      "effect": "READ_ONLY",
+      "grounds_completion": true,
+      "required_capability": "RUN_SHELL",
+      "label": "tool.shell",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE",
+      "sensitive_field_paths": [
+        "argv"
+      ]
+    },
+    "screen_act": {
+      "binding": "DEVICE_BOUND",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "required_capability": "SCREEN_ACT_BATCH",
+      "label": "tool.screen_act",
+      "category": "PRIMARY",
+      "result_image_role": "BEFORE_AND_AFTER",
+      "sensitive_field_paths": [
+        "text",
+        "query"
+      ]
+    },
+    "screen_act_batch": {
+      "binding": "DEVICE_BOUND",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "required_capability": "SCREEN_ACT_BATCH",
+      "label": "tool.screen_act",
+      "category": "PRIMARY",
+      "result_image_role": "BEFORE_AND_AFTER",
+      "sensitive_field_paths": [
+        "actions"
+      ]
+    },
+    "wait": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "grounds_completion": false,
+      "label": "tool.wait",
+      "category": "SUPPORTING",
+      "result_image_role": "OUTPUT"
+    },
+    "ask_human": {
+      "binding": "TURN_LOCAL",
+      "effect": "USER_INTERVENTION",
+      "grounds_completion": false,
+      "label": "tool.ask_human",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "recall_skill": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "requires_result_before_action": true,
+      "grounds_completion": false,
+      "label": "tool.recall_skill",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "session_read": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "requires_result_before_action": true,
+      "grounds_completion": false,
+      "label": "tool.session_search",
+      "category": "SUPPORTING",
+      "result_image_role": "OUTPUT"
+    },
+    "session_search": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "requires_result_before_action": true,
+      "grounds_completion": false,
+      "label": "tool.session_search",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "save_skill": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.save_skill",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "read_skill_file": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "grounds_completion": false,
+      "label": "tool.recall_skill",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "skill_source": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "grounds_completion": false,
+      "label": "tool.recall_skill",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "task_memo": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.task_memo",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "report_result": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.report_result",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "experience": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.update_memory",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE",
+      "sensitive_field_paths": [
+        "source_quote",
+        "update"
+      ]
+    },
+    "update_memory": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.update_memory",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "verify_skill": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.verify_skill",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "run_skill": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.run_skill",
+      "category": "PRIMARY",
+      "result_image_role": "NONE"
+    },
+    "present_result_card": {
+      "binding": "TURN_LOCAL",
+      "effect": "COMPLETION",
+      "grounds_completion": false,
+      "label": "tool.present_result_card",
+      "category": "COMPLETION",
+      "result_image_role": "NONE"
+    },
+    "done": {
+      "binding": "TURN_LOCAL",
+      "effect": "COMPLETION",
+      "grounds_completion": false,
+      "label": "tool.done",
+      "category": "COMPLETION",
+      "result_image_role": "NONE"
+    },
+    "read_notifications": {
+      "binding": "TURN_LOCAL",
+      "effect": "READ_ONLY",
+      "grounds_completion": false,
+      "label": "tool.read_notifications",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "click_notification": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.click_notification",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "dismiss_notification": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.dismiss_notification",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "manage_app_takeover": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.manage_app_takeover",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE"
+    },
+    "program": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.program",
+      "category": "SUPPORTING",
+      "result_image_role": "OUTPUT",
+      "sensitive_field_paths": [
+        "code",
+        "text",
+        "stdin"
+      ]
+    },
+    "workspace": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": false,
+      "label": "tool.workspace",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE",
+      "sensitive_field_paths": [
+        "text"
+      ]
+    },
+    "automation": {
+      "binding": "TURN_LOCAL",
+      "effect": "STATE_CHANGING",
+      "grounds_completion": true,
+      "label": "tool.automation",
+      "category": "SUPPORTING",
+      "result_image_role": "NONE",
+      "sensitive_field_paths": [
+        "instruction"
+      ]
+    }
+  }
+}

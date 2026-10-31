@@ -1,0 +1,21 @@
+{
+  "verified_on": "2026-10-22",
+  "note": "Extra top-level fields added to a gateway's Responses requests. A request rejection that names a field disables the fields for that provider scope and retries once without them.",
+  "gateways": [
+    {
+      "hosts": [
+        "ark.cn-beijing.volces.com"
+      ],
+      "responses": {
+        "caching": {
+          "type": "enabled"
+        }
+      },
+      "source": "https://docs.volcengine.com/docs/ark/context-api",
+      "note": "Session cache: each round updates the cache and the next round continues from its previous_response_id. The coding/agent plan endpoints (/api/coding/v3) reject caching and do not store responses. Caching may require account enablement and is billed by stored tokens.",
+      "path_prefixes": [
+        "/api/v3"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 YBBLab
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<resources>
+    <color name="droidance_launch_background">#101010</color>
+</resources>

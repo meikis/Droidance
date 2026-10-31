@@ -1,0 +1,9 @@
+# Context compaction
+
+## execution_policy
+{"requestTimeoutMs":180000,"totalTimeoutMs":600000,"requestRetries":2,"maxOutputTokens":4096,"retryMaxOutputTokens":8192,"chunkInputTokens":24000,"maxSoftDeferrals":1,"deferralHeadroomTokens":4096}
+
+## contract
+When the complete parent request fits with the summary output reserve, fork it with the same system instructions, tool definitions and retained messages, then append the summary instruction. This is a read-only continuation of the same Agent; tool calls in this branch are rejected without execution. Only oversized sources use bounded source chunks. A committed checkpoint starts a new conversation prefix.
+
+Summary requests have an output reserve and bounded input chunk size. Each summary request has a three-minute deadline; all summary chunks and retries share a ten-minute total budget, further bounded by the remaining task budget. Parent cancellation still applies. Continuing reasoning does not trigger a separate first-output deadline. Output-limit truncation discards the partial summary and may increase the output allowance up to the configured ceiling within the same retry and total-time budgets. Exhaustion uses the same bounded deferral or incomplete-task outcome as an unavailable summary; it is not an internal runtime error. A request retry performs only summarization, never device actions. Keep all source events and the previous checkpoint until the complete summary fits and a new checkpoint commits atomically. At the early trigger, a transient summary request failure may defer once only while the current request still has the configured headroom below its usable input limit. At the hard limit, do not continue normal model requests without successful compaction. Cancellation propagates to the owning task; corrupt evidence or failed persistence must not be treated as a transient network error.

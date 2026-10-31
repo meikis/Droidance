@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 YBBLab
+# SPDX-License-Identifier: Apache-2.0
+
+schema_version: 1
+
+communication_contract:
+  screen_evidence_parameter: "Optional record deltas: stable record_id and fields keyed by name, each with string value and exact supplied source_ref. uncertainties is beside fields. Rejection does not block the device call; see collection contract."
+  evidence_refs_parameter: >-
+    Optional array of exact original tool/source reference strings supporting this entry. Omit when citations are unnecessary. Copy actual references rather than inventing them; workspace hashes identify files, not independent factual sources.
+  terminal_observation_ref_parameter: >-
+    Optional exact reference to the current observed frame. The runtime already tracks which frame reached the Agent; copying this ID is not required.
+
+messages:
+  max_device_task_wall_stop: >-
+    The active device execution reached its configured time budget after {seconds} seconds without verified completion.
+  manual_takeover_resumed: >-
+    [MANUAL_TAKEOVER_RESUMED] The user completed manual takeover. Pre-pause actions were discarded, a fresh current screen is attached, and the original task remains unfinished.
+  user_intervention_invalid_request: "The task is paused because a human takeover request could not be completed. Please take over and explicitly resume when ready."
+  user_intervention_not_paused: >-
+    [USER_INTERVENTION_PROTOCOL_ERROR] The user-intervention tool completed without entering the required paused state; device execution is stopped.
+  completion_protocol_unconfirmed: >-
+    Completion could not be confirmed because the final response did not satisfy the completion protocol. Earlier actions and the candidate response remain in the task history; they have not been marked as verified completion.
+  context_compaction_unavailable: >-
+    Context summarization could not finish within its retry and time budget. Execution has stopped before completion was confirmed. Earlier actions, evidence and the previous context checkpoint remain preserved.
+  context_checkpoint_failed: 'The local context checkpoint could not be persisted ({error}); the task stopped to preserve the durable event history.'
+  turn_canceled: '[TURN_CANCELED] The active device tool was canceled with the surrounding turn.'
+  empty_final_response: >-
+    Return either the next tool action or a non-empty final answer grounded in the current task evidence.
+  terminal_protocol_error: >-
+    The model response did not provide a valid public terminal result.
+  channel_unavailable_hint: >-
+    Device input or screenshot channel is unavailable.
+  channel_unavailable_stop: >-
+    Device channel is unavailable; user takeover is required.
+  model_timeout: >-
+    The model response timed out before the turn could finish.
+  context_limit_exceeded: >-
+    [CONTEXT_LIMIT_EXCEEDED] The protected task state, current evidence, tool schema, and current observation exceed the model context window. Stop this turn without dropping the latest closed evidence.
+  working_memory_action_line: '- R{round} {tool}({args}) -> {outcome}'
+  virtual_space_empty_frame_guidance: >-
+    The virtual display has no renderable content yet.

@@ -1,0 +1,32 @@
+# Gradle / build output
+.gradle/
+.kotlin/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local machine configuration
+local.properties
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+.env
+.env.*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS / tooling
+.DS_Store
+.claude/
+__pycache__/
+*.pyc
+
+# Debug exports and captures
+*.hprof
+captures/

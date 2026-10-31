@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "ndk_revision": "29.0.14206865",
+  "cmake_revision": "3.22.1",
+  "abis": [
+    "arm64-v8a",
+    "armeabi-v7a",
+    "x86_64"
+  ],
+  "source_date_epoch": 1748165667,
+  "sources": {
+    "shizuku": {
+      "repository": "https://github.com/RikkaApps/Shizuku",
+      "commit": "2650830c5b099ae0dd34fedf614d4f592ca05d65",
+      "url": "https://codeload.github.com/RikkaApps/Shizuku/zip/2650830c5b099ae0dd34fedf614d4f592ca05d65",
+      "archive_root": "Shizuku-2650830c5b099ae0dd34fedf614d4f592ca05d65",
+      "bytes": 542693,
+      "sha256": "f5876e286aee4cefe598e53c48660deca275b188f7f14c5d9a32a07733e4ada1"
+    },
+    "boringssl": {
+      "repository": "https://github.com/google/boringssl",
+      "commit": "571a7432a19592c620fa316abde47770dad4f82b",
+      "url": "https://codeload.github.com/google/boringssl/zip/571a7432a19592c620fa316abde47770dad4f82b",
+      "archive_root": "boringssl-571a7432a19592c620fa316abde47770dad4f82b",
+      "bytes": 49664697,
+      "sha256": "9acab9343a969c8ce5013a637624f5dc61273ef3adbabe8d067cf7ad4953fa42"
+    }
+  },
+  "license_assets": [
+    {
+      "source": "shizuku",
+      "source_path": "LICENSE",
+      "asset_name": "Shizuku-LICENSE.txt",
+      "bytes": 11357,
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+    },
+    {
+      "source": "boringssl",
+      "source_path": "LICENSE",
+      "asset_name": "BoringSSL-LICENSE.txt",
+      "bytes": 12534,
+      "sha256": "756a61a8300d105ae68e7f2993e27d41a765c946f3400422e2403b01e7ded527"
+    },
+    {
+      "source": "ndk",
+      "source_path": "toolchains/llvm/prebuilt/{host}/NOTICE",
+      "asset_name": "NDK-NOTICE.txt",
+      "bytes": 130424,
+      "sha256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1"
+    },
+    {
+      "source": "boringssl",
+      "source_path": "third_party/fiat/LICENSE",
+      "asset_name": "Fiat-LICENSE.txt",
+      "bytes": 1161,
+      "sha256": "43e358d7b6eb109d0f51f7b3a090fd82607965767c25fadee39e922475de2061"
+    }
+  ]
+}

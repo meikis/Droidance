@@ -1,0 +1,227 @@
+# SPDX-FileCopyrightText: 2026 YBBLab
+# SPDX-License-Identifier: Apache-2.0
+
+schema_version: 1
+
+runtime_thresholds:
+  channel_unavailable_stop_repeats: 1
+  frame_recovery_repeats: 2
+  # 0 = unlimited by default. A positive value applies only when the user explicitly
+  # configures task wall minutes in settings; the operator treats 0 as no wall-clock limit.
+  max_device_task_wall_ms: 0
+  # Check the single virtual display once per minute by default; a natural-language tool may override the interval for a selected app.
+  app_takeover_default_poll_ms: 60000
+  app_takeover_min_poll_ms: 5000
+  app_takeover_max_poll_ms: 86400000
+  # Notifications only wake the agent. Coalesce a short event burst before one serial task reads the full in-app context.
+  app_takeover_signal_debounce_ms: 1500
+  app_takeover_frame_signal_debounce_ms: 400
+  app_takeover_execution_retry_delay_ms: 3000
+  app_takeover_scheduler_max_sleep_ms: 60000
+  # Changes on the virtual display may wake the agent early; pixel changes are not evidence of a business message.
+  app_takeover_frame_poll_ms: 400
+  app_takeover_frame_stable_samples: 2
+  app_takeover_frame_wake_cooldown_ms: 2000
+  app_takeover_frame_pixel_delta: 18
+  app_takeover_frame_change_fraction: 0.001
+  app_takeover_frame_stable_fraction: 0.0005
+  app_takeover_display_keepalive_ms: 30000
+  manual_takeover_wait_timeout_ms: 0
+  manual_takeover_transition_debounce_ms: 1500
+  llm_transient_retry_limit: 2
+  llm_transient_retry_backoff_ms: 2000
+  # A decision and its transient retries share one monotonic recovery budget.
+  llm_recovery_timeout_ms: 600000
+  # Provider reasoning renews stream liveness. Only silence or the total request budget
+  # ends a request; a first-output deadline must not interrupt continuing reasoning.
+  # One minute of provider silence is treated as a stalled connection and retried, so a
+  # dropped stream does not hold the task for minutes.
+  llm_round_timeout_ms: 600000
+  llm_first_event_timeout_ms: 60000
+  llm_stream_idle_timeout_ms: 60000
+  llm_first_output_timeout_ms: 0
+  # Reserve space for reasoning and complete structured calls; the model may finish early.
+  # Observed rounds need at most about 3k reasoning and 3k output tokens; a larger budget only
+  # lets a runaway reasoning stream run longer. Truncation does not expand the budget, and a turn
+  # retries a truncated round at most llm_output_truncation_retries times.
+  llm_action_max_output_tokens: 12288
+  llm_retry_max_output_tokens: 12288
+  llm_output_truncation_retries: 1
+  # A single device tool cannot hold the turn indefinitely; cancellation is recorded as a
+  # terminal tool outcome and the next round can recover from the latest observation.
+  # Loading a network-backed app can legitimately exceed one interactive round. Keep the
+  # cancellation bounded, but long enough for a read-only wait_for_content call to observe the
+  # first settled result instead of being canceled at the same instant as its default timeout.
+  tool_execution_timeout_ms: 90000
+  # Allow a bounded startup window for the sidecar and Binder before freezing the task execution strategy.
+  task_entry_capability_wait_ms: 5000
+  # Wait for the virtual-display launcher to exit or settle before sending a Deep Link, so startup does not consume the route.
+  route_entry_settle_timeout_ms: 4000
+  # After an app launch, wait until the entry activity hands off or the frame is fully still,
+  # so splash, countdown and ad screens that resolve by themselves never reach a decision.
+  # A still or handed-off page returns early; 0 disables the wait.
+  app_launch_settle_timeout_ms: 6000
+  # Launch mode for the first plain app open of a package in one execution when the Agent omits
+  # launch_mode, so pages left by earlier tasks never become the starting state. Later opens of
+  # the same package resume, keeping pages this execution reached.
+  app_first_open_launch_mode: reset_task
+  # A batch that ends with its own settled capture publishes that frame as the round's
+  # observation instead of capturing again; pre-action checks still guard the next action.
+  post_action_reusable_frame_ttl_ms: 8000
+  # Token watermark for the active input budget. Reserve output and estimation margins before automatic model compaction.
+  context_budget_percent: 90
+  # Send the current frame plus requested sources/collection pages. Superseded navigation
+  # frames stay retrievable, without an automatic previous-frame attachment on every round.
+  context_recent_image_limit: 0
+  # Carry explicit screenshot history across model rounds, independently of batch boundaries.
+  # Bounds apply to retained model representations; current-call captures have their own budget.
+  # Every retained image is re-sent each round, so keep the working set small; facts already
+  # read belong in task_memo, and older captures stay retrievable by reference.
+  context_capture_history_max_images: 4
+  context_capture_history_max_bytes: 16777216
+  input_focus_probe_timeout_ms: 3000
+  foreground_package_cache_ttl_ms: 700
+  route_attestation_attempts: 4
+  route_attestation_delay_ms: 300
+  # After confirming a Deep Link target package, wait for a fresh frame rather than pairing an old frame with a new package.
+  # This is not semantic completion evidence. Observe the actual destination page next.
+  route_attestation_timeout_ms: 8000
+  # Pre-action pixel checks reject actions based on stale images if the sampled screen changed beyond threshold.
+  pre_action_observation_mode: enforce
+  pre_action_observation_sample_side: 64
+  pre_action_observation_pixel_delta: 8
+  pre_action_observation_change_fraction: 0.20
+  pre_action_target_radius: 40
+  # Before rejecting, consecutive live readings set aside samples that change on their own (playing video).
+  # The check is repeated on the samples that held still when at least this fraction of them did.
+  pre_action_motion_readings: 2
+  pre_action_motion_interval_ms: 150
+  pre_action_motion_min_still_fraction: 0.15
+  # A tap still rejected is judged once more without the samples in recurring motion across frames of
+  # the same surface spanning at least the minimum span: the interface laid over moving content stays in.
+  # The surface is sampled at the interval while the Agent decides, so these frames exist.
+  pre_action_stable_history_frames: 16
+  pre_action_stable_history_window_ms: 20000
+  pre_action_stable_history_min_span_ms: 2000
+  pre_action_stable_motion_changes: 2
+  pre_action_surface_sampling_interval_ms: 1000
+  # After a visit's BACK, a screen that changed less than this from the visit's own target capture is still on the target.
+  visit_return_change_fraction: 0.45
+  # One virtual-display observation includes backend work and decoding.
+
+observation_fingerprint:
+  # Tool receipts are not page content. Including them in screen fingerprints falsely indicates continuous changes.
+  # Keep these exclusions in configuration so they can evolve with receipt wording without changing Kotlin.
+  tool_receipt_markers:
+    - LOCAL_VALIDATION
+    - TEXT_INPUT
+    - INPUT_FOCUS
+    - PURE_VLM_SCREEN
+  # Normalize continuously changing text, such as clocks and countdowns, before comparing fingerprints.
+  volatile_text_pattern: '\d{1,2}:\d{2}(?::\d{2})?'
+  volatile_text_placeholder: '#t#'
+
+# OpenAI Responses computer_call can return several low-risk UI actions in one decision.
+# The harness keeps the whole batch inside the existing single device-action slot and stops
+# immediately when a sub-action is canceled, rejected, or cannot be verified.
+screen_action_batch:
+  enabled: true
+  allowed_operations:
+    - click
+    - type_text
+    - press_key
+    - scroll
+    - swipe
+    - drag
+    - path
+    - wait
+    - screenshot
+    - visit
+    - collect
+  # Wait intervals are bounded by this policy and are validated before any sub-action runs.
+  # Omitting ms uses the configured default_wait_ms.
+  default_wait_ms: 1000
+  min_wait_ms: 100
+  max_wait_ms: 5000
+  # Lets one batch follow a transition that plays for several seconds, such as captions
+  # sampled between waits; each single wait still stays within max_wait_ms.
+  max_total_wait_ms: 10000
+  # Per-model-response capture capacity, shared by all batches; not a model deadline.
+  max_capture_images: 10
+  # Aggregate native + model bytes for a capture batch, separate from each blob's 8 MiB read limit.
+  max_capture_bytes: 33554432
+  max_drag_repeat: 64
+memory_context:
+  experience_max_updates: 3
+  experience_max_chars: 12000
+  experience_context_items: 3
+  # Re-query methods when the observed foreground App changes; each recorded refresh replaces the memory context once.
+  experience_refresh_max: 2
+  # Lexical candidates reordered by query overlap plus recent Agent assessments (success adds, failure subtracts per use).
+  experience_rank_candidates: 50
+  experience_rank_success_weight: 2
+  experience_rank_failure_weight: 4
+  # Only stable user profile facts that remain useful across tasks enter every turn prefix.
+  # Load summaries for other profile facts, long-term memories and past tasks; the same Agent expands relevant entries.
+  core_profile_categories:
+    - identity
+    - communication
+    - language
+    - boundary
+    - preference
+    - personal_preference
+  core_profile_max_items: 8
+  related_memory_max_items: 6
+  summary_max_chars: 240
+  turn_index_max_chars: 2400
+  skill_catalog_max_chars: 8000
+  recall_detail_max_chars: 6000
+
+human_assistance:
+  observation_unavailable_diagnostics:
+    - OBSERVATION_UNAVAILABLE
+  allowed_boundary_types:
+    - live_verification
+    - secret_credential
+    - payment_authorization
+    - irreversible_confirmation
+    - user_judgment
+
+tool_safety:
+  confirmation_tools:
+    - send_sms
+    - make_call
+    - read_sms
+    - read_notifications
+    - set_alarm
+  shell_destructive_patterns:
+    - '(^|\s)rm\s+-'
+    - '(^|\s)rm\s+'
+    - '(^|\s)dd\s+'
+    - '(^|\s)mkfs(\s|$)'
+    - '(^|\s)reboot(\s|$)'
+    - '(^|\s)shutdown(\s|$)'
+    - '(^|\s)locksettings\s+'
+    - '(^|\s)pm\s+(uninstall|clear|disable|hide|suspend)\s+'
+    - '(^|\s)cmd\s+(appops|deviceidle|package)\s+.*\b(set|uninstall|clear|disable|suspend)\b'
+    - '(^|\s)content\s+(insert|update|delete)\s+'
+    - '(^|\s)(kill|pkill|killall)\s+'
+    - '(^|\s)(chmod|chown|mount|umount|setenforce|iptables)\s+'
+  shell_forbidden_patterns:
+    - 'uiautomator\s+dump'
+    - 'uiautomator\s+runtest'
+    - 'cat\s+/sdcard/ui'
+    # Simulated input bypasses the bound display, coordinate mapping and pre-action checks.
+    - '(^|[\s;&|(`])(cmd\s+)?input\s+(-d\s+\S+\s+)?(tap|swipe|draganddrop|press|roll|keyevent|keycombination|text|motionevent|touchscreen|touchpad|touchnavigation|mouse|keyboard|gamepad|joystick|stylus|dpad|trackball|rotaryencoder)\b'
+    - '(^|[\s;&|(`])sendevent\s+'
+
+vision_frame:
+  # Model representation only; immutable native originals remain available for crop/source reads.
+  max_long_edge: 1600
+  max_pixels: 5000000
+  jpeg_quality: 78
+virtual_space:
+  render_wait_timeout_ms: 3000
+  render_wait_poll_ms: 120
+  black_frame_mean_threshold: 8.0
+  black_frame_variance_threshold: 6.0

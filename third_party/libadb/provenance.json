@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "description": "Droidance libadb binaries built from the adjacent locked upstream sources and recipe.",
+  "recipe_input_sha256": {
+    "source.lock.json": "9705f7a3f49b96f0a34f9b832667b253832e05479dd745d729c04dfdeb0d0ce9",
+    "build_android.py": "de0771acff025418fa3ca3995b4ce41f8a005ca701f7d6d66d02b9ba23263301",
+    "CMakeLists.txt": "23fc35b33621046e2ae7397b995bf235693865fdffd50677d24218b1a7f39bfb"
+  },
+  "ndk_revision": "29.0.14206865",
+  "cmake_revision": "3.22.1",
+  "build_host": "darwin-x86_64",
+  "tool_sha256": {
+    "clang": "06f04f4211f423d368e060e8f9a6d05f38005ad399eb8e17b14c509d67376d76",
+    "cmake": "e46c7ffb232c25a43e130509368dd6b88f492f110ab6b44c69c639ac1ed8c8f6",
+    "ninja": "5b861a9e1e062ad8e01a1370f5909b36c086774899b4ac2029192744352404d0",
+    "strip": "af5d31dfee7cfc076d5850e1f407dfa74690b1e510dd2ccf5f7eb16d29edb9c8",
+    "readelf": "96d2f26d8528457d0edc7558f46033efb51098dc05093d7c35039d80544dcddd"
+  },
+  "libraries": {
+    "arm64-v8a": {
+      "bytes": 73424,
+      "sha256": "574ccf5dfa75f07a2e2b505e7a3c52277444e6be3b3257a76252f7278bbf2c1d"
+    },
+    "armeabi-v7a": {
+      "bytes": 63440,
+      "sha256": "baa51dd3a8f0dae422e520b575b9b6f6f7b570592daa04c24ff52f76e05e2fb5"
+    },
+    "x86_64": {
+      "bytes": 107648,
+      "sha256": "49e9fb3176386e32fb0a5aed9ac538236cac2053fa362067e63158f6d41baf68"
+    }
+  },
+  "license_output_sha256": {
+    "BoringSSL-LICENSE.txt": "756a61a8300d105ae68e7f2993e27d41a765c946f3400422e2403b01e7ded527",
+    "BoringSSL-source-notices.txt": "dd6ae2284734d7b27b922b0a4dc736d0596a187b0addc72b98f25f4eb403159b",
+    "Fiat-LICENSE.txt": "43e358d7b6eb109d0f51f7b3a090fd82607965767c25fadee39e922475de2061",
+    "NDK-NOTICE.txt": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+    "NOTICE.txt": "7a39a35892b9be4eea52469b9518aaf5ffd0713ab84e04829d7e0aafd9564b3c",
+    "Shizuku-LICENSE.txt": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+  },
+  "source_notice_summary": {
+    "compiled_sources": 360,
+    "dependency_sources": 577,
+    "generated_assembly_inputs": 116,
+    "dependencies_covered_by_fiat_license": 8,
+    "retained_notices": 512
+  },
+  "verification": "Source digest, JNI export, static linkage and 16 KB LOAD/RELRO checks passed; device acceptance is separate."
+}

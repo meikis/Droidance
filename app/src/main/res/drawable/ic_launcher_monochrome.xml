@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 YBBLab
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<!-- The same antenna, round ears, smiling eyes and small mouth in a themed icon mask. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.875" android:scaleY="0.875"
+        android:pivotX="54" android:pivotY="54">
+    <path android:fillColor="#000000" android:fillType="evenOdd"
+        android:pathData="M54,23.5 a5,5 0,1 1,0,10 a5,5 0,1 1,0,-10 Z
+            M52,32.5 L56,32.5 L56,36 L52,36 Z
+            M54,34 C36,34 27,44 27,58 C27,72 38,79 54,79 C70,79 81,72 81,58 C81,44 72,34 54,34 Z
+            M54,45 C40,45 34,50 34,60 C34,69 41,73 54,73 C67,73 74,69 74,60 C74,50 68,45 54,45 Z
+            M24,49 C21,49 20,52 20,58 C20,64 21,67 24,67 C27,67 28,64 28,58 C28,52 27,49 24,49 Z
+            M84,49 C81,49 80,52 80,58 C80,64 81,67 84,67 C87,67 88,64 88,58 C88,52 87,49 84,49 Z
+            M33,77 C29,77 27,80 27,83 C27,86 30,88 34,88 C38,88 40,86 40,83 C40,80 37,77 33,77 Z
+            M75,77 C71,77 68,80 68,83 C68,86 70,88 74,88 C78,88 81,86 81,83 C81,80 79,77 75,77 Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#000000"
+        android:strokeWidth="2.8" android:strokeLineCap="round"
+        android:pathData="M40,60 C40,53 48,53 48,60 M60,60 C60,53 68,53 68,60 M50,66 Q54,70 58,66" />
+    </group>
+</vector>
