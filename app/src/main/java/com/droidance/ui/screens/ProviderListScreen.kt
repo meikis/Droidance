@@ -139,7 +139,8 @@ fun ProviderListScreen(
                         onMakeDefault = { viewModel.makeDefault(config.id) },
                         onEdit = { onNavigateToEdit(config.id) },
                         onToggle = {
-                            if (!config.isEnabled && config.baseUrl.isBlank()) onNavigateToEdit(config.id)
+                            if (!config.isEnabled && (config.baseUrl.isBlank() || config.apiKey.isBlank() ||
+                                (config.models.isEmpty() && config.defaultModel.isBlank()))) onNavigateToEdit(config.id)
                             else viewModel.toggleProvider(config.id)
                         },
                         onDelete = { viewModel.deleteProvider(config.id) },

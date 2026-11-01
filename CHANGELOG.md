@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Added
+
+- Built-in cloud model provider presets with API addresses and protocols. Enter your own API key and model ID to enable a provider, or start from a custom endpoint. No model IDs or credentials are bundled in presets.
+
 ### Fixed
 
 - Screen capture, viewer mirroring and task takeover on Android 11–14: the sidecar now uses each release's platform APIs and reads the display stream where on-demand capture is unavailable.

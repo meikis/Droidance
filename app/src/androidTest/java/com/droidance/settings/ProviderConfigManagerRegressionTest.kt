@@ -12,6 +12,8 @@ import com.droidance.BuildConfig
 import com.droidance.core.model.llm.models.ApiType
 import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.core.model.llm.session.ModelTransport
+import com.droidance.ui.viewmodel.ProviderEditViewModel
+import com.droidance.ui.viewmodel.ProviderFormError
 import java.util.UUID
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -71,8 +73,76 @@ class ProviderConfigManagerRegressionTest {
     }
 
     @Test
-    fun freshInstallHasNoProviders() {
-        assertTrue(ProviderConfigManager(isolatedContext).getAllConfigs().isEmpty())
+    fun freshInstallSeedsDisabledPresetsOnlyOnce() {
+        val manager = ProviderConfigManager(isolatedContext)
+        assertEquals(manager.presets.map { it.createConfig() }, manager.getAllConfigs())
+        assertTrue(manager.getEnabledConfigs().isEmpty())
+        assertEquals(null, manager.getDefaultConfig())
+        assertTrue(manager.getAllConfigs().all { it.apiKey.isEmpty() && !it.isEnabled })
+        manager.deleteConfig(manager.getAllConfigs().first().id)
+        assertEquals(manager.getAllConfigs(), ProviderConfigManager(isolatedContext).getAllConfigs())
+    }
+
+    @Test
+    fun eachPresetRequiresAUserModelAndPreservesItsProtocolAcrossReloads() {
+        val manager = ProviderConfigManager(isolatedContext)
+        manager.presets.forEach { preset ->
+            val config = preset.createConfig()
+            val editor = ProviderEditViewModel(manager)
+            editor.loadProvider(config.id)
+            assertEquals(ProviderFormError.KEY_REQUIRED, editor.uiState.value.validationError)
+            editor.updateApiKey("test-key")
+            assertEquals(ProviderFormError.MODEL_REQUIRED, editor.uiState.value.validationError)
+            assertTrue(!editor.saveProvider())
+            assertEquals(config, manager.getConfig(config.id))
+            editor.updateModelInput("user-selected-model")
+            assertEquals(null, editor.uiState.value.validationError)
+            assertTrue(editor.saveProvider())
+            val saved = ProviderConfigManager(isolatedContext).getConfig(config.id)!!
+            assertEquals(config.copy(apiKey = "test-key", isEnabled = true,
+                models = listOf("user-selected-model"), defaultModel = "user-selected-model"), saved)
+            assertTrue(saved.isAvailableForRequests())
+            manager.setDefaultProvider(saved.id)
+            assertEquals(saved.id, ProviderConfigManager(isolatedContext).getDefaultConfig()?.id)
+        }
+    }
+
+    @Test
+    fun selectingANewTemplateClearsKeysAndSavingUsesItsTransport() {
+        val manager = ProviderConfigManager(isolatedContext)
+        val editor = ProviderEditViewModel(manager)
+        editor.loadProvider(null)
+        manager.presets.forEach { preset ->
+            editor.updateApiKey("previous-provider-key")
+            editor.selectPreset(preset.id)
+            assertEquals("", editor.uiState.value.apiKey)
+            assertEquals(preset.baseUrl, editor.uiState.value.baseUrl)
+            assertTrue(editor.uiState.value.models.isEmpty())
+            assertEquals("", editor.uiState.value.defaultModel)
+            editor.updateApiKey("new-provider-key")
+            editor.updateModelInput("user-selected-model")
+            assertTrue(editor.saveProvider())
+            val saved = manager.getAllConfigs().last()
+            assertEquals(preset.apiType, saved.apiType)
+            assertEquals(preset.transportKind, saved.resolvedTransportOrNull())
+            assertEquals("user-selected-model", saved.defaultModel)
+        }
+        editor.selectPreset(null)
+        assertEquals("", editor.uiState.value.name)
+        assertEquals("", editor.uiState.value.apiKey)
+        assertEquals(ModelTransport.GENERIC_CHAT_COMPLETIONS, editor.uiState.value.transportKind)
+    }
+
+    @Test
+    fun editingADisabledConfiguredProviderKeepsItDisabled() {
+        val manager = ProviderConfigManager(isolatedContext)
+        val configured = provider("disabled").copy(isEnabled = false)
+        manager.addConfig(configured)
+        val editor = ProviderEditViewModel(manager)
+        editor.loadProvider(configured.id)
+        editor.updateName("Renamed")
+        assertTrue(editor.saveProvider())
+        assertEquals(configured.copy(name = "Renamed"), manager.getConfig(configured.id))
     }
 
     @Test
@@ -96,9 +166,7 @@ class ProviderConfigManagerRegressionTest {
     @Test
     fun deletingLastProviderPersistsAcrossReconstruction() {
         val manager = ProviderConfigManager(isolatedContext)
-        val configured = provider("user")
-        manager.addConfig(configured)
-        manager.deleteConfig(configured.id)
+        manager.getAllConfigs().forEach { manager.deleteConfig(it.id) }
         assertTrue(ProviderConfigManager(isolatedContext).getAllConfigs().isEmpty())
     }
 

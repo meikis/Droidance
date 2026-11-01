@@ -311,6 +311,8 @@
     <string name="common_show">Show</string>
     <string name="common_hide">Hide</string>
     <string name="provider_title">AI model configuration</string>
+    <string name="provider_preset">Provider</string>
+    <string name="provider_preset_custom">Custom</string>
     <string name="provider_add">Add model</string>
     <string name="provider_empty">No AI models configured</string>
     <string name="provider_empty_hint">Tap + to add your first model</string>

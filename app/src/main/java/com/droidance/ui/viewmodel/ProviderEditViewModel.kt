@@ -26,6 +26,7 @@ class ProviderEditViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ProviderEditUiState())
     val uiState: StateFlow<ProviderEditUiState> = _uiState
+    val presets get() = configManager.presets
 
     private var loaded = false
     private var initialState = ProviderEditUiState()
@@ -49,11 +50,13 @@ class ProviderEditViewModel @Inject constructor(
                 ?: models.firstOrNull().orEmpty()
             _uiState.value = ProviderEditUiState(
                 name = config.name,
+                apiType = config.apiType,
+                transportKind = config.transportKind,
                 baseUrl = config.baseUrl,
                 apiKey = config.apiKey,
                 models = models,
                 defaultModel = defaultModel,
-                isEnabled = config.isEnabled,
+                isEnabled = config.isEnabled || config.apiKey.isBlank(),
                 reasoningPreference = config.reasoningPreference
             )
         } else {
@@ -66,6 +69,19 @@ class ProviderEditViewModel @Inject constructor(
     }
 
     // ====== 字段更新 ======
+
+    fun selectPreset(id: String?) {
+        if (editingId != null) return
+        val preset = id?.let { selected -> presets.firstOrNull { it.id == selected } ?: return }
+        // A key belongs to its endpoint; selecting another template always clears it.
+        _uiState.value = if (preset == null) ProviderEditUiState() else ProviderEditUiState(
+            presetId = preset.id,
+            name = preset.name,
+            baseUrl = preset.baseUrl,
+            apiType = preset.apiType,
+            transportKind = preset.transportKind
+        )
+    }
 
     fun updateName(name: String) {
         _uiState.update { it.copy(name = name) }
@@ -133,8 +149,8 @@ class ProviderEditViewModel @Inject constructor(
         val config = ProviderConfig(
             id = editingId ?: UUID.randomUUID().toString(),
             name = state.name.trim(),
-            apiType = existing?.apiType ?: ApiType.OPENAI_COMPATIBLE,
-            transportKind = existing?.transportKind ?: ModelTransport.GENERIC_CHAT_COMPLETIONS,
+            apiType = state.apiType,
+            transportKind = state.transportKind,
             transportDiagnostic = existing?.transportDiagnostic,
             baseUrl = state.baseUrl.trim(),
             apiKey = state.apiKey.trim(),
@@ -167,7 +183,10 @@ class ProviderEditViewModel @Inject constructor(
  * Provider 编辑页 UI 状态
  */
 data class ProviderEditUiState(
+    val presetId: String? = null,
     val name: String = "",
+    val apiType: ApiType = ApiType.OPENAI_COMPATIBLE,
+    val transportKind: ModelTransport? = ModelTransport.GENERIC_CHAT_COMPLETIONS,
     val baseUrl: String = "",
     val apiKey: String = "",
     val models: List<String> = emptyList(),

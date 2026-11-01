@@ -1,0 +1,156 @@
+[
+  {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "baseUrl": "https://api.openai.com/v1",
+    "apiType": "OPENAI_RESPONSES",
+    "transportKind": "OPENAI_RESPONSES"
+  },
+  {
+    "id": "gemini",
+    "name": "Google Gemini",
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "baseUrl": "https://api.deepseek.com",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "alibabacloud",
+    "name": "Alibaba Cloud",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "siliconflow",
+    "name": "SiliconFlow",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi",
+    "baseUrl": "https://api.moonshot.ai/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "zhipu",
+    "name": "Zhipu AI",
+    "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "minimax",
+    "name": "MiniMax",
+    "baseUrl": "https://api.minimax.io/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "xai",
+    "name": "xAI",
+    "baseUrl": "https://api.x.ai/v1",
+    "apiType": "OPENAI_RESPONSES",
+    "transportKind": "OPENAI_RESPONSES"
+  },
+  {
+    "id": "groq",
+    "name": "Groq",
+    "baseUrl": "https://api.groq.com/openai/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "mistral",
+    "name": "Mistral AI",
+    "baseUrl": "https://api.mistral.ai/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "volcengine",
+    "name": "Volcengine",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "hunyuan",
+    "name": "Tencent Hunyuan",
+    "baseUrl": "https://api.hunyuan.cloud.tencent.com/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "baidu",
+    "name": "Baidu Qianfan",
+    "baseUrl": "https://qianfan.baidubce.com/v2",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "stepfun",
+    "name": "StepFun",
+    "baseUrl": "https://api.stepfun.com/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "nvidia",
+    "name": "NVIDIA NIM",
+    "baseUrl": "https://integrate.api.nvidia.com/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "together",
+    "name": "Together AI",
+    "baseUrl": "https://api.together.ai/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "fireworks",
+    "name": "Fireworks AI",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "huggingface",
+    "name": "Hugging Face",
+    "baseUrl": "https://router.huggingface.co/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "modelscope",
+    "name": "ModelScope",
+    "baseUrl": "https://api-inference.modelscope.cn/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  },
+  {
+    "id": "novita",
+    "name": "Novita AI",
+    "baseUrl": "https://api.novita.ai/openai/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+  }
+]

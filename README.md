@@ -96,7 +96,7 @@ cd Droidance
 ./gradlew :app:assembleDebug
 ```
 
-请在 App 内添加模型服务商的服务地址、API Key 和模型；构建过程不会将本机 Key 注入 APK。
+选择内置服务商，填写 API 密钥和模型 ID 后保存即可启用。API 地址和协议已预填，不预置模型 ID；也可以添加自定义地址。已有配置会保留。接口地址与地域说明见[服务商预设](docs/MODEL_PROVIDER_PRESETS.md)。构建过程不会将本机 Key 注入 APK。
 
 完整的本地检查（架构、资源、单元测试、Lint 与 Debug APK）：
 

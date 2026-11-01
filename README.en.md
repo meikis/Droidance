@@ -96,7 +96,7 @@ cd Droidance
 ./gradlew :app:assembleDebug
 ```
 
-Add provider endpoints, API keys and models in the app. Builds do not embed local provider keys.
+Choose a built-in provider, enter your API key and model ID, and save to enable it. The API address and protocol are prefilled; no model IDs are preset. You can also add a custom endpoint. Existing configurations are preserved. See [provider presets](docs/MODEL_PROVIDER_PRESETS.md) for endpoints and regional scope. Builds do not embed local provider keys.
 
 Full local checks (architecture, resources, unit tests, lint and debug APK):
 

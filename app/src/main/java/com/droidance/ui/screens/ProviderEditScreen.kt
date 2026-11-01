@@ -165,6 +165,40 @@ fun ProviderEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (isNew) {
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = viewModel.presets.firstOrNull { it.id == uiState.presetId }?.name
+                            ?: stringResource(R.string.provider_preset_custom),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.provider_preset)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        shape = AppShapes.Control,
+                        colors = droidanceFieldColors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.provider_preset_custom)) },
+                            onClick = { viewModel.selectPreset(null); expanded = false }
+                        )
+                        viewModel.presets.forEach { preset ->
+                            DropdownMenuItem(
+                                text = { Text(preset.name) },
+                                onClick = { viewModel.selectPreset(preset.id); expanded = false }
+                            )
+                        }
+                    }
+                }
+            }
             // ====== Provider 名称 ======
             SectionField(label = stringResource(R.string.provider_name)) {
                 OutlinedTextField(

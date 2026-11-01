@@ -39,6 +39,12 @@ class ProviderConfigManager @Inject constructor(
     private val prefs = context.getSharedPreferences("droidance_providers", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
+    val presets: List<ProviderPreset> by lazy {
+        context.assets.open(ProviderPresetCatalog.ASSET_PATH).bufferedReader().use {
+            ProviderPresetCatalog.decode(it.readText())
+        }
+    }
+
     /** 内存缓存 */
     private var _configs = mutableListOf<ProviderConfig>()
     private var imageDetailCapabilities = mutableListOf<PersistedImageDetailCapability>()
@@ -293,7 +299,11 @@ class ProviderConfigManager @Inject constructor(
 
     private fun loadConfigs() {
         val rawConfigs = prefs.getString(PROVIDER_CONFIGS_KEY, null)
-        if (rawConfigs == null) return
+        if (rawConfigs == null) {
+            _configs = presets.map { it.createConfig() }.toMutableList()
+            saveConfigs()
+            return
+        }
 
         when (prefs.getInt(PROVIDER_CONFIG_SCHEMA_VERSION_KEY, 0)) {
             CURRENT_SCHEMA_VERSION -> {
