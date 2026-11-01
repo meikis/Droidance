@@ -217,12 +217,16 @@ class TextInputService(
         var focusRebinds = 0L
         // A tapped page can hand focus to its own input window after the outgoing window was
         // bound. Nothing was injected, so bind the identified window now holding focus on the same
-        // display once, within the same focus budget. Input without a causal tap never rebinds.
+        // display once, within the same focus budget. Input without a causal tap never rebinds,
+        // and focus that moved to another app or a system window is not that page's handoff.
         val tapCaused = expectedFocusTarget != null || focusPoint != null
         result.textInputEvidence?.takeIf { tapCaused && !it.focusConfirmed && !it.eventInjected }?.let {
-            val rebound = awaitFocus().target
+            val handoff = awaitFocus()
+            val rebound = handoff.target
             if (rebound != null && rebound != focusAfter && focusTargetId(rebound) != null &&
-                (deviceBackend.activeDisplayId ?: 0) == before.displayId) {
+                (deviceBackend.activeDisplayId ?: 0) == before.displayId &&
+                before.foregroundPackage != null &&
+                windowPackage(handoff.focusedWindowName) == before.foregroundPackage) {
                 focusAfter = rebound
                 focusRebinds = 1L
                 result = deviceBackend.typeText(text, clear, rebound, method, imePoint)
@@ -441,6 +445,9 @@ class TextInputService(
         val normalized = coordinateMapper().toModel(point.x, point.y)
         return "point:${normalized.x / 160}:${normalized.y / 120}"
     }
+
+    private fun windowPackage(windowName: String?): String? = windowName
+        ?.split(' ')?.firstOrNull { '/' in it }?.substringBefore('/')
 
     private fun focusTargetId(focusState: String?): String? = focusState
         ?.substringAfter("window_id=", missingDelimiterValue = "")

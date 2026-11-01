@@ -83,6 +83,22 @@ class VisualTextInputTest {
         assertEquals(1L, result.metrics["text_input_focus_rebinds"])
     }
 
+    @Test fun focusThatMovedOutsideTheTappedAppIsNeverBoundOrTyped() = runBlocking {
+        for (window in listOf("3c4d other.app/.Dialog", "StatusBar", null)) {
+            val fixture = Fixture(focus = "input_window=true;displayId=1;window_id=search", focusedWindow = window)
+            val rejected = fixture.service.typeText("""{"text":"sample","clear":true}""",
+                fixture.before, expectedFocusTarget = "input_window=true;displayId=1;window_id=editor")
+            assertEquals(0, fixture.injections)
+            assertEquals(ToolExecutionStatus.NOT_EXECUTED, rejected.executionStatus)
+        }
+        val unknownOrigin = Fixture(focus = "input_window=true;displayId=1;window_id=search")
+        val rejected = unknownOrigin.service.typeText("""{"text":"sample","clear":true}""",
+            unknownOrigin.before.copy(foregroundPackage = null),
+            expectedFocusTarget = "input_window=true;displayId=1;window_id=editor")
+        assertEquals(0, unknownOrigin.injections)
+        assertEquals(ToolExecutionStatus.NOT_EXECUTED, rejected.executionStatus)
+    }
+
     @Test fun twoTargetedBatchInputsFocusWithoutKeyboardOrIntermediateObservation() = runBlocking {
         val fixture = Fixture()
         for (x in listOf(300, 700)) {
@@ -218,6 +234,7 @@ class VisualTextInputTest {
     private class Fixture(
         val afterDisplay: Int = 1,
         val focus: String? = "input_window=true;displayId=1;window_id=editor",
+        val focusedWindow: String? = "1a2b generic.app/.Editor",
         val readback: Boolean = false,
         val previouslyVerified: Boolean = false,
         val changeFocus: Boolean = false,
@@ -239,7 +256,8 @@ class VisualTextInputTest {
                 "awaitInputFocus" -> {
                     focusProbes++
                     val editor = if (changeFocus && focusProbes > 1) "other-editor" else focus
-                    InputFocusReadiness(editor, if (editor == null) focusDiagnostic else "INPUT_CONNECTION_READY")
+                    InputFocusReadiness(editor, if (editor == null) focusDiagnostic else "INPUT_CONNECTION_READY",
+                        focusedWindowName = focusedWindow)
                 }
                 "tap" -> { taps++; DeviceInputResult(true, "delivered") }
                 "typeText" -> {

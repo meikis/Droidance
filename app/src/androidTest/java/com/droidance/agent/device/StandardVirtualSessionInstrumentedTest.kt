@@ -129,7 +129,9 @@ class StandardVirtualSessionInstrumentedTest {
                             recordInputDiagnostic = { _, _, _ -> }, validate = { _, _, _, _, _ -> error("Batch input must defer validation") },
                             appendValidation = { result, _ -> result }, recordExecutedActionResult = {})
                         val arguments = buildJsonObject { put("text", text); put("clear", true) }.toString()
-                        val rejected = service.typeText(arguments, before, focus.target + "-changed")
+                        // Focus handed to a window outside the tapped app is never typed into.
+                        val rejected = service.typeText(arguments, before.copy(foregroundPackage = "other.app"),
+                            focus.target + "-changed")
                         assertEquals(ToolExecutionStatus.NOT_EXECUTED, rejected.executionStatus)
                         scenario.onActivity { assertNotEquals(text, it.editor.text.toString()) }
                         val accepted = service.typeText(arguments, before, checkNotNull(focus.target))
