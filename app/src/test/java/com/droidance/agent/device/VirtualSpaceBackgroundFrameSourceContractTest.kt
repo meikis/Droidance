@@ -311,20 +311,17 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue(service.contains("addService"))
         assertTrue(service.contains("ImageReader.newInstance"))
         assertTrue(service.contains("createVirtualDisplay"))
-        assertTrue(service.contains("VIRTUAL_DISPLAY_FLAG_TRUSTED"))
-        assertTrue(service.contains("VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY"))
-        assertTrue(service.contains("VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP"))
-        assertTrue(service.contains("VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED"))
+        val displayFlags = projectFile(
+            "core/device/src/main/java/com/droidance/core/device/agent/device/SidecarPlatformCompat.java"
+        ).readText()
+        assertTrue(service.contains("SidecarPlatformCompat.virtualDisplayFlags(Build.VERSION.SDK_INT)"))
         assertFalse(service.contains("VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH"))
         // App 自己的查看页/接管镜像一直在主屏前台持有焦点。虚拟屏不自持焦点与触摸模式时，
         // 该屏窗口拿不到自己的焦点代际，注入的 tap/swipe 会被系统丢弃（agent 与人工接管同时点不动）。
-        assertTrue("虚拟屏必须自持焦点，否则主屏前台一有 App 窗口就注入不进去", service.contains("VIRTUAL_DISPLAY_FLAG_OWN_FOCUS"))
+        assertTrue("虚拟屏必须自持焦点，否则主屏前台一有 App 窗口就注入不进去", displayFlags.contains("flags |= OWN_FOCUS"))
         // ALWAYS_UNLOCKED 只对非默认显示组合法：两者必须成对出现，单独摘 OWN_DISPLAY_GROUP
         // 会让 createVirtualDisplay 抛参数异常，虚拟空间连屏都建不起来（20260725 实测踩过）。
-        assertTrue(
-            service.contains("VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED") ==
-                service.contains("VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP")
-        )
+        assertTrue(displayFlags.contains("flags |= TRUSTED | OWN_DISPLAY_GROUP | ALWAYS_UNLOCKED"))
         // 真机 dumpsys 实证(20260726)：独占 power group 和主屏一样受息屏超时管辖，建屏时唤醒一次
         // 之后没有任何用户活动再喂给它，几十秒后 wakefulness=DOZING / mIsInteractive=false，
         // InputManagerService 把该屏列入 "Display not interactive"，InputDispatcher 丢弃所有触摸
@@ -497,7 +494,7 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue("唤醒事务只能追加在所有既有事务之后", captureFrame < ensureInteractive)
         assertTrue("唤醒事务只能追加在所有既有事务之后", inputEvidence < ensureInteractive)
         assertTrue(service.contains("public int getProtocolVersion()"))
-        assertTrue(service.contains("SIDECAR_PROTOCOL_VERSION = 71"))
+        assertTrue(service.contains("SIDECAR_PROTOCOL_VERSION = 72"))
         assertTrue(bridge.contains("SIDECAR_PROTOCOL_VERSION = VirtualSpaceSidecarService.SIDECAR_PROTOCOL_VERSION"))
         assertTrue(service.contains("public Bundle capturePngFrame("))
         assertTrue(service.contains("public Bundle sampleFrame(int targetDisplayId)"))
@@ -599,7 +596,7 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue(service.contains("intent.putExtra(SidecarBinderReceiver.EXTRA_SIDECAR_UID, Process.myUid())"))
         assertTrue(service.contains("SidecarBinderReceiver.EXTRA_SIDECAR_PROTOCOL_VERSION"))
         assertFalse(service.contains("EXTRA_SIDECAR_MAIN_SCREEN_ONLY"))
-        assertTrue(service.contains("public static final int SIDECAR_PROTOCOL_VERSION = 71"))
+        assertTrue(service.contains("public static final int SIDECAR_PROTOCOL_VERSION = 72"))
         assertTrue(service.contains("intent.setPackage(targetPackage)"))
         assertFalse(service.contains("queryBroadcastReceivers"))
 
@@ -975,11 +972,11 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue(service.contains("SidecarRuntimeSurface"))
         assertTrue(surface.contains("SurfaceControl.Builder"))
         assertTrue(surface.contains("SurfaceControl.Transaction"))
-        assertTrue(surface.contains("setCrop(control, new Rect(0, 0, width, height))"))
+        assertTrue(surface.contains("setCrop(transaction, control, new Rect(0, 0, width, height))"))
         assertTrue(surface.contains(".setParent(control)"))
         assertTrue(surface.contains(".setBufferSize(width, height)"))
         assertTrue(surface.contains("clearSurface(inputSurface)"))
-        assertTrue(surface.contains("setCrop(inputControl, new Rect(0, 0, width, height))"))
+        assertTrue(surface.contains("setCrop(transaction, inputControl, new Rect(0, 0, width, height))"))
         assertTrue(surface.contains("new Surface(control)"))
         assertFalse(surface.contains("WindowManager.LayoutParams"))
         assertFalse(surface.contains("TYPE_APPLICATION_OVERLAY"))

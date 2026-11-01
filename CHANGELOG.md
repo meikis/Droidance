@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Screen capture, viewer mirroring and task takeover on Android 11–14: the sidecar now uses each release's platform APIs and reads the display stream where on-demand capture is unavailable.
+
 ## [0.1.0] - 2026-10-31
 
 First public release.

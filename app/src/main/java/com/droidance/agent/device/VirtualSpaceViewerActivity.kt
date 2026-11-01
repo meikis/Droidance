@@ -151,7 +151,9 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
         viewerMirror = VirtualSpaceViewerMirror(virtualSpaceManager) { binding, attached ->
             displayedBinding = binding.takeIf { attached && viewerVisible && it == virtualSpaceManager.activeBinding() }
             if (binding != null && viewerVisible) {
-                if (attached) errorView.visibility = View.GONE else showChannelError()
+                // A healthy mirror does not clear a frame failure that is still being reported.
+                if (!attached) showChannelError()
+                else if (frameFailures < FRAME_FAILURE_LIMIT) errorView.visibility = View.GONE
             }
         }
         setContentView(buildContentView())

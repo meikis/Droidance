@@ -102,6 +102,7 @@ final class SidecarViewerIme implements AutoCloseable {
     private static final class WindowPlatform implements Platform {
         private final Object windows;
         private final Method setPolicy;
+        private final boolean booleanPolicy;
         WindowPlatform() throws Exception {
             IBinder binder = (IBinder) Class.forName("android.os.ServiceManager")
                     .getMethod("getService", String.class).invoke(null, Context.WINDOW_SERVICE);
@@ -109,11 +110,19 @@ final class SidecarViewerIme implements AutoCloseable {
             Class<?> windowClass = Class.forName("android.view.IWindowManager");
             windows = Class.forName("android.view.IWindowManager$Stub")
                     .getMethod("asInterface", IBinder.class).invoke(null, binder);
-            setPolicy = windowClass.getMethod("setDisplayImePolicy", int.class, int.class);
+            Method displayPolicy = null;
+            try {
+                displayPolicy = windowClass.getMethod("setDisplayImePolicy", int.class, int.class);
+            } catch (NoSuchMethodException booleanOnly) {
+                displayPolicy = windowClass.getMethod("setShouldShowIme", int.class, boolean.class);
+            }
+            setPolicy = displayPolicy;
+            booleanPolicy = displayPolicy.getParameterTypes()[1] == boolean.class;
         }
 
         @Override public void setPolicy(int displayId, int policy) throws Exception {
-            setPolicy.invoke(windows, displayId, policy);
+            if (booleanPolicy) setPolicy.invoke(windows, displayId, policy == LOCAL);
+            else setPolicy.invoke(windows, displayId, policy);
         }
 
         @Override public void hideIme() throws Exception {
@@ -123,19 +132,26 @@ final class SidecarViewerIme implements AutoCloseable {
                     .getMethod("asInterface", IBinder.class).invoke(null, binder);
             // HIDE updates the display policy cache. Explicitly close the existing IME
             // window as well; otherwise its old client may stay shown after viewer exit.
-            Class.forName("com.android.internal.view.IInputMethodManager")
-                    .getMethod("hideSoftInputFromServerForTest").invoke(input);
+            Class<?> inputClass = Class.forName("com.android.internal.view.IInputMethodManager");
+            try {
+                inputClass.getMethod("hideSoftInputFromServerForTest").invoke(input);
+            } catch (NoSuchMethodException olderPlatform) {
+                // A missing cleanup call must not fail the policy change and drop the viewer mirror.
+                try { inputClass.getMethod("removeImeSurface").invoke(input); }
+                catch (ReflectiveOperationException unavailable) {
+                    android.util.Log.w("ViewerIme", "IME window cleanup unavailable", unavailable);
+                }
+            }
         }
 
         @Override public void focusDisplay(int displayId) throws Exception {
             Class<?> taskManagerClass = Class.forName("android.app.IActivityTaskManager");
             Object tasks = Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null);
-            java.util.List<?> roots = (java.util.List<?>) taskManagerClass
-                    .getMethod("getAllRootTaskInfosOnDisplay", int.class).invoke(tasks, displayId);
+            java.util.List<?> roots = SidecarDisplayContent.rootTasks(displayId);
             // WM returns roots in z-order. Focus the current visible task without relaunching it.
             for (Object root : roots) {
                 if (!root.getClass().getField("visible").getBoolean(root)) continue;
-                int taskId = root.getClass().getField("taskId").getInt(root);
+                int taskId = SidecarDisplayContent.topTaskId(root);
                 taskManagerClass.getMethod("setFocusedTask", int.class).invoke(tasks, taskId);
                 return;
             }

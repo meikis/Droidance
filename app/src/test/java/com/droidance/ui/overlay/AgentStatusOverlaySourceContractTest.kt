@@ -220,7 +220,7 @@ class AgentStatusOverlaySourceContractTest {
         assertTrue("输入层必须是灵动岛视觉层的子图层", surface.contains(".setParent(control)"))
         assertTrue("输入层必须有与灵动岛相同的真实缓冲边界", surface.contains(".setBufferSize(width, height)"))
         assertTrue("输入缓冲必须透明，不得遮挡当前 App", surface.contains("clearSurface(inputSurface)"))
-        assertTrue("输入层必须显式裁剪为灵动岛尺寸", surface.contains("setCrop(inputControl, new Rect(0, 0, width, height))"))
+        assertTrue("输入层必须显式裁剪为灵动岛尺寸", surface.contains("setCrop(transaction, inputControl, new Rect(0, 0, width, height))"))
         assertFalse("不得创建需要悬浮窗权限的 Window", surface.contains("TYPE_APPLICATION_OVERLAY"))
         assertTrue("Input follows the island surface", controller.contains("it.reparent(pkg.surfaceControl, surface)"))
         assertTrue(controller.contains("SurfaceControlViewHost(appContext, display"))

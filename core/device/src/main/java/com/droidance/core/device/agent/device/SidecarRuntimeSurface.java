@@ -636,6 +636,8 @@ final class SidecarRuntimeSurface {
 
     /** Shell-owned presentation layers must not participate in input-occlusion blocking. */
     private static void markTrustedOverlay(SurfaceControl.Transaction transaction, SurfaceControl control) {
+        // Android 11 has neither this call nor untrusted-touch occlusion blocking.
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return;
         try {
             SurfaceControl.Transaction.class.getMethod("setTrustedOverlay", SurfaceControl.class, boolean.class)
                     .invoke(transaction, control, true);
@@ -687,15 +689,13 @@ final class SidecarRuntimeSurface {
             try (SurfaceControl.Transaction transaction = new SurfaceControl.Transaction()) {
                 markTrustedOverlay(transaction, control);
                 bindToDisplayLayerStack(transaction, control, layerStack);
-                transaction
-                        .setCrop(control, new Rect(0, 0, width, height))
+                SidecarPlatformCompat.setCrop(transaction, control, new Rect(0, 0, width, height))
                         .setLayer(control, layer)
                         .setVisibility(control, true);
                 // The app owns island drag position; bitmap refreshes only update visibility.
                 if (inputControl == null || !shownLogged) transaction.setPosition(control, x, y);
                 if (inputControl != null) {
-                    transaction
-                            .setCrop(inputControl, new Rect(0, 0, width, height))
+                    SidecarPlatformCompat.setCrop(transaction, inputControl, new Rect(0, 0, width, height))
                             .setPosition(inputControl, 0, 0)
                             .setLayer(inputControl, 0)
                             .setVisibility(inputControl, true);

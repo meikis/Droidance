@@ -22,6 +22,16 @@ public class SidecarDisplayContentTest {
         }
     }
 
+    public static class StackInfo {
+        public int displayId = 7;
+        public int[] taskIds;
+        StackInfo(int... taskIds) { this.taskIds = taskIds; }
+    }
+
+    public static class RootTask {
+        public int taskId = 12;
+    }
+
     public static class MissingCount {
         public int displayId = 7;
     }
@@ -35,6 +45,19 @@ public class SidecarDisplayContentTest {
     @Test public void countsActivitiesAcrossAllRootTasks() throws Exception {
         assertEquals(4, SidecarDisplayContent.activityCount(
                 Arrays.asList(new TaskInfo(7, 1), new TaskInfo(7, 3)), 7));
+    }
+
+    @Test public void androidElevenStacksCountTheirTasksAndExposeTheTopOne() throws Exception {
+        assertEquals(3, SidecarDisplayContent.activityCount(
+                Arrays.asList(new StackInfo(1, 2), new StackInfo(3)), 7));
+        assertEquals(0, SidecarDisplayContent.activityCount(Collections.singletonList(new StackInfo()), 7));
+        assertEquals(2, SidecarDisplayContent.topTaskId(new StackInfo(1, 2)));
+        assertEquals(12, SidecarDisplayContent.topTaskId(new RootTask()));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void stackWithoutTasksCannotBeFocused() throws Exception {
+        SidecarDisplayContent.topTaskId(new StackInfo());
     }
 
     @Test(expected = IllegalArgumentException.class)

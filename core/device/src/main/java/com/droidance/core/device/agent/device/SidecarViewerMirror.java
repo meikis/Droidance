@@ -64,10 +64,9 @@ final class SidecarViewerMirror implements AutoCloseable {
         }
         float scale = Math.min(viewWidth / (float) displayWidth, viewHeight / (float) displayHeight);
         try (SurfaceControl.Transaction transaction = new SurfaceControl.Transaction()) {
-            transaction.reparent(mirror, parent)
-                    .setLayer(mirror, 1)
-                    .setCrop(mirror, new Rect(0, 0, displayWidth, displayHeight))
-                    .setScale(mirror, scale, scale)
+            transaction.reparent(mirror, parent).setLayer(mirror, 1);
+            SidecarPlatformCompat.setCrop(transaction, mirror, new Rect(0, 0, displayWidth, displayHeight));
+            SidecarPlatformCompat.setScale(transaction, mirror, scale)
                     .setPosition(mirror, (viewWidth - displayWidth * scale) / 2f,
                             (viewHeight - displayHeight * scale) / 2f)
                     .setVisibility(mirror, true);

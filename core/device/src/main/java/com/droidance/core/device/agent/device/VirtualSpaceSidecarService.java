@@ -22,6 +22,7 @@ import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -60,11 +61,6 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     public static final String SERVICE_NAME = "droidance_vspace";
     private static final String DISPLAY_NAME = "Wireless Display";
     private static final String CLIP_LABEL = "text";
-    private static final int OWN_CONTENT_ONLY_FALLBACK = 1 << 3;
-    private static final int TRUSTED_FALLBACK = 1 << 10;
-    private static final int OWN_DISPLAY_GROUP_FALLBACK = 1 << 11;
-    private static final int ALWAYS_UNLOCKED_FALLBACK = 1 << 12;
-    private static final int OWN_FOCUS_FALLBACK = 1 << 14;
     private static final int WAKE_REASON_APPLICATION = 2;
     // PowerManager.SCREEN_BRIGHT_WAKE_LOCK | ACQUIRE_CAUSES_WAKEUP：唯一能把虚拟屏所在
     // power group 拉成 interactive 的等级（真机 dumpsys 验证，见 keepDisplayInteractive）。
@@ -87,7 +83,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     private static final int INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH = 2;
     private static final int PREVIEW_MAX_WIDTH = 720;
     private static final int PREVIEW_JPEG_QUALITY = 72;
-    public static final int SIDECAR_PROTOCOL_VERSION = 71;
+    public static final int SIDECAR_PROTOCOL_VERSION = 72;
     private static final long MAIN_DIRECT_CAPTURE_TIMEOUT_MS = 1_500L;
     private static final long SHELL_EXEC_TIMEOUT_MS = 8_000L;
     private static final long LIFECYCLE_FRAME_TIMEOUT_MS = 1_500L;
@@ -183,7 +179,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 }
             }, new Handler(thread.getLooper()));
 
-            int flags = displayFlags(Process.myUid());
+            int flags = SidecarPlatformCompat.virtualDisplayFlags(Build.VERSION.SDK_INT);
             VirtualDisplay created = null;
             try {
                 created = displayManager.createVirtualDisplay(
@@ -267,11 +263,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
         result.putBoolean("querySucceeded", false);
         if (!valid) return result;
         try {
-            Object manager = Class.forName("android.app.ActivityTaskManager")
-                    .getMethod("getService").invoke(null);
-            Object tasks = Class.forName("android.app.IActivityTaskManager")
-                    .getMethod("getAllRootTaskInfosOnDisplay", int.class)
-                    .invoke(manager, requestedDisplayId);
+            Object tasks = SidecarDisplayContent.rootTasks(requestedDisplayId);
             int activityCount = SidecarDisplayContent.activityCount(tasks, requestedDisplayId);
             // The platform may remove a display during the read even while this service is locked.
             currentDisplayId = getDisplayId();
@@ -869,6 +861,9 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 return png;
             }
         }
+        Bitmap bitmap() {
+            return imageToBitmap(image, width, height);
+        }
         byte[] preview() throws Exception {
             synchronized (previewLock) {
                 if (preview == null) preview = encodeImageToJpeg(image, width, height, PREVIEW_MAX_WIDTH, PREVIEW_JPEG_QUALITY);
@@ -896,7 +891,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             viewerMirror.attach(targetDisplayId, parent, width, height, viewWidth, viewHeight, owner, lifetime);
             Log.i("ViewerMirror", "attached display=" + targetDisplayId + " target_fps=60 owner=" + owner);
             return true;
-        } catch (Exception error) {
+        } catch (Exception | LinkageError error) {
             fail("Viewer mirror failed: " + safeMessage(error));
             return false;
         } finally {
@@ -1241,7 +1236,29 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
         } catch (Throwable error) { fail("captureFreshSample failed: " + safeMessage(error)); return null; }
     }
 
+    /**
+     * WindowManager can capture on demand from Android 14. Earlier releases and vendor variants
+     * read the display's own stream instead; its newest frame stays current on a static screen.
+     */
     private Bitmap captureDisplayBitmap(int targetDisplayId) throws Exception {
+        try {
+            return captureComposedBitmap(targetDisplayId);
+        } catch (InterruptedException interrupted) {
+            throw interrupted;
+        } catch (Exception unavailable) {
+            Log.w("FramePipeline", "WindowManager capture unavailable: " + deepestCauseMessage(unavailable));
+            return captureStreamBitmap();
+        }
+    }
+
+    private Bitmap captureStreamBitmap() throws Exception {
+        try (FrameLeaseStore.Lease<CapturedFrame> lease = frames.acquire()) {
+            if (lease == null) throw new IllegalStateException("display stream has no frame");
+            return lease.value().bitmap();
+        }
+    }
+
+    private Bitmap captureComposedBitmap(int targetDisplayId) throws Exception {
         Class<?> serviceManagerClass = Class.forName("android.os.ServiceManager");
         Method getService = serviceManagerClass.getDeclaredMethod("getService", String.class);
         IBinder windowBinder = (IBinder) getService.invoke(null, Context.WINDOW_SERVICE);
@@ -1254,7 +1271,6 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 .getDeclaredMethod("asInterface", IBinder.class)
                 .invoke(null, windowBinder);
         Class<?> windowManagerClass = Class.forName("android.view.IWindowManager");
-        Class<?> screenCaptureClass = Class.forName("android.window.ScreenCapture");
         Class<?> captureArgsClass = Class.forName("android.window.ScreenCapture$CaptureArgs");
         Class<?> captureArgsBuilderClass = Class.forName("android.window.ScreenCapture$CaptureArgs$Builder");
         Class<?> listenerClass = Class.forName("android.window.ScreenCapture$ScreenCaptureListener");
@@ -1269,7 +1285,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             captureStatus.set(statusCode);
             callbackReceived.countDown();
         };
-        Object listener = listenerClass.getConstructor(ObjIntConsumer.class).newInstance(callback);
+        Object listener = SidecarPlatformCompat.newCaptureListener(listenerClass, callback);
 
         Method captureDisplay = windowManagerClass.getMethod(
                 "captureDisplay",
@@ -1679,6 +1695,8 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
 
     /** The visible mirror owns this lease, including cleanup on Binder death. */
     private AutoCloseable holdViewerDisplayAwake() throws Exception {
+        // Android 11 has no per-display power state; the virtual display follows the device.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return () -> { };
         Object lock = newDisplayWakeLock(resolveContext().getSystemService(Context.POWER_SERVICE),
                 VIEWER_WAKE_LOCK_TAG);
         lock.getClass().getMethod("acquire").invoke(lock);
@@ -1844,48 +1862,6 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
         Log.e("DroidanceVSpace", lastError);
         if (!"READY".equals(status)) {
             status = "ERROR";
-        }
-    }
-
-    private static int displayFlags() {
-        return displayFlags(Process.myUid());
-    }
-
-    private static int displayFlags(int uid) {
-        // PUBLIC lets the user's IME process obtain this display and create its native window.
-        // OWN_CONTENT_ONLY prevents default-screen auto-mirroring; PRESENTATION stays disabled.
-        // 这四个 flag 是**互相依赖的一组，不要单独摘任何一个**：
-        //   ALWAYS_UNLOCKED 只对"不在默认显示组"的虚拟屏合法 -> 必须与 OWN_DISPLAY_GROUP 同在，
-        //     单独摘掉 OWN_DISPLAY_GROUP 会让 createVirtualDisplay 直接抛参数异常、虚拟空间连屏都建不起来；
-        //   OWN_FOCUS 要求该屏是 TRUSTED。
-        //   OWN_DISPLAY_GROUP 带来的独立电源组默认是 Asleep，必须由 wakeDisplayGroup() 唤醒，
-        //     否则系统判该屏 not interactive 并丢弃全部注入触摸。
-        // OWN_FOCUS 是注入能否生效的前提：App 自己的查看页/接管面板长期在主屏前台持有焦点，
-        // 没有这个 flag 时虚拟屏不维护自己的焦点与触摸模式，注入的 tap/swipe 会被系统丢弃
-        // （agent 和人工接管同时"点不动、滑不动"）。该 flag 要求同屏已置 TRUSTED。
-        // OWN_FOCUS keeps input events scoped to this display. The platform IME stays
-        // hidden by default. The viewer or the same Agent can explicitly enable the
-        // selected native keyboard; background text uses display-scoped keys/clipboard.
-        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC |
-                // Releasing a public display must never move the user's background apps to display zero.
-                hiddenDisplayFlag("VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL", 1 << 8) |
-                hiddenDisplayFlag("VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY", OWN_CONTENT_ONLY_FALLBACK) |
-                hiddenDisplayFlag("VIRTUAL_DISPLAY_FLAG_TRUSTED", TRUSTED_FALLBACK) |
-                hiddenDisplayFlag("VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP", OWN_DISPLAY_GROUP_FALLBACK) |
-                hiddenDisplayFlag("VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED", ALWAYS_UNLOCKED_FALLBACK) |
-                hiddenDisplayFlag("VIRTUAL_DISPLAY_FLAG_OWN_FOCUS", OWN_FOCUS_FALLBACK);
-
-        return flags;
-    }
-
-
-    private static int hiddenDisplayFlag(String name, int fallback) {
-        try {
-            Field field = DisplayManager.class.getDeclaredField(name);
-            field.setAccessible(true);
-            return field.getInt(null);
-        } catch (Throwable ignored) {
-            return fallback;
         }
     }
 
