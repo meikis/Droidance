@@ -55,9 +55,8 @@ android {
         targetSdk = 35
         resourceConfigurations += listOf("en", "zh")
         buildConfigField("String", "UPDATE_REPOSITORY", "\"$updateRepository\"")
-        versionCode = 1
-        versionName = "0.1.0"
-        buildConfigField("String", "VERSION_SUFFIX", "\"20261101-V3\"")
+        versionCode = 2
+        versionName = "0.1.1"
 
         testInstrumentationRunner = providers.gradleProperty("droidanceTestRunner")
             .getOrElse("androidx.test.runner.AndroidJUnitRunner")

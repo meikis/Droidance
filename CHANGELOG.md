@@ -8,19 +8,28 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-01
+
 ### Added
 
-- Built-in cloud model provider presets with API addresses and protocols. Enter your own API key and model ID to enable a provider, or start from a custom endpoint. No model IDs or credentials are bundled in presets.
+- Built-in cloud model provider presets. Enter your own API key and model ID to enable a provider, or start from a custom endpoint.
+
+### Changed
+
+- Android 11–13 support is now marked experimental. Low-memory and Android Go devices report that they are unsupported.
 
 ### Fixed
 
-- Screen capture, viewer mirroring and task takeover on Android 11–14: the sidecar now uses each release's platform APIs and reads the display stream where on-demand capture is unavailable.
-- Key and text input on Android 11–13, foreground detection on vendor dumpsys formats, blocked-input and unsupported-device diagnostics, and virtual displays created on a foldable's cover screen.
-- Text input no longer follows focus into another app or system window after a tap.
+- Screen capture, viewer mirroring and takeover failures on Android 11–14, including "screen channel unavailable" on Samsung devices.
+- Key and text input on Android 11–13, and foreground detection on vendor system formats.
+- A clear message when the system blocks input, with the setting to change.
+- Virtual displays created on a foldable's cover screen are rebuilt after unfolding.
+- Text input no longer follows focus into another app or system window.
 
 ## [0.1.0] - 2026-10-31
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/YbbLab/Droidance/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/YbbLab/Droidance/releases/tag/v0.1.0

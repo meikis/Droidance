@@ -89,7 +89,7 @@ fun SettingsAboutScreen(
                         Text(
                             text = stringResource(
                                 R.string.settings_about_version,
-                                BuildConfig.VERSION_NAME + " · " + BuildConfig.VERSION_SUFFIX
+                                BuildConfig.VERSION_NAME
                             ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
