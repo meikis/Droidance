@@ -28,4 +28,10 @@ public class InputWindowFocusParserTest {
         assertNotNull(InputWindowFocusParser.parse(a + a, 3).target);
         assertEquals("INPUT_WINDOW_CHANGED_DURING_QUERY", InputWindowFocusParser.parse(a + dump("    displayId=3, name='bbb activity'\n"), 3).diagnostic);
     }
+
+    @Test public void noFocusedWindowsIsNotAnUnknownFormat() {
+        assertTrue(InputWindowFocusParser.requiredLine("  FocusedWindows: <none>"));
+        assertEquals("INPUT_WINDOW_NOT_FOCUSED",
+                InputWindowFocusParser.parse("  FocusedWindows: <none>\n", 7).diagnostic);
+    }
 }

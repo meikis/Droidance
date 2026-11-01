@@ -14,11 +14,12 @@ import java.util.regex.Pattern;
 final class InputWindowFocusParser {
     private InputWindowFocusParser() {}
 
+    private static final String NO_FOCUSED_WINDOWS = "FocusedWindows: <none>";
     private static final Pattern WINDOW = Pattern.compile("^displayId=(\\d+), name='(.+)'$");
 
     static boolean requiredLine(String line) {
         String text = line.trim();
-        return text.endsWith(":") || WINDOW.matcher(text).matches();
+        return text.endsWith(":") || text.equals(NO_FOCUSED_WINDOWS) || WINDOW.matcher(text).matches();
     }
 
     static final class Result {
@@ -39,6 +40,7 @@ final class InputWindowFocusParser {
         for (String line : dump.split("\\r?\\n")) {
             String text = line.trim();
             int indent = line.length() - line.replaceFirst("^\\s+", "").length();
+            if (text.equals(NO_FOCUSED_WINDOWS)) { foundSection = true; continue; }
             if (text.equals("FocusedWindows:")) {
                 inFocusedWindows = true; foundSection = true; sectionIndent = indent; continue;
             }

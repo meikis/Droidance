@@ -494,7 +494,7 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue("唤醒事务只能追加在所有既有事务之后", captureFrame < ensureInteractive)
         assertTrue("唤醒事务只能追加在所有既有事务之后", inputEvidence < ensureInteractive)
         assertTrue(service.contains("public int getProtocolVersion()"))
-        assertTrue(service.contains("SIDECAR_PROTOCOL_VERSION = 72"))
+        assertTrue(service.contains("SIDECAR_PROTOCOL_VERSION = 73"))
         assertTrue(bridge.contains("SIDECAR_PROTOCOL_VERSION = VirtualSpaceSidecarService.SIDECAR_PROTOCOL_VERSION"))
         assertTrue(service.contains("public Bundle capturePngFrame("))
         assertTrue(service.contains("public Bundle sampleFrame(int targetDisplayId)"))
@@ -596,7 +596,7 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue(service.contains("intent.putExtra(SidecarBinderReceiver.EXTRA_SIDECAR_UID, Process.myUid())"))
         assertTrue(service.contains("SidecarBinderReceiver.EXTRA_SIDECAR_PROTOCOL_VERSION"))
         assertFalse(service.contains("EXTRA_SIDECAR_MAIN_SCREEN_ONLY"))
-        assertTrue(service.contains("public static final int SIDECAR_PROTOCOL_VERSION = 72"))
+        assertTrue(service.contains("public static final int SIDECAR_PROTOCOL_VERSION = 73"))
         assertTrue(service.contains("intent.setPackage(targetPackage)"))
         assertFalse(service.contains("queryBroadcastReceivers"))
 
@@ -840,8 +840,8 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         assertTrue(bridge.contains("SidecarBinderRegistry.clear(binder)"))
         assertTrue(bridge.contains("isBinderTransportFailure(failure)"))
         // call()/captureLatestPng()/captureMainScreenPng()/startService()/shutdown() 都必须走超时包装。
-        assertTrue(bridge.contains("val result = callWithTimeout(SIDECAR_CALL_TIMEOUT_MS, suspectService = service) { action(service) }"))
-        assertTrue(bridge.contains("timeoutMs = timeoutMs.coerceIn(1L, SIDECAR_CAPTURE_TIMEOUT_MS)"))
+        assertTrue(bridge.contains("val result = callWithTimeout(frameInspector.sidecarCallTimeoutMs(), suspectService = service) { action(service) }"))
+        assertTrue(bridge.contains("timeoutMs = timeoutMs.coerceIn(1L, frameInspector.sidecarCaptureTimeoutMs())"))
         assertTrue(bridge.contains("callWithTimeout(SIDECAR_START_TIMEOUT_MS, suspectService = service)"))
     }
 

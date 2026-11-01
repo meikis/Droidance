@@ -32,6 +32,21 @@ public class SidecarDisplayContentTest {
         public int taskId = 12;
     }
 
+    public static class Component {
+        final String name;
+        Component(String name) { this.name = name; }
+        public String flattenToShortString() { return name; }
+    }
+
+    public static class VisibleRoot {
+        public boolean visible;
+        public Component topActivity;
+        VisibleRoot(boolean visible, String name) {
+            this.visible = visible;
+            this.topActivity = name == null ? null : new Component(name);
+        }
+    }
+
     public static class MissingCount {
         public int displayId = 7;
     }
@@ -78,5 +93,11 @@ public class SidecarDisplayContentTest {
     @Test(expected = IllegalArgumentException.class)
     public void negativeActivityCountCannotBeClassifiedAsEmpty() throws Exception {
         SidecarDisplayContent.activityCount(Collections.singletonList(new TaskInfo(7, -1)), 7);
+    }
+
+    @Test public void topComponentIsTheFirstVisibleRootsActivity() throws Exception {
+        assertEquals("com.example/.Main", SidecarDisplayContent.topComponent(Arrays.asList(
+                new VisibleRoot(false, "com.hidden/.Main"), new VisibleRoot(true, "com.example/.Main"))));
+        assertEquals(null, SidecarDisplayContent.topComponent(Collections.singletonList(new VisibleRoot(true, null))));
     }
 }

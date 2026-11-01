@@ -40,7 +40,8 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     @ApplicationContext private val context: Context,
     private val airModePairingManager: AirModePairingManager,
     private val shellRunner: PrivilegedShellRunner,
-    private val adbShell: AdbShellExecutor
+    private val adbShell: AdbShellExecutor,
+    private val frameInspector: VirtualSpaceFrameInspector
 ) {
     data class FrameSnapshot(
         val png: ByteArray,
@@ -73,7 +74,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     }
 
     private fun <T> callWithTimeout(
-        timeoutMs: Long = SIDECAR_CALL_TIMEOUT_MS,
+        timeoutMs: Long = frameInspector.sidecarCallTimeoutMs(),
         markSidecarSuspectOnTimeout: Boolean = true,
         suspectService: IVirtualSpaceSidecar? = null,
         op: () -> T
@@ -1040,7 +1041,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     fun captureLatestPng(
         displayId: Int,
-        timeoutMs: Long = SIDECAR_CAPTURE_TIMEOUT_MS,
+        timeoutMs: Long = frameInspector.sidecarCaptureTimeoutMs(),
         markSidecarSuspectOnTimeout: Boolean = false,
         mode: RuntimeMode? = null,
         expectedBackendSessionId: String? = null
@@ -1051,7 +1052,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         if (!matchesExpectedSession(displayId, resolvedMode, service, expectedBackendSessionId)) {
             return null
         }
-        val boundedTimeoutMs = timeoutMs.coerceIn(1L, SIDECAR_CAPTURE_TIMEOUT_MS)
+        val boundedTimeoutMs = timeoutMs.coerceIn(1L, frameInspector.sidecarCaptureTimeoutMs())
         return callWithTimeout(
             timeoutMs = boundedTimeoutMs,
             markSidecarSuspectOnTimeout = markSidecarSuspectOnTimeout,
@@ -1063,7 +1064,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     fun captureLatestPngFrame(
         displayId: Int,
-        timeoutMs: Long = SIDECAR_CAPTURE_TIMEOUT_MS,
+        timeoutMs: Long = frameInspector.sidecarCaptureTimeoutMs(),
         mode: RuntimeMode? = null,
         expectedBackendSessionId: String? = null
     ): FrameSnapshot? {
@@ -1074,7 +1075,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             return null
         }
         val frame = callWithTimeout(
-            timeoutMs = timeoutMs.coerceIn(1L, SIDECAR_CAPTURE_TIMEOUT_MS),
+            timeoutMs = timeoutMs.coerceIn(1L, frameInspector.sidecarCaptureTimeoutMs()),
             markSidecarSuspectOnTimeout = false,
             suspectService = service
         ) { service.capturePreviewFrame(displayId) }.getOrNull() ?: return null
@@ -1087,7 +1088,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     fun captureLatestPreviewJpeg(
         displayId: Int,
-        timeoutMs: Long = SIDECAR_CAPTURE_TIMEOUT_MS,
+        timeoutMs: Long = frameInspector.sidecarCaptureTimeoutMs(),
         mode: RuntimeMode? = null,
         expectedBackendSessionId: String? = null
     ): ByteArray? {
@@ -1100,7 +1101,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             return null
         }
         return callWithTimeout(
-            timeoutMs = timeoutMs.coerceIn(1L, SIDECAR_CAPTURE_TIMEOUT_MS),
+            timeoutMs = timeoutMs.coerceIn(1L, frameInspector.sidecarCaptureTimeoutMs()),
             markSidecarSuspectOnTimeout = false,
             suspectService = service
         ) { service.capturePreviewJpeg(displayId) }
@@ -1229,7 +1230,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     fun execShellCommand(
         command: String,
         mode: RuntimeMode? = null,
-        timeoutMs: Long = SIDECAR_CALL_TIMEOUT_MS
+        timeoutMs: Long = frameInspector.sidecarCallTimeoutMs()
     ): AdbShellExecutor.Result? {
         val service = serviceOrNull(mode) ?: return null
         val token = java.util.UUID.randomUUID().toString()
@@ -1245,7 +1246,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     fun execShellCommand(
         binding: SidecarSessionBinding,
         command: String,
-        timeoutMs: Long = SIDECAR_CALL_TIMEOUT_MS
+        timeoutMs: Long = frameInspector.sidecarCallTimeoutMs()
     ): AdbShellExecutor.Result? {
         val token = java.util.UUID.randomUUID().toString()
         var dispatched: IVirtualSpaceSidecar? = null
@@ -1354,7 +1355,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     fun shutdown(mode: RuntimeMode): CommandResult {
         val service = serviceOrNull(mode) ?: return invalid("sidecar binder unavailable")
-        val result = callWithTimeout(SIDECAR_CALL_TIMEOUT_MS, suspectService = service) {
+        val result = callWithTimeout(frameInspector.sidecarCallTimeoutMs(), suspectService = service) {
             val ok = service.shutdown()
             CommandResult(ok = ok, detail = if (ok) "shutdown" else service.lastError.orEmpty())
         }
@@ -1423,7 +1424,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     ): CommandResult {
         val service = serviceOrNull(mode)
             ?: return invalid("sidecar binder unavailable for $op", channelUnavailable = true)
-        val result = callWithTimeout(SIDECAR_CALL_TIMEOUT_MS, suspectService = service) { action(service) }
+        val result = callWithTimeout(frameInspector.sidecarCallTimeoutMs(), suspectService = service) { action(service) }
         return result.fold(
             onSuccess = { ok ->
                 CommandResult(ok = ok, detail = if (ok) "$op ok" else runCatching { service.lastError }.getOrDefault(""))
@@ -1464,7 +1465,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
      */
     private fun <T> callBoundValue(
         binding: SidecarSessionBinding,
-        timeoutMs: Long = SIDECAR_CALL_TIMEOUT_MS,
+        timeoutMs: Long = frameInspector.sidecarCallTimeoutMs(),
         markSidecarSuspectOnFailure: Boolean = true,
         action: (IVirtualSpaceSidecar) -> T
     ): Result<T> {
@@ -1525,7 +1526,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         val service = serviceOrNull(mode)
             ?: return null
         if (!matchesExpectedSession(displayId, mode, service, expectedBackendSessionId)) return null
-        return callWithTimeout(SIDECAR_CALL_TIMEOUT_MS, suspectService = service) {
+        return callWithTimeout(frameInspector.sidecarCallTimeoutMs(), suspectService = service) {
             action(service)
         }.getOrNull()
     }
@@ -1892,10 +1893,8 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         private const val SIDECAR_PROTOCOL_VERSION = VirtualSpaceSidecarService.SIDECAR_PROTOCOL_VERSION
         private const val AM_START_TIMEOUT_MS = 12_000L
         // 跨进程 Binder 调用的有界超时：tap/key/text 等输入动作正常是毫秒级本机 IPC。
-        private const val SIDECAR_CALL_TIMEOUT_MS = 5_000L
         private const val SIDECAR_TEXT_CALL_TIMEOUT_MS = 20_000L
         // 截图给 sidecar 自身内部截屏逻辑（含 6s 内部超时）留出往返余量。
-        private const val SIDECAR_CAPTURE_TIMEOUT_MS = 8_000L
         // 创建 VirtualDisplay/ImageReader 比普通调用重，放宽一些。
         private const val SIDECAR_START_TIMEOUT_MS = 8_000L
     }

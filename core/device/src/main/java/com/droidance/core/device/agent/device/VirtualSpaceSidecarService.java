@@ -83,7 +83,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     private static final int INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH = 2;
     private static final int PREVIEW_MAX_WIDTH = 720;
     private static final int PREVIEW_JPEG_QUALITY = 72;
-    public static final int SIDECAR_PROTOCOL_VERSION = 72;
+    public static final int SIDECAR_PROTOCOL_VERSION = 73;
     private static final long MAIN_DIRECT_CAPTURE_TIMEOUT_MS = 1_500L;
     private static final long SHELL_EXEC_TIMEOUT_MS = 8_000L;
     private static final long LIFECYCLE_FRAME_TIMEOUT_MS = 1_500L;
@@ -518,6 +518,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     @Override
     public boolean key(int targetDisplayId, int keycode) {
         if (!acceptsInteractiveDisplay(targetDisplayId)) return false;
+        claimInputFocus();
         // 反射注入为主(与阿拉丁一致)；失败再退 input 命令兜底。
         try {
             injectKey(targetDisplayId, keycode);
@@ -530,6 +531,8 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             if (ok) return true;
             fail(lastReflectionFailure);
             return false;
+        } finally {
+            releaseInputFocus();
         }
     }
 
@@ -541,12 +544,31 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 fail("empty key combo");
                 return false;
             }
+            claimInputFocus();
             injectKeyCombo(targetDisplayId, keycodes);
             return true;
         } catch (Throwable t) {
             fail(t.getClass().getSimpleName() + ": " + safeMessage(t));
             return false;
+        } finally {
+            releaseInputFocus();
         }
+    }
+
+    /**
+     * Android 13 and earlier keep one global input focus, so keys for this display are dropped
+     * while another display is focused. Android 14 gives the display its own via OWN_FOCUS.
+     */
+    private void claimInputFocus() {
+        if (SidecarPlatformCompat.hasOwnDisplayFocus(Build.VERSION.SDK_INT) || viewerIme == null) return;
+        try { viewerIme.focusForInput(); }
+        catch (Exception unavailable) { Log.w("DroidanceVSpace", "Cannot focus virtual display: " + safeMessage(unavailable)); }
+    }
+
+    private void releaseInputFocus() {
+        if (SidecarPlatformCompat.hasOwnDisplayFocus(Build.VERSION.SDK_INT) || viewerIme == null) return;
+        try { viewerIme.returnInputFocus(); }
+        catch (Exception unavailable) { Log.w("DroidanceVSpace", "Cannot return input focus: " + safeMessage(unavailable)); }
     }
 
     @Override
@@ -561,6 +583,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 evidence.putString("detail", "unsupported text input method");
                 return evidence;
             }
+            claimInputFocus();
             String focusState = getInputFocusState(targetDisplayId);
             boolean focusConfirmed = focusState != null &&
                     (expectedFocusTarget == null || expectedFocusTarget.equals(focusState));
@@ -585,6 +608,8 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             fail(t.getClass().getSimpleName() + ": " + safeMessage(t));
             evidence.putString("detail", lastError);
             return evidence;
+        } finally {
+            releaseInputFocus();
         }
     }
 
@@ -592,7 +617,14 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     public String getForegroundComponent(int targetDisplayId) {
         if (!acceptsDisplay(targetDisplayId)) return null;
         String dump = shellStdout("dumpsys window displays");
-        return DisplayForegroundParser.parse(dump, targetDisplayId);
+        String component = DisplayForegroundParser.parse(dump, targetDisplayId);
+        if (component != null) return component;
+        // A vendor dump format must not cost the frame: the task inventory names the same window.
+        try { return SidecarDisplayContent.topComponent(SidecarDisplayContent.rootTasks(targetDisplayId)); }
+        catch (Exception unavailable) {
+            Log.w("FramePipeline", "Foreground query unavailable: " + safeMessage(unavailable));
+            return null;
+        }
     }
 
     @Override
@@ -620,6 +652,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             result.putString("diagnostic", "INPUT_FOCUS_INVALID_TOKEN");
             return result;
         }
+        claimInputFocus();
         focusQueries.entrySet().removeIf(entry -> started - entry.getValue().createdAt > 300000L);
         FocusQuery request = focusQueries.computeIfAbsent(executionToken, ignored -> new FocusQuery());
         String diagnostic = "INPUT_CONNECTION_NOT_READY";
@@ -823,7 +856,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             String before = beforeQuery.get(SHELL_EXEC_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             String after = afterQuery.get(SHELL_EXEC_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             long finished = SystemClock.elapsedRealtime();
-            if (before == null || !before.equals(after)) {
+            if (!java.util.Objects.equals(before, after)) {
                 lastError = "OBSERVATION_WINDOW_CHANGED";
                 return null;
             }
@@ -2433,13 +2466,27 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     }
 
     private static boolean injectInputEventOnce(InputEvent event, int mode) throws Exception {
-        Class<?> inputManagerClass = Class.forName("android.hardware.input.InputManager");
-        Method getInstance = inputManagerClass.getDeclaredMethod("getInstance");
+        Class<?> inputManagerClass;
+        Method getInstance;
+        try {
+            inputManagerClass = Class.forName("android.hardware.input.InputManager");
+            getInstance = inputManagerClass.getDeclaredMethod("getInstance");
+        } catch (NoSuchMethodException globalManager) {
+            inputManagerClass = Class.forName("android.hardware.input.InputManagerGlobal");
+            getInstance = inputManagerClass.getDeclaredMethod("getInstance");
+        }
         Object manager = getInstance.invoke(null);
         Method inject = inputManagerClass.getDeclaredMethod("injectInputEvent", InputEvent.class, int.class);
         inject.setAccessible(true);
-        Object result = inject.invoke(manager, event, mode);
-        return !(result instanceof Boolean) || ((Boolean) result);
+        try {
+            Object result = inject.invoke(manager, event, mode);
+            return !(result instanceof Boolean) || ((Boolean) result);
+        } catch (java.lang.reflect.InvocationTargetException failure) {
+            if (failure.getCause() instanceof SecurityException) {
+                throw new SecurityException(SidecarPlatformCompat.INPUT_INJECTION_DENIED, failure.getCause());
+            }
+            throw failure;
+        }
     }
 
     private static void injectInputEventWithRetry(InputEvent event, int mode) throws Exception {

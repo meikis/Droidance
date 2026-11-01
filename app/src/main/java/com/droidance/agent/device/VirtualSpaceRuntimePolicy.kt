@@ -28,6 +28,12 @@ class VirtualSpaceRuntimePolicy @Inject constructor(
     override fun renderWaitPollMs(): Long =
         ruleConfigManager.harnessPolicy().virtualSpace.renderWaitPollMs
 
+    override fun sidecarCallTimeoutMs(): Long =
+        ruleConfigManager.harnessPolicy().virtualSpace.sidecarCallTimeoutMs
+
+    override fun sidecarCaptureTimeoutMs(): Long =
+        ruleConfigManager.harnessPolicy().virtualSpace.sidecarCaptureTimeoutMs
+
     override fun emptyFrameFailure(): String {
         val guidance = ruleConfigManager.message("virtual_space_empty_frame_guidance")
         return listOf(VirtualSpaceFrameInspector.EMPTY_FRAME_MARKER, guidance)

@@ -54,6 +54,16 @@ final class SidecarDisplayContent {
         return count;
     }
 
+    /** Roots arrive in z-order; a visible root's top activity is the display's foreground. */
+    static String topComponent(List<?> rootTasks) throws ReflectiveOperationException {
+        for (Object root : rootTasks) {
+            if (!root.getClass().getField("visible").getBoolean(root)) continue;
+            Object component = root.getClass().getField("topActivity").get(root);
+            if (component != null) return (String) component.getClass().getMethod("flattenToShortString").invoke(component);
+        }
+        return null;
+    }
+
     private static int activities(Object task) throws ReflectiveOperationException {
         try {
             return task.getClass().getField("numActivities").getInt(task);

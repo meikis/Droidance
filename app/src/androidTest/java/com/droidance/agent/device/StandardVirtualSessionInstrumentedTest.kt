@@ -94,8 +94,12 @@ class StandardVirtualSessionInstrumentedTest {
                 try {
                     val reference = checkNotNull(frame.pixelReference)
                     reference.samples.forEachIndexed { index, point ->
-                        assertEquals("Retained evidence must preserve the native sampled pixel",
-                            reference.colors[index], bitmap.getPixel(point.physicalX, point.physicalY))
+                        // Decision frames are JPEG, so the retained image may differ slightly per channel.
+                        val pixel = bitmap.getPixel(point.physicalX, point.physicalY)
+                        for (shift in listOf(16, 8, 0)) {
+                            val delta = ((reference.colors[index] shr shift) and 255) - ((pixel shr shift) and 255)
+                            assertTrue("Retained evidence must preserve the native sampled pixel", kotlin.math.abs(delta) <= 24)
+                        }
                     }
                 } finally { bitmap.recycle() }
                 val tap = backend.tap(x, y, TapPrecision.EXACT)

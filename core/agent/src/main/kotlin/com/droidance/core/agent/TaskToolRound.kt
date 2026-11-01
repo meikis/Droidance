@@ -1669,7 +1669,8 @@ internal suspend fun TaskTurnSession.runToolRound(modelRound: ModelRoundOutput):
         val terminalBackendDiagnostics = setOf(
             AttemptDiagnosticCode.BACKEND_UNAVAILABLE,
             AttemptDiagnosticCode.AIR_CHANNEL_RECOVERY_REQUIRED,
-            AttemptDiagnosticCode.AIR_PAIRING_REQUIRED
+            AttemptDiagnosticCode.AIR_PAIRING_REQUIRED,
+            AttemptDiagnosticCode.VIRTUAL_DISPLAY_UNSUPPORTED
         )
         val backendUnavailableRejections = roundPlan.rejectedCalls.filter {
             it.diagnosticCode in terminalBackendDiagnostics
@@ -1685,6 +1686,8 @@ internal suspend fun TaskTurnSession.runToolRound(modelRound: ModelRoundOutput):
                     fallbackText("termination_air_channel_recovery_required")
                 AttemptDiagnosticCode.AIR_PAIRING_REQUIRED ->
                     fallbackText("termination_air_pairing_required")
+                AttemptDiagnosticCode.VIRTUAL_DISPLAY_UNSUPPORTED ->
+                    fallbackText("termination_virtual_display_unsupported")
                 else -> fallbackText("termination_channel_down")
             }
             // The execution channel, not the model protocol, ended this turn.

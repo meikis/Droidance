@@ -76,6 +76,15 @@ final class SidecarViewerIme implements AutoCloseable {
         if (active) platform.focusDisplay(displayId);
     }
 
+    /** Runs for any owner: keys need the focus whether or not the keyboard is shown. */
+    synchronized void focusForInput() throws Exception {
+        platform.focusDisplay(displayId);
+    }
+
+    synchronized void returnInputFocus() throws Exception {
+        if (!active) platform.focusDisplay(Display.DEFAULT_DISPLAY);
+    }
+
     private synchronized void releaseAfterDeath(String requestedOwner) {
         if (!requestedOwner.equals(owner)) return;
         try { close(); }

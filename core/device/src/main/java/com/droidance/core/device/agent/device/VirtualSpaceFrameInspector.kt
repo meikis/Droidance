@@ -16,6 +16,8 @@ interface VirtualSpaceFrameInspector {
 
     fun renderWaitTimeoutMs(): Long
     fun renderWaitPollMs(): Long
+    fun sidecarCallTimeoutMs(): Long
+    fun sidecarCaptureTimeoutMs(): Long
     fun emptyFrameFailure(): String
     fun checkBlackFrame(pngBytes: ByteArray): BlackFrameCheck
 

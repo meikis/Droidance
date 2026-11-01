@@ -161,6 +161,8 @@
   "virtual_space": {
     "render_wait_timeout_ms": 3000,
     "render_wait_poll_ms": 120,
+    "sidecar_call_timeout_ms": 5000,
+    "sidecar_capture_timeout_ms": 8000,
     "black_frame_mean_threshold": 8.0,
     "black_frame_variance_threshold": 6.0
   }

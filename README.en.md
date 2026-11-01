@@ -68,7 +68,9 @@ No XML hierarchy dumps and no accessibility service. Custom-drawn controls and W
 
 **Requirements**
 
-- An Android 11 or later phone (wireless debugging pairing requires Android 11+) connected to Wi‑Fi.
+- An Android 11 or later phone (wireless debugging pairing requires Android 11+) connected to Wi‑Fi. Low-memory and Android Go devices are not supported.
+- Android 11–13 support is experimental: without per-display focus, key and text input briefly take focus from the main screen, and on Android 11 and 12 tasks cannot continue while the phone is locked.
+- If the Agent reports that the system blocked input, enable "USB debugging (Security settings)" on Xiaomi-family phones, or disable permission monitoring on OPPO, OnePlus and realme phones, then restart wireless debugging.
 - An API key for a multimodal model that supports image input and tool calling.
 
 | Step | Action |

@@ -20,7 +20,15 @@ final class SidecarPlatformCompat {
     private static final int ALWAYS_UNLOCKED = 1 << 12;
     private static final int OWN_FOCUS = 1 << 14;
 
+    static final String INPUT_INJECTION_DENIED = "INPUT_INJECTION_DENIED: the system blocked input from wireless "
+            + "debugging. Enable the developer option for USB debugging security settings, or disable "
+            + "permission monitoring, then restart wireless debugging.";
+
     private SidecarPlatformCompat() {}
+
+    static boolean hasOwnDisplayFocus(int sdk) {
+        return sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
+    }
 
     static int virtualDisplayFlags(int sdk) {
         // PUBLIC lets the user's IME process obtain this display and create its native window.
@@ -42,7 +50,7 @@ final class SidecarPlatformCompat {
         // OWN_FOCUS keeps input events scoped to this display. The platform IME stays
         // hidden by default. The viewer or the same Agent can explicitly enable the
         // selected native keyboard; background text uses display-scoped keys/clipboard.
-        if (sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) flags |= OWN_FOCUS;
+        if (hasOwnDisplayFocus(sdk)) flags |= OWN_FOCUS;
         return flags;
     }
 

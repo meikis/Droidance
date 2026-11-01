@@ -378,6 +378,10 @@ data class VirtualSpacePolicy(
     val renderWaitTimeoutMs: Long,
     @SerialName("render_wait_poll_ms")
     val renderWaitPollMs: Long,
+    @SerialName("sidecar_call_timeout_ms")
+    val sidecarCallTimeoutMs: Long,
+    @SerialName("sidecar_capture_timeout_ms")
+    val sidecarCaptureTimeoutMs: Long,
     @SerialName("black_frame_mean_threshold")
     val blackFrameMeanThreshold: Double,
     @SerialName("black_frame_variance_threshold")
@@ -387,6 +391,8 @@ data class VirtualSpacePolicy(
         require(renderWaitTimeoutMs > 0)
         require(renderWaitPollMs > 0)
         require(renderWaitPollMs <= renderWaitTimeoutMs)
+        require(sidecarCallTimeoutMs > 0)
+        require(sidecarCaptureTimeoutMs > 0)
         require(blackFrameMeanThreshold.isFinite() && blackFrameMeanThreshold >= 0)
         require(blackFrameVarianceThreshold.isFinite() && blackFrameVarianceThreshold >= 0)
     }

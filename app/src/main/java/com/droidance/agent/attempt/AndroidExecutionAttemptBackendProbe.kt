@@ -32,6 +32,7 @@ class AndroidExecutionAttemptBackendProbe @Inject constructor(
      * the channel unavailable, which ends the task.
      */
     override suspend fun prepare(route: ExecutionAttemptRoute): ExecutionBackendObservation {
+        virtualSpaceManager.releaseOutgrownDisplay()
         val deadline = android.os.SystemClock.elapsedRealtime() +
             ruleConfigManager.harnessPolicy().runtimeThresholds.taskEntryCapabilityWaitMs
         while (true) {
@@ -60,6 +61,7 @@ class AndroidExecutionAttemptBackendProbe @Inject constructor(
         return ExecutionBackendObservation(route.expectedBackend,
             capabilityRegistry.getVirtualDisplayId() ?: 0, "", false, emptySet(),
             unavailableDiagnosticCode = when {
+                !virtualSpaceManager.isDeviceSupported() -> AttemptDiagnosticCode.VIRTUAL_DISPLAY_UNSUPPORTED
                 route.runtimeMode != RuntimeMode.STANDARD || route.executionSpace != ExecutionSpace.VIRTUAL_SPACE -> AttemptDiagnosticCode.BACKEND_UNAVAILABLE
                 airModePairingManager.isPairingRequired || !airModePairingManager.isPreviouslyPaired -> AttemptDiagnosticCode.AIR_PAIRING_REQUIRED
                 else -> AttemptDiagnosticCode.AIR_CHANNEL_RECOVERY_REQUIRED

@@ -10,6 +10,7 @@ import com.droidance.core.device.agent.device.*
 import com.droidance.agent.device.*
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.view.WindowManager
 import com.droidance.agent.RuntimeCapabilityRegistry
@@ -66,6 +67,23 @@ class VirtualSpaceManager @Inject constructor(
     fun isActiveForMode(mode: RuntimeMode): Boolean =
         active && sidecarSession?.mode == mode
     fun isVisible(): Boolean = false
+
+    /** Wireless debugging arrived in Android 11; app windows on other displays need the platform feature. */
+    fun isDeviceSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS)
+
+    /**
+     * A display created on a foldable's cover screen stays that small after unfolding. Runs only
+     * at task entry, and a retained display that still fits the screen is kept.
+     */
+    @Synchronized
+    fun releaseOutgrownDisplay() {
+        val session = sidecarSession?.takeIf { active } ?: return
+        val spec = resolveScreenSpec()
+        if (minOf(spec.width, spec.height) <= minOf(session.width, session.height)) return
+        debugLogManager.appendEvent("virtual_space: screen outgrew display ${session.width}x${session.height}")
+        stop()
+    }
     fun activeDisplayId(): Int? = capabilityRegistry.getVirtualDisplayId().takeIf { active }
     fun activeDisplaySize(): Pair<Int, Int>? = sidecarSession
         ?.takeIf { active && capabilityRegistry.getVirtualDisplayId() == it.displayId }
