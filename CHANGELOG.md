@@ -8,17 +8,21 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
-### Changed
+## [0.1.5] - 2026-11-02
 
-- Documentation, test sources, fixtures and debug acceptance tools are local-only. Public CI validates the published source and APK build without claiming local test coverage.
-- **Breaking:** Custom rule overrides must replace `human_assistance.observation_unavailable_diagnostics` with `recovery_handoffs` and include the current localized runtime notice keys from the bundled rule configuration.
+### Added
+
+- Show chat and conversation token usage; hide counts when unavailable.
 
 ### Fixed
 
-- Transient screenshot exceptions use the bounded frame recovery path instead of immediately ending the task.
-- Blocked input permissions pause the task with recovery instructions instead of being reported as a disconnected control channel.
-- Model connection, rate-limit, request-format and availability failures retain their specific notices even when a stopped-task explanation is unavailable.
-- Execution failures retain a diagnostic reference and stack locations for data export.
+- Recover temporary screenshot failures and pause for blocked input permissions.
+- Explain task failures more clearly and retain diagnostic references.
+
+### Changed
+
+- Keep documentation, tests and acceptance tools local.
+- **Custom rule overrides:** replace `observation_unavailable_diagnostics` with `recovery_handoffs` and refresh bundled notice keys.
 
 ## [0.1.4] - 2026-11-02
 
@@ -81,7 +85,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/YbbLab/Droidance/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/YbbLab/Droidance/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/YbbLab/Droidance/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/YbbLab/Droidance/compare/v0.1.0...v0.1.1
