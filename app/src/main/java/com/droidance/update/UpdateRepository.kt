@@ -6,6 +6,7 @@ package com.droidance.update
 import com.droidance.BuildConfig
 import com.droidance.settings.GeneralSettingsRepository
 import com.droidance.update.model.AppReleaseInfo
+import com.droidance.update.model.ReleaseMetadataDto
 import com.droidance.update.model.GitHubReleaseDto
 import com.droidance.update.model.UpdateCheckError
 import com.droidance.update.model.UpdateCheckState
@@ -62,13 +63,33 @@ class UpdateRepository internal constructor(
                     if (!VersionComparator.isValid(dto.tagName) || !VersionComparator.isValid(currentVersion)) {
                         throw SerializationException("Release and installed versions must use SemVer")
                     }
+                    if (!VersionComparator.isNewer(dto.tagName, currentVersion)) {
+                        recordCheckTime(System.currentTimeMillis())
+                        return@withUpdateResponse UpdateCheckState.UpToDate(currentVersion)
+                    }
                     val asset = dto.assets.firstOrNull { isReleaseAsset(it.downloadUrl, it.name, repository) }
                         ?: return@withUpdateResponse UpdateCheckState.CheckFailed(UpdateCheckError.NO_RELEASE_FOUND)
+                    val metadataUrl = "https://github.com/$repository/releases/download/${dto.tagName}/release.json"
+                    val metadataAsset = dto.assets.singleOrNull { it.name == "release.json" && it.downloadUrl == metadataUrl }
+                        ?: throw SerializationException("Release has no localized update metadata")
+                    val metadataRequest = Request.Builder().url(metadataAsset.downloadUrl)
+                        .header("User-Agent", "Droidance-AppUpdate/${BuildConfig.VERSION_NAME}")
+                        .apply { if (force) cacheControl(CacheControl.FORCE_NETWORK) }
+                        .build()
+                    val metadata = client.withUpdateResponse(metadataRequest) { metadataResponse ->
+                        if (!metadataResponse.isSuccessful) throw UpdateHttpException(metadataResponse.code)
+                        json.decodeFromString<ReleaseMetadataDto>(metadataResponse.body?.string()
+                            ?: throw SerializationException("Empty release metadata"))
+                    }
+                    if (metadata.tag != dto.tagName || metadata.apk != asset.name ||
+                        listOf("en", "zh").any { metadata.releaseNotes[it].isNullOrBlank() }) {
+                        throw SerializationException("Localized update notes do not match the selected release")
+                    }
                     val release = AppReleaseInfo(
                         tagName = dto.tagName,
                         versionName = dto.tagName.removePrefix("v").removePrefix("V"),
                         releaseTitle = dto.name?.takeIf { it.isNotBlank() } ?: dto.tagName,
-                        releaseNotes = dto.body.orEmpty(),
+                        releaseNotes = metadata.releaseNotes,
                         publishedAt = dto.publishedAt.orEmpty(),
                         htmlUrl = "https://github.com/$repository/releases",
                         apkDownloadUrl = asset.downloadUrl,
@@ -77,11 +98,7 @@ class UpdateRepository internal constructor(
                         sha256 = asset.sha256Digest()
                     )
                     recordCheckTime(System.currentTimeMillis())
-                    if (VersionComparator.isNewer(dto.tagName, currentVersion)) {
-                        UpdateCheckState.UpdateAvailable(release, currentVersion)
-                    } else {
-                        UpdateCheckState.UpToDate(currentVersion)
-                    }
+                    UpdateCheckState.UpdateAvailable(release, currentVersion)
                 }
             } catch (e: CancellationException) {
                 throw e

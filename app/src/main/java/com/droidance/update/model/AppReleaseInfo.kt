@@ -13,7 +13,7 @@ data class AppReleaseInfo(
     val tagName: String,
     val versionName: String,
     val releaseTitle: String,
-    val releaseNotes: String,
+    val releaseNotes: Map<String, String>,
     val publishedAt: String,
     val htmlUrl: String,
     val apkDownloadUrl: String,
@@ -26,7 +26,6 @@ data class AppReleaseInfo(
 internal data class GitHubReleaseDto(
     @SerialName("tag_name") val tagName: String = "",
     @SerialName("name") val name: String? = null,
-    @SerialName("body") val body: String? = null,
     @SerialName("published_at") val publishedAt: String? = null,
     @SerialName("html_url") val htmlUrl: String? = null,
     @SerialName("assets") val assets: List<GitHubAssetDto> = emptyList()
@@ -44,3 +43,10 @@ internal data class GitHubAssetDto(
 internal fun GitHubAssetDto.sha256Digest(): String? = digest
     ?.removePrefix("sha256:")
     ?.takeIf { digest?.startsWith("sha256:") == true && it.matches(Regex("[a-fA-F0-9]{64}")) }
+
+@Serializable
+internal data class ReleaseMetadataDto(
+    val tag: String,
+    val apk: String,
+    @SerialName("release_notes") val releaseNotes: Map<String, String>
+)

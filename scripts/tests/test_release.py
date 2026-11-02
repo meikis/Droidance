@@ -50,8 +50,12 @@ class ReleaseTests(unittest.TestCase):
             with patch.object(release, 'run', side_effect=command):
                 identity, notes = release.tagged_identity('v0.2.0-beta.1', root)
                 self.assertTrue(identity['prerelease'])
-                self.assertIn('## English\n\n### Fixed\n\n- Upgrade handling.', notes)
-                self.assertIn('## 简体中文\n\n### 修复\n\n- 升级处理。', notes)
+                self.assertEqual('### Fixed\n\n- Upgrade handling.', notes)
+                localized = release.localized_release_notes(root, '0.2.0-beta.1')
+                self.assertEqual(notes, localized['en'])
+                self.assertEqual('### 修复\n\n- 升级处理。', localized['zh'])
+                self.assertNotIn('简体中文', notes)
+                self.assertNotIn('升级处理', notes)
                 with self.assertRaises(ValueError):
                     release.tagged_identity('v0.3.0', root)
             def wrong_commit(*args, **kwargs):

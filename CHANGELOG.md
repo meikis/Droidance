@@ -8,6 +8,23 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-02
+
+### Added
+
+- Optional ADB persistence reconnects through a saved local port after network changes. It is disabled by default and requires USB debugging to be enabled manually.
+
+### Fixed
+
+- Sidecar recovery now tries the saved local ADB port without waiting for Wi-Fi.
+- Port setup waits until tasks are idle. Pairing details are retained if port shutdown cannot be confirmed.
+- Tasks without a configured model now explain how to add a model and API key.
+- ADB shell output is decoded correctly for process detection and recovery diagnostics.
+
+### Changed
+
+- GitHub release descriptions are English. In-app update notes use the selected app language, with separate English and Chinese text.
+
 ## [0.1.3] - 2026-11-02
 
 ### Added
@@ -52,7 +69,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/YbbLab/Droidance/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/YbbLab/Droidance/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/YbbLab/Droidance/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/YbbLab/Droidance/releases/tag/v0.1.0

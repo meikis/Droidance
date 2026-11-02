@@ -38,8 +38,12 @@ def build_identity(source):
                 min_sdk=int(field(r'^\s*minSdk = ([0-9]+)\s*$')))
 
 
-# The app selects a section by these headings; see ReleaseNotes.kt.
-RELEASE_NOTE_SOURCES = (('## English', 'CHANGELOG.md'), ('## 简体中文', 'CHANGELOG.zh.md'))
+RELEASE_NOTE_SOURCES = {'en': 'CHANGELOG.md', 'zh': 'CHANGELOG.zh.md'}
+
+
+def localized_release_notes(root, version):
+    return {language: changelog_entry(root / name, version)
+            for language, name in RELEASE_NOTE_SOURCES.items()}
 
 
 def tagged_identity(tag, root=ROOT):
@@ -57,8 +61,7 @@ def tagged_identity(tag, root=ROOT):
         previous = build_identity(run('git', 'show', f'{other}:app/build.gradle.kts', cwd=root))
         if expected['version_code'] <= previous['version_code']:
             raise ValueError(f'versionCode must exceed reserved release {other}')
-    notes = '\n\n'.join(f"{heading}\n\n{changelog_entry(root / name, expected['version_name'])}"
-                        for heading, name in RELEASE_NOTE_SOURCES)
+    notes = localized_release_notes(root, expected['version_name'])['en']
     return dict(expected, tag=tag, commit=commit, prerelease='-' in expected['version_name']), notes
 
 
@@ -118,8 +121,9 @@ def main():
         if expected != tagged:
             raise ValueError('Prepared identity no longer matches the tagged source')
         metadata = verify_apk(args.apk, expected, args.sdk, args.certificate)
+        metadata['release_notes'] = localized_release_notes(ROOT, expected['version_name'])
         args.apk.with_suffix('.apk.sha256').write_text(f"{metadata['sha256']}  {args.apk.name}\n")
-        (args.apk.parent / 'release.json').write_text(json.dumps(metadata, indent=2) + '\n')
+        (args.apk.parent / 'release.json').write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + '\n')
         print('Final APK identity, alignment, signing certificate and SHA-256 verified')
 
 
