@@ -1237,6 +1237,7 @@ internal suspend fun TaskTurnSession.runModelRound(repairPurpose: RepairPurpose)
             runtimeFailureSummary = when {
                 imageInputRejected -> fallbackText("termination_model_image_unavailable")
                 providerFailure?.category == ProviderErrorCategory.BILLING -> fallbackText("termination_model_billing")
+                providerFailure?.category == ProviderErrorCategory.AUTHENTICATION -> fallbackText("termination_model_authentication")
                 providerFailure?.category == ProviderErrorCategory.PERMISSION_DENIED ->
                     providerFailure.publicReason?.let { reason ->
                         fallbackText("termination_model_permission_denied_reason", mapOf("reason" to reason))

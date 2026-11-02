@@ -10,11 +10,11 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class PermissionFailureNoticeIntegrationTest {
-    private fun runDenied(body: String): Pair<TurnResult, Int> = runBlocking {
+class ProviderAccessFailureNoticeIntegrationTest {
+    private fun runRejected(status: Int, body: String): Pair<TurnResult, Int> = runBlocking {
         val fixture = TaskCoordinatorTestFixture(stoppedReplyEnabled = true)
         val started = fixture.startTurn("denied", "Inspect the requested source")
-        fixture.model.nextStreamFailure = ProviderHttpException.fromResponse(403, "provider", body)
+        fixture.model.nextStreamFailure = ProviderHttpException.fromResponse(status, "provider", body)
         val result = fixture.coordinator.coordinateTask(
             taskGoal = "Inspect the requested source", additionalContext = "",
             durableTurn = started.active, turnContext = "", expectedBackend = started.expectedBackend,
@@ -24,7 +24,7 @@ class PermissionFailureNoticeIntegrationTest {
     }
 
     @Test fun deniedRequestStopsWithoutRetryAndUsesTheReasonNotice() {
-        val (result, requests) = runDenied("""{"error":{"message":"Plan excludes this model"}}""")
+        val (result, requests) = runRejected(403, """{"error":{"message":"Plan excludes this model"}}""")
         assertEquals(TurnFailureReason.MODEL_UNAVAILABLE, result.failureReason)
         assertEquals(TurnTerminal.SYSTEM_ERROR, result.terminal)
         assertEquals(1, requests)
@@ -33,8 +33,15 @@ class PermissionFailureNoticeIntegrationTest {
     }
 
     @Test fun deniedRequestWithoutAReasonUsesThePlainNotice() {
-        val (result, requests) = runDenied("<html>403</html>")
+        val (result, requests) = runRejected(403, "<html>403</html>")
         assertEquals(1, requests)
         assertEquals("termination_model_permission_denied", result.runtimeFailureSummary)
+    }
+    @Test fun rejectedKeyStopsWithoutRetryAndUsesTheAuthenticationNotice() {
+        val (result, requests) = runRejected(401, """{"error":{"message":"private-response-body"}}""")
+        assertEquals(TurnFailureReason.MODEL_UNAVAILABLE, result.failureReason)
+        assertEquals(1, requests)
+        assertEquals("termination_model_authentication", result.runtimeFailureSummary)
+        assertEquals(result.runtimeFailureSummary, RuntimeUiResultPolicy.failureSummary(result) { "wrong fallback" })
     }
 }

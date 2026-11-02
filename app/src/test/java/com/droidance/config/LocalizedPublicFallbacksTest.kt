@@ -44,6 +44,20 @@ class LocalizedPublicFallbacksTest {
         }
     }
 
+    @Test fun authenticationNoticePointsAtTheKeyWithoutProviderDetails() {
+        notices.validate()
+        val chinese = notices.text("zh", "termination_model_authentication")
+        val english = notices.text("en", "termination_model_authentication")
+        assertTrue(chinese.contains("检查密钥"))
+        assertTrue(chinese.contains("尚未完成"))
+        assertTrue(english.contains("Check the key"))
+        assertTrue(english.contains("incomplete"))
+        for (text in listOf(chinese, english)) {
+            assertFalse(text.contains("401"))
+            assertFalse(text.contains("http"))
+        }
+    }
+
     @Test fun permissionNoticesPointAtKeyPermissionsOrPlanAndOnlyOneCarriesTheReason() {
         notices.validate()
         for (language in listOf("zh", "en")) {

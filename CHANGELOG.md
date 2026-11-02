@@ -16,6 +16,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 - The provider list and chat model list show the default provider first, then custom providers, then presets.
 - A 403 from a model service now asks you to check API key permissions or plan, and shows the service's reason with sensitive values removed.
+- A task stopped by a rejected API key now says to check the key instead of showing a generic execution error.
 
 ### Fixed
 
