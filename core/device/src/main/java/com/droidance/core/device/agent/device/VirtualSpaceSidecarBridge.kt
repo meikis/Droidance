@@ -10,12 +10,10 @@ import com.droidance.core.agent.device.*
 import com.droidance.core.device.agent.device.*
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.IBinder
 import android.os.RemoteException
-import android.os.SystemClock
 import android.view.SurfaceControl
 import com.droidance.core.device.air.AirModePairingManager
 import com.droidance.core.device.tools.AdbShellExecutor
@@ -33,7 +31,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicLong
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -67,7 +64,6 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     private val displayModes = ConcurrentHashMap<Int, RuntimeMode>()
     private val displaySizes = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val protocolCompatibility = ConcurrentHashMap<IBinder, Boolean>()
-    private val lastBinderRequestAtMs = AtomicLong(0L)
 
     // sidecar 是独立 app_process 子进程；AIDL 是同步阻塞的双向 Binder transact，进程卡住时
     // 调用方线程会被无限期挂起——既不抛异常也不返回。这曾是"后台任务卡住上百分钟只能手动取消"的
@@ -137,17 +133,6 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     fun isResidentBinderAlive(mode: RuntimeMode): Boolean =
         isRegisteredServiceAlive(mode)
-
-    /** Asks a resident sidecar for its Binder; only local IPC, so it works without Wi-Fi or ADB. */
-    fun requestResidentBinder() {
-        val now = SystemClock.elapsedRealtime()
-        val last = lastBinderRequestAtMs.get()
-        if (last != 0L && now - last < BINDER_REQUEST_INTERVAL_MS) return
-        if (!lastBinderRequestAtMs.compareAndSet(last, now)) return
-        runCatching {
-            context.sendBroadcast(Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_REQUEST))
-        }
-    }
 
     fun isChannelAvailableForMode(mode: RuntimeMode?): Boolean =
         when (mode) {
@@ -277,6 +262,20 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                         "app-received-broadcasts=${SidecarBinderRegistry.receivedCount}; sidecar-log=[${readSidecarLog()}]"
             }
             ok
+        }
+    }
+
+    /** Stops the sidecar and its supervisor; a graceful exit also works without the live ADB shell. */
+    fun stopResidentChannel() {
+        synchronized(serviceLock) {
+            val service = rawServiceOrNull(RuntimeMode.STANDARD)
+            stopResidentSidecarProcess(
+                RuntimeMode.STANDARD,
+                service,
+                allowGracefulDestroy = service != null,
+                currentProtocolOnly = false
+            )
+            clearStoppedSidecar(service?.asBinder())
         }
     }
 
@@ -1838,22 +1837,16 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         height: Int,
         densityDpi: Int,
     ): String {
-        val apkPath = context.applicationInfo.sourceDir
-        val mainClass = "com.droidance.core.device.agent.device.VirtualSpaceSidecarMain"
-        return buildString {
-            // 不能在同一条 sh -c 里按 mainClass 清进程，否则会匹配当前命令文本并杀掉启动过程。
-            append("export CLASSPATH=${adbShell.escapeForShell(apkPath)}; ")
-            // setsid 让 sidecar 脱离 AIR/AirAdbClient 的一次性 shell 会话，避免 shell 连接关闭时
-            // SIGHUP 杀掉后台 sidecar 进程（真机 binder timeout 的疑似主因；模拟器手动 adb shell 不复现）。
-            // setsid 脱离一次性 shell 会话 + </dev/null 关闭 stdin 防 SIGPIPE，
-            // 确保 AirAdbClient 连接关闭后 sidecar 仍存活到完成 binder 广播。
-            append("(setsid app_process /system/bin $mainClass ")
-            append("$width $height $densityDpi ")
-            append("${adbShell.escapeForShell(context.packageName)} ")
-            append("droidance-sidecar-protocol=$SIDECAR_PROTOCOL_VERSION ")
-            append("${adbShell.escapeForShell("droidance-sidecar-source=$apkPath")} ")
-            append("</dev/null >/data/local/tmp/droidance_vspace.log 2>&1 &)")
-        }
+        return ResidentSidecarProcessCommands.launchCommand(
+            apkPath = context.applicationInfo.sourceDir,
+            mainClass = "com.droidance.core.device.agent.device.VirtualSpaceSidecarMain",
+            width = width,
+            height = height,
+            densityDpi = densityDpi,
+            packageName = context.packageName,
+            protocolVersion = SIDECAR_PROTOCOL_VERSION,
+            escape = adbShell::escapeForShell
+        )
     }
 
     /** 诊断用：把 sidecar 进程存活、setsid/nohup 可用性、日志文件状态、日志内容一起读回来，定位 binder timeout 真因。 */
@@ -1900,7 +1893,6 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         private const val ADB_BIND_RETRIES = 50
         private const val RESIDENT_REBIND_RETRIES = 30
         private const val BIND_POLL_MS = 200L
-        private const val BINDER_REQUEST_INTERVAL_MS = 3_000L
         private const val PROCESS_PROBE_TIMEOUT_MS = 2_000L
         private const val PROCESS_EXIT_RETRIES = 20
         private const val GRACEFUL_EXIT_RETRIES = 5

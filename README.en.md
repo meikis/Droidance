@@ -201,7 +201,7 @@ Agent rules and policies live in Markdown configuration (`app/src/main/assets/ru
 | Exact alarms, start at boot, battery optimization exemption | Run and restore scheduled tasks on time |
 | Install unknown apps | Install updates downloaded in the app |
 
-Runtime permissions can be revoked in system settings at any time, and turning off wireless debugging stops the sidecar. See [permissions and security boundaries](docs/PERMISSIONS_AND_SECURITY.md) for the full list, and report security issues privately according to [SECURITY](SECURITY.md).
+Runtime permissions can be revoked in system settings at any time. After pairing, the sidecar does not depend on Wi‑Fi and restarts itself if killed. Reset pairing or restart the phone to stop it; it no longer restarts once developer options are off. See [permissions and security boundaries](docs/PERMISSIONS_AND_SECURITY.md) for the full list, and report security issues privately according to [SECURITY](SECURITY.md).
 
 **Limits**
 
@@ -212,7 +212,7 @@ Runtime permissions can be revoked in system settings at any time, and turning o
 
 ## 📱 Compatibility and known limitations
 
-- Wireless debugging requires Wi‑Fi. Some systems turn it off after network changes, restarts or long idle periods, and it must be enabled again.
+- Pairing and reconnecting after a phone restart require Wi‑Fi. Some systems turn wireless debugging off after network changes, restarts or long idle periods, and it must be enabled again when needed.
 - Some vendor systems restrict background work. Allow Droidance to run in the background and turn off battery optimization for it.
 - Some apps detect developer options or wireless debugging and may refuse to run or limit features.
 - Success rate and speed depend on the model's vision and reasoning. An agent reporting "done" does not guarantee the business result is correct, so check important results yourself.

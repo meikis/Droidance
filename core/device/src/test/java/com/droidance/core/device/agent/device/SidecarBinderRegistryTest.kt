@@ -8,6 +8,7 @@ import com.droidance.core.agent.device.*
 import com.droidance.core.device.agent.device.*
 
 import android.os.Binder
+import android.os.IBinder
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -35,7 +36,27 @@ class SidecarBinderRegistryTest {
         SidecarBinderRegistry.clear(rebroadcastProxy)
     }
 
+    @Test
+    fun restartedSidecarReplacesBinderThatStillReportsAliveAfterItsObituary() {
+        val first = LiveBinder()
+        val restarted = LiveBinder()
+        SidecarBinderRegistry.clear(first)
+
+        SidecarBinderRegistry.set(2000, first)
+        first.recipient!!.binderDied()
+        SidecarBinderRegistry.set(2000, restarted)
+
+        assertSame(restarted, SidecarBinderRegistry.get(2000))
+        SidecarBinderRegistry.clear(restarted)
+    }
+
     private class LiveBinder : Binder() {
+        var recipient: IBinder.DeathRecipient? = null
+
         override fun isBinderAlive(): Boolean = true
+
+        override fun linkToDeath(recipient: IBinder.DeathRecipient, flags: Int) {
+            this.recipient = recipient
+        }
     }
 }

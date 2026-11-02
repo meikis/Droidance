@@ -61,15 +61,47 @@ class ResidentSidecarProcessCommandsTest {
     }
 
     @Test
-    fun stopCommandUsesOnlyParsedNumericPidsAndSupportsForceFallback() {
-        assertEquals(
-            "kill 4312 2>/dev/null; kill 4313 2>/dev/null",
-            ResidentSidecarProcessCommands.stopCommand(listOf(4312, 4313, 4312), force = false)
-        )
-        assertEquals(
-            "kill -9 4312 2>/dev/null; kill -9 4313 2>/dev/null",
-            ResidentSidecarProcessCommands.stopCommand(listOf(4312, 4313), force = true)
-        )
+    fun stopCommandSignalsParsedProcessGroupsAndSupportsForceFallback() {
+        val graceful = ResidentSidecarProcessCommands.stopCommand(listOf(4312, 4313, 4312), force = false)!!
+        val forced = ResidentSidecarProcessCommands.stopCommand(listOf(4312), force = true)!!
+
+        assertTrue(graceful.contains("/proc/4312/stat"))
+        assertTrue(graceful.contains("kill -- -\$g"))
+        assertTrue(graceful.contains("kill 4313 2>/dev/null"))
+        assertEquals(1, Regex("/proc/4312/stat").findAll(graceful).count())
+        assertTrue(forced.contains("kill -9 -- -\$g"))
+        assertTrue(forced.contains("kill -9 4312 2>/dev/null"))
         assertEquals(null, ResidentSidecarProcessCommands.stopCommand(emptyList(), force = true))
     }
+
+    @Test
+    fun supervisorScriptCannotBeMistakenForASidecarProcess() {
+        val probe = Regex("VirtualSpaceSidecarMain|droidance-sidecar-protocol=")
+        val command = launchCommand()
+        val supervisorArgs = command.substringAfter("setsid sh -c ").substringBefore(" </dev/null")
+
+        assertTrue(probe.containsMatchIn(command))
+        assertFalse(probe.containsMatchIn(supervisorArgs))
+    }
+
+    @Test
+    fun supervisorRestartsOnlyAbnormalExitsWhileTheInstallIsCurrent() {
+        val command = launchCommand()
+
+        assertTrue(command.contains("[ \$? -eq 0 ] && break"))
+        assertTrue(command.contains("[ -f \"\$CLASSPATH\" ] || break"))
+        assertTrue(command.contains("development_settings_enabled"))
+        assertTrue(command.contains("sleep 5"))
+    }
+
+    private fun launchCommand() = ResidentSidecarProcessCommands.launchCommand(
+        apkPath = "/data/app/base.apk",
+        mainClass = "com.droidance.core.device.agent.device.VirtualSpaceSidecarMain",
+        width = 1080,
+        height = 2400,
+        densityDpi = 420,
+        packageName = "com.droidance",
+        protocolVersion = 21,
+        escape = { "'$it'" }
+    )
 }

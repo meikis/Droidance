@@ -16,7 +16,9 @@ import android.os.Build;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
+import android.system.ErrnoException;
 import android.system.Os;
+import android.system.OsConstants;
 import android.util.Log;
 
 /**
@@ -30,6 +32,7 @@ public final class VirtualSpaceSidecarMain {
     private static final int SHELL_UID = 2000;
     private static final long STALE_PROCESS_EXIT_WAIT_MS = 100L;
     private static final int STALE_PROCESS_EXIT_RETRIES = 20;
+    private static final long SCREEN_OFF_APP_PROBE_MS = 2000L;
     private static java.io.RandomAccessFile leaseFile;
     private static java.nio.channels.FileLock leaseLock;
 
@@ -72,7 +75,6 @@ public final class VirtualSpaceSidecarMain {
             VirtualSpaceSidecarService service = new VirtualSpaceSidecarService(sidecarContext);
             writeLog("INFO service created", null);
             registerScreenLifecycle(sidecarContext, service, targetPackage);
-            registerBinderRequests(sidecarContext, service, targetPackage);
             boolean broadcastOk = service.broadcastBinder(sidecarContext, targetPackage);
             writeLog("INFO broadcastBinder returned=" + broadcastOk + " err=" + service.getLastError(), null);
             if (!broadcastOk) {
@@ -124,36 +126,6 @@ public final class VirtualSpaceSidecarMain {
             context.registerReceiver(receiver, filter);
         }
         writeLog("INFO screen lifecycle receiver registered", null);
-    }
-
-    /**
-     * 熄屏时周期广播暂停，无 ADB 时重启后的 app 只能靠这条请求取回 binder。
-     * 发送方限定为持有 ADB 授予权限的 app；回复仍只发给 targetPackage。注册失败不影响常驻通道。
-     */
-    private static void registerBinderRequests(
-            Context context,
-            VirtualSpaceSidecarService service,
-            String targetPackage
-    ) {
-        BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context receiverContext, Intent intent) {
-                service.broadcastBinder(receiverContext, targetPackage);
-            }
-        };
-        IntentFilter filter = new IntentFilter(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_REQUEST);
-        try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                context.registerReceiver(receiver, filter,
-                        SidecarBinderReceiver.BINDER_REQUEST_SENDER_PERMISSION, null, Context.RECEIVER_EXPORTED);
-            } else {
-                context.registerReceiver(receiver, filter,
-                        SidecarBinderReceiver.BINDER_REQUEST_SENDER_PERMISSION, null);
-            }
-            writeLog("INFO binder request receiver registered", null);
-        } catch (RuntimeException e) {
-            writeLog("WARN binder request receiver failed: " + safeMessage(e), null);
-        }
     }
 
     private static void ensureSupportedIdentity() {
@@ -226,7 +198,7 @@ public final class VirtualSpaceSidecarMain {
                 if (!MAIN_CLASS_NAME.equals(fields[4])) continue;
                 if (isCurrentBuildCommand(line, protocolVersion, codeSource)) continue;
                 if (android.os.Process.myUid() == SHELL_UID) {
-                    android.os.Process.killProcess(pid);
+                    killProcessGroup(pid);
                     stalePids.add(pid);
                 }
             }
@@ -242,6 +214,26 @@ public final class VirtualSpaceSidecarMain {
             }
         }
         return stalePids;
+    }
+
+    /** A stale supervisor must stop with its sidecar, or it would relaunch the previous build. */
+    private static void killProcessGroup(int pid) {
+        try {
+            int group = processGroupOf(Integer.toString(pid));
+            if (group > 1 && group != processGroupOf("self")) Os.kill(-group, OsConstants.SIGKILL);
+        } catch (ErrnoException | java.io.IOException | RuntimeException e) {
+            writeLog("WARN stale sidecar group kill failed: " + safeMessage(e), null);
+        }
+        android.os.Process.killProcess(pid);
+    }
+
+    private static int processGroupOf(String process) throws java.io.IOException {
+        String stat = new String(
+                java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("/proc/" + process + "/stat")),
+                java.nio.charset.StandardCharsets.UTF_8
+        );
+        // Fields after the parenthesized name: state, ppid, pgrp.
+        return Integer.parseInt(stat.substring(stat.lastIndexOf(')') + 2).split(" ")[2]);
     }
 
     static boolean isCurrentBuildCommand(String commandLine, int protocolVersion, String codeSource) {
@@ -312,6 +304,24 @@ public final class VirtualSpaceSidecarMain {
         leaseFile = null;
     }
 
+    private static int readAppPid(String targetPackage) {
+        java.lang.Process probe = null;
+        try {
+            probe = new ProcessBuilder("/system/bin/pidof", targetPackage).redirectErrorStream(true).start();
+            if (!probe.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) return 0;
+            String output = new String(
+                    probe.getInputStream().readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8
+            ).trim();
+            return output.isEmpty() ? 0 : parsePositiveInt(output.split("\\s+")[0]);
+        } catch (Throwable t) {
+            writeLog("WARN app pid probe failed: " + safeMessage(t), null);
+            return 0;
+        } finally {
+            if (probe != null) probe.destroyForcibly();
+        }
+    }
+
     private static void startRebroadcast(
             VirtualSpaceSidecarService service,
             Context ctx,
@@ -323,16 +333,24 @@ public final class VirtualSpaceSidecarMain {
             // 一个存活的 binder，无需再经 ADB/无线调试(WiFi 关也成立)。广播是本机 IPC，与网络无关。
             int i = 0;
             PowerManager powerManager = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+            int observedAppPid = -1;
             while (true) {
-                long sleepMs = i < 15 ? 1000L : 5000L;
+                boolean interactive = powerManager == null || powerManager.isInteractive();
+                long sleepMs = i < 15 ? 1000L : interactive ? 5000L : SCREEN_OFF_APP_PROBE_MS;
                 try {
                     Thread.sleep(sleepMs);
                 } catch (InterruptedException e) {
                     return;
                 }
                 // 熄屏时不向挂起的目标应用发送周期广播，防止 OEM 功耗冻结管理器代理队列打满(如 ColorOS bcMax)强制唤醒
+                // 但无 ADB 时重启后的 app 只能等这里：熄屏时 app 进程号变化才补发一次，不走周期广播。
                 if (powerManager != null && !powerManager.isInteractive()) {
-                    continue;
+                    int appPid = readAppPid(targetPackage);
+                    boolean restarted = observedAppPid >= 0 && appPid > 0 && appPid != observedAppPid;
+                    observedAppPid = appPid;
+                    if (!restarted) continue;
+                } else {
+                    observedAppPid = -1;
                 }
                 try {
                     service.broadcastBinder(ctx, targetPackage);

@@ -209,7 +209,8 @@ private fun AirPairingStatusCard(
                 }
                 // 进行中留一条回到系统无线调试页的通路——用户切回 App 后不必取消重来
                 when {
-                    pairingState == PairingState.IDLE && state.airPreviouslyPaired && !connected -> {
+                    (pairingState == PairingState.IDLE || pairingState == PairingState.CONNECTED) &&
+                        state.airPreviouslyPaired -> {
                         Spacer(Modifier.width(12.dp))
                         SettingsPillButton(
                             text = stringResource(R.string.settings_air_reset_pairing),

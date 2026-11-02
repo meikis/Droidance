@@ -15,7 +15,7 @@
 | `READ/WRITE_CONTACTS`, `READ/SEND_SMS`, `READ/WRITE_CALENDAR`, `READ_CALL_LOG` | `core:device` (`UnifiedDeviceToolRegistrar`) | 本地系统工具执行用户指令（如查日程、读验证码、发短信） | 模型发起工具调用前受系统权限弹窗约束；敏感写入操作推荐受控执行 |
 | `WRITE_SECURE_SETTINGS` | `app` (`AirSetup`) | AIR 模式通过 ADB shell 授予，用于自动维护无线调试连接 | 仅通过无线调试配对握手获取，不借此修改其他安全设置 |
 | `SYSTEM_ALERT_WINDOW` | `app` (悬浮控制/Island 交互) | 悬浮窗显示当前 Agent 思考状态与快速中断控制 | 用户手动授予悬浮窗权限，可由系统设置随时收回 |
-| Paired ADB shell (UID 2000) | `core:device` (`SidecarInputController`, `AdbShellExecutor`) | Standard virtual-display input, observation and device commands | Wireless debugging pairing is required; no privileged-UID fallback is provided |
+| Paired ADB shell (UID 2000) | `core:device` (`SidecarInputController`, `AdbShellExecutor`) | Standard virtual-display input, observation and device commands | Wireless debugging pairing is required; no privileged-UID fallback is provided. A shell-UID supervisor restarts the sidecar after abnormal exits without ADB or Wi-Fi. It stops on pairing reset, intentional sidecar exit, phone restart or APK removal, and does not restart the sidecar once developer options are off |
 
 ---
 

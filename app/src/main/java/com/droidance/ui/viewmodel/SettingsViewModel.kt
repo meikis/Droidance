@@ -216,7 +216,11 @@ class SettingsViewModel @Inject constructor(
     }
     fun stopAirPairing() { airModePairingManager.disconnect() }
     fun resetAirPairing() {
-        airModePairingManager.resetPairing()
+        // Stop first: the live ADB shell can still clean up, and the supervisor must not outlive trust.
+        appScope.launch(Dispatchers.IO) {
+            runCatching { virtualSpaceSidecarBridge.stopResidentChannel() }
+            airModePairingManager.resetPairing()
+        }
         _uiState.update {
             it.copy(
                 airBridgeState = AirModePairingManager.PairingState.IDLE,

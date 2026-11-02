@@ -8,6 +8,7 @@ import com.droidance.core.agent.device.*
 import com.droidance.core.device.agent.device.*
 
 import android.os.IBinder
+import android.os.RemoteException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -33,12 +34,24 @@ object SidecarBinderRegistry {
             // 已冻结的执行绑定随后被误判为“session changed”。只在旧 Binder 已死时
             // 换代；同一常驻进程的 rebroadcast 保持第一次收到的稳定代理引用。
             val current = binders[uid]
-            if (current == null || !current.isBinderAlive) {
+            if ((current == null || !current.isBinderAlive) && watchForDeath(uid, value)) {
                 binders[uid] = value
             }
             receivedCount++
         }
     }
+
+    /**
+     * A proxy reports isBinderAlive until an obituary or a failed call arrives. Without this link,
+     * an idle app would keep the dead Binder and ignore the restarted sidecar's Binder as a duplicate.
+     */
+    private fun watchForDeath(uid: Int, binder: IBinder): Boolean =
+        try {
+            binder.linkToDeath({ binders.remove(uid, binder) }, 0)
+            true
+        } catch (_: RemoteException) {
+            false
+        }
 
     fun get(uid: Int): IBinder? {
         if (uid != 2000) return null

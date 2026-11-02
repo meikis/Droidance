@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Changed
+
+- The background control service restarts itself if it is killed or crashes, without Wi-Fi. Resetting pairing stops it, and it does not restart once developer options are off.
+
 ### Fixed
 
 - After Wi-Fi drops, pairing settings keep showing Connected while the background control service is running, and reading notifications no longer needs the live wireless debugging connection.

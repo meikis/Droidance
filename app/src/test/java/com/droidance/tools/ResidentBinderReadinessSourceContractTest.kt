@@ -109,14 +109,12 @@ class ResidentBinderReadinessSourceContractTest {
     }
 
     @Test
-    fun restartedAppRequestsResidentBinderWithoutAdb() {
-        val registry = projectFile("app/src/main/java/com/droidance/agent/RuntimeCapabilityRegistry.kt").readText()
-        val bridge = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarBridge.kt").readText()
+    fun sidecarResendsBinderWhenTheAppRestartsWithTheScreenOff() {
         val sidecar = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarMain.java").readText()
+        val rebroadcast = sidecar.substringAfter("private static void startRebroadcast(")
 
-        assertTrue(registry.contains("virtualSpaceSidecarBridge.requestResidentBinder()"))
-        assertTrue(bridge.contains("Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_REQUEST)"))
-        assertTrue(sidecar.contains("SidecarBinderReceiver.BINDER_REQUEST_SENDER_PERMISSION"))
+        assertTrue(rebroadcast.contains("readAppPid(targetPackage)"))
+        assertTrue(rebroadcast.contains("appPid != observedAppPid"))
     }
 
     @Test

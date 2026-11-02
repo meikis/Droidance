@@ -528,7 +528,7 @@ class VirtualSpaceBackgroundFrameSourceContractTest {
         )
         assertTrue(
             bridge.contains(
-                "append(\"droidance-sidecar-protocol=${'$'}SIDECAR_PROTOCOL_VERSION \")"
+                "protocolVersion = SIDECAR_PROTOCOL_VERSION,"
             )
         )
         assertTrue(stop.contains("ResidentSidecarProcessCommands.stopCommand("))
