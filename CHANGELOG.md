@@ -4,13 +4,17 @@ All notable user-visible changes to Droidance are recorded in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/), and public releases use [Semantic Versioning](https://semver.org/). Version selection, entry rules, and the release process are defined in the [versioning and update policy](docs/release/VERSIONING_POLICY.md).
 
-Record a notable change in `Unreleased` within the same pull request that implements it. Use only the categories that contain changes: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Mark incompatible entries with `**Breaking:**`, name the affected contract, and give migration steps. At release time, move the entries under the exact version and its release date.
+Record a notable change in `Unreleased` within the same pull request that implements it. Use only the categories that contain changes: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Mark incompatible entries with `**Breaking:**`, name the affected contract, and give migration steps. At release time, move the entries under the exact version and its release date. Add the same version to [CHANGELOG.zh.md](CHANGELOG.zh.md), which supplies the Chinese update notes.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-02
+
 ### Changed
 
+- After pairing, device control keeps working without Wi-Fi and on mobile data. Pairing and reconnecting after a phone restart still need Wi-Fi.
 - The background control service restarts itself if it is killed or crashes, without Wi-Fi. Resetting pairing stops it, and it does not restart once developer options are off.
+- Update notes in the app follow the app language.
 
 ### Fixed
 
