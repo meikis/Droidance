@@ -399,7 +399,7 @@ class LLMRouter(
                     ))
                     val stream = when (transport) {
                         ModelTransport.GENERIC_CHAT_COMPLETIONS -> streamOpenAICompatible(
-                            endpointUrl = resolveEndpointUrl(config),
+                            endpointUrl = ProviderEndpoint.resolve(config.baseUrl, transport),
                             apiKey = config.apiKey,
                             model = currentModel,
                             messages = messages,
@@ -416,7 +416,7 @@ class LLMRouter(
                             forceDefaultReasoning = useDefaultReasoning
                         )
                         ModelTransport.OPENAI_RESPONSES -> streamOpenAIResponses(
-                            endpointUrl = OpenAIResponsesProtocol.endpoint(config.baseUrl),
+                            endpointUrl = ProviderEndpoint.resolve(config.baseUrl, transport),
                             apiKey = config.apiKey,
                             model = currentModel,
                             messages = messages,
@@ -640,16 +640,6 @@ class LLMRouter(
 
     // ====== OpenAI 兼容 HTTP 调用 ======
 
-    /** 按 OpenAI 兼容惯例解析最终请求端点：baseUrl 追加 /chat/completions。 */
-    private fun resolveEndpointUrl(config: ProviderConfig): String {
-        val trimmed = config.baseUrl.trim().trimEnd('/')
-        return if (trimmed.endsWith("/chat/completions")) {
-            trimmed
-        } else {
-            "$trimmed/chat/completions"
-        }
-    }
-
     /**
      * 流式调用 OpenAI 兼容 API（SSE）
      */
@@ -732,7 +722,7 @@ class LLMRouter(
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: "unknown error"
                 exchange.line(redactor.text(errorBody))
-                throw ProviderHttpException.fromResponse(response.code, providerName, errorBody, response.header("retry-after"))
+                throw ProviderHttpException.fromResponse(response.code, providerName, errorBody, response.header("retry-after"), redactor = redactor)
             }
 
             val source = response.body!!.source()
@@ -767,7 +757,7 @@ class LLMRouter(
                         val codeRaw = errObj["code"]?.jsonPrimitive?.contentOrNull
                         val codeInt = (errObj["code"] as? JsonPrimitive)?.intOrNull ?: codeRaw?.toIntOrNull()
                         val statusCode = codeInt ?: 500
-                        throw ProviderHttpException.fromResponse(statusCode, providerName, data)
+                        throw ProviderHttpException.fromResponse(statusCode, providerName, data, redactor = redactor)
                     }
 
                     // 解析 usage（出现在最后一个有效 chunk，需 stream_options.include_usage=true）
@@ -954,7 +944,7 @@ class LLMRouter(
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: "unknown error"
                 exchange.line(redactor.text(errorBody))
-                throw ProviderHttpException.fromResponse(response.code, providerName, errorBody, response.header("retry-after"))
+                throw ProviderHttpException.fromResponse(response.code, providerName, errorBody, response.header("retry-after"), redactor = redactor)
             }
             val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
             var line: String?

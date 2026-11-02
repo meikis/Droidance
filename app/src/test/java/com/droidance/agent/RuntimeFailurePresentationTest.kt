@@ -51,6 +51,10 @@ class RuntimeFailurePresentationTest {
             runtimeFailureMessageResource(ProviderHttpException.fromResponse(401, "provider", "{}"))
         )
         assertEquals(
+            R.string.chat_provider_permission_denied,
+            runtimeFailureMessageResource(ProviderHttpException.fromResponse(403, "provider", "{}"))
+        )
+        assertEquals(
             R.string.chat_provider_rate_limited,
             runtimeFailureMessageResource(ProviderHttpException.fromResponse(429, "provider", "{}"))
         )

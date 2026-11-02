@@ -11,6 +11,7 @@ object ModelRoundRetryPolicy {
     fun isTransientFailure(error: Throwable): Boolean {
         error.providerHttpException()?.let { failure ->
             return failure.category !in setOf(com.droidance.core.model.llm.ProviderErrorCategory.AUTHENTICATION,
+                com.droidance.core.model.llm.ProviderErrorCategory.PERMISSION_DENIED,
                 com.droidance.core.model.llm.ProviderErrorCategory.BILLING,
                 com.droidance.core.model.llm.ProviderErrorCategory.REQUEST_REJECTED,
                 com.droidance.core.model.llm.ProviderErrorCategory.CONTEXT_LIMIT) &&

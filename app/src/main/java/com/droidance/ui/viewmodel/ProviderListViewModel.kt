@@ -5,6 +5,7 @@ package com.droidance.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import com.droidance.settings.ProviderConfigManager
+import com.droidance.settings.inDisplayOrder
 import com.droidance.core.model.llm.models.ProviderConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,7 @@ class ProviderListViewModel @Inject constructor(
     }
 
     fun refreshList() {
-        _providers.value = configManager.getAllConfigs()
+        _providers.value = configManager.getAllConfigs().inDisplayOrder(configManager.presets)
     }
 
     private val _actionFailed = MutableStateFlow(false)

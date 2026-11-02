@@ -7,6 +7,8 @@ import com.droidance.core.agent.device.ExecutionSpace
 import com.droidance.core.model.llm.ModelStreamPlan
 import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.settings.ComposerSettings
+import com.droidance.settings.ProviderPreset
+import com.droidance.settings.inDisplayOrder
 
 data class ComposerModelOption(
     val providerId: String,
@@ -32,8 +34,11 @@ internal fun restoredComposerPreferences(
     executionSpace = settings.executionSpace
 )
 
-internal fun composerModelOptions(providers: List<ProviderConfig>): List<ComposerModelOption> =
-    providers.filter { it.isEnabled && it.isTransportConfigured() }.flatMap { provider ->
+internal fun composerModelOptions(
+    providers: List<ProviderConfig>,
+    presets: List<ProviderPreset>
+): List<ComposerModelOption> =
+    providers.filter { it.isEnabled && it.isTransportConfigured() }.inDisplayOrder(presets).flatMap { provider ->
         (provider.models + provider.defaultModel).filter(String::isNotBlank).distinct().map { model ->
             ComposerModelOption(provider.id, provider.name, model)
         }

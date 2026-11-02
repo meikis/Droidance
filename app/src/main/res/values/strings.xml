@@ -326,6 +326,10 @@
     <string name="provider_name">Name</string>
     <string name="provider_name_placeholder">Example: Primary model</string>
     <string name="provider_api_address">API address</string>
+    <string name="provider_protocol">API protocol</string>
+    <string name="provider_protocol_chat_completions">Chat Completions</string>
+    <string name="provider_protocol_responses">Responses</string>
+    <string name="provider_protocol_required">Select an API protocol</string>
     <string name="provider_model">Model ID</string>
     <string name="provider_reasoning">Reasoning effort</string>
     <string name="provider_reasoning_agent">Agent decides</string>
@@ -510,6 +514,8 @@
     <string name="execution_action_batch">Execute a group of screen actions</string>
     <string name="memory_background_save_failed">The recent memory could not be fully saved. You can continue this conversation.</string>
     <string name="chat_provider_auth_failed">Model service authentication failed. Check the provider configuration.</string>
+    <string name="chat_provider_permission_denied">The model service denied this request. Check your API key permissions or plan.</string>
+    <string name="chat_provider_service_reason">%1$s\nService reason: %2$s</string>
     <string name="chat_provider_rate_limited">The model service is rate limited. Try again later.</string>
     <string name="chat_network_unavailable">The network is unavailable. Check your connection.</string>
     <string name="automation_once">Once</string>

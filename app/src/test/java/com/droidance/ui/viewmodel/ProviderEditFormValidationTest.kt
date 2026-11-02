@@ -3,8 +3,14 @@
 
 package com.droidance.ui.viewmodel
 
+import com.droidance.core.model.llm.models.ApiType
+import com.droidance.core.model.llm.models.ProviderConfig
+import com.droidance.core.model.llm.models.ProviderTransportDiagnostic
+import com.droidance.core.model.llm.session.ModelTransport
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderEditFormValidationTest {
@@ -26,6 +32,73 @@ class ProviderEditFormValidationTest {
             ProviderFormError.MODEL_REQUIRED,
             completeState(models = emptyList(), modelInput = "").validationError
         )
+    }
+
+    @Test
+    fun everyProtocolMapsToAConfigThatCanServeRequests() {
+        val responses = completeState().withProtocol(ModelTransport.OPENAI_RESPONSES)
+        assertEquals(ApiType.OPENAI_RESPONSES, responses.apiType)
+        assertEquals(ModelTransport.OPENAI_RESPONSES, responses.savedConfig().resolvedTransportOrNull())
+        val chat = responses.withProtocol(ModelTransport.GENERIC_CHAT_COMPLETIONS)
+        assertEquals(ApiType.OPENAI_COMPATIBLE, chat.apiType)
+        assertEquals(ModelTransport.GENERIC_CHAT_COMPLETIONS, chat.savedConfig().resolvedTransportOrNull())
+    }
+
+    @Test
+    fun selectingTheCurrentProtocolKeepsACustomEntryUnchanged() {
+        val custom = storedConfig().copy(apiType = ApiType.CUSTOM, transportKind = ModelTransport.OPENAI_RESPONSES)
+        val state = custom.toEditState()
+        assertEquals(ModelTransport.OPENAI_RESPONSES, state.transportKind)
+        assertEquals(state, state.withProtocol(ModelTransport.OPENAI_RESPONSES))
+    }
+
+    @Test
+    fun unconfirmedEntryNeedsAProtocolAndIsConfirmedBySaving() {
+        val unconfirmed = storedConfig().copy(
+            apiType = ApiType.CUSTOM,
+            transportKind = ModelTransport.GENERIC_CHAT_COMPLETIONS,
+            transportDiagnostic = ProviderTransportDiagnostic.TRANSPORT_CONFIRMATION_REQUIRED,
+            isEnabled = false
+        )
+        val state = unconfirmed.toEditState()
+        assertNull(state.transportKind)
+        assertNull(state.requestUrl)
+        assertEquals(ProviderFormError.PROTOCOL_REQUIRED, state.validationError)
+
+        val confirmed = state.withProtocol(ModelTransport.OPENAI_RESPONSES)
+        assertNull(confirmed.validationError)
+        val saved = confirmed.savedConfig()
+        assertNull(saved.transportDiagnostic)
+        assertEquals(ModelTransport.OPENAI_RESPONSES, saved.resolvedTransportOrNull())
+        assertTrue(saved.isAvailableForRequests())
+    }
+
+    @Test
+    fun storedProtocolMismatchIsNotShownAsConfirmed() {
+        val mismatched = storedConfig().copy(transportKind = ModelTransport.OPENAI_RESPONSES)
+        assertEquals(ProviderFormError.PROTOCOL_REQUIRED, mismatched.toEditState().validationError)
+    }
+
+    @Test
+    fun configuredDisabledEntryStaysDisabled() {
+        assertFalse(storedConfig().copy(isEnabled = false).toEditState().isEnabled)
+    }
+
+    @Test
+    fun requestUrlFollowsAddressAndProtocol() {
+        val state = completeState(baseUrl = "https://relay.example/team/v1/")
+        assertEquals("https://relay.example/team/v1/chat/completions", state.requestUrl)
+        assertEquals(
+            "https://relay.example/team/v1/responses",
+            state.withProtocol(ModelTransport.OPENAI_RESPONSES).requestUrl
+        )
+        assertEquals(
+            "https://relay.example/v1/responses",
+            completeState(baseUrl = "https://relay.example/v1/responses")
+                .withProtocol(ModelTransport.OPENAI_RESPONSES).requestUrl
+        )
+        assertNull(completeState(baseUrl = "").requestUrl)
+        assertNull(completeState(baseUrl = "relay.example/v1").requestUrl)
     }
 
     @Test
@@ -79,6 +152,19 @@ class ProviderEditFormValidationTest {
             )
         }
     }
+
+    private fun ProviderEditUiState.savedConfig() = toConfig("provider", models, 128_000)
+
+    private fun storedConfig() = ProviderConfig(
+        id = "provider",
+        name = "Provider",
+        apiType = ApiType.OPENAI_COMPATIBLE,
+        transportKind = ModelTransport.GENERIC_CHAT_COMPLETIONS,
+        baseUrl = "https://api.example.com/v1",
+        apiKey = "test-key",
+        models = listOf("gpt-5"),
+        defaultModel = "gpt-5"
+    )
 
     private fun completeState(
         name: String = "Provider",

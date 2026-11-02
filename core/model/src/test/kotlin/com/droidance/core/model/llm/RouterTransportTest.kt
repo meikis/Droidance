@@ -465,6 +465,31 @@ class RouterTransportTest {
     }
 
     @Test
+    fun responsesStreamNormalizesEndpointWhenBaseUrlAlreadyIncludesPath() = runBlocking {
+        val body = """
+            data: {"type":"response.output_text.delta","delta":"Hello"}
+
+            data: {"type":"response.completed","response":{"id":"response-1","model":"wire-model","usage":{"input_tokens":1,"output_tokens":1}}}
+
+        """.trimIndent()
+        val requests = mutableListOf<Request>()
+        val router = router(
+            provider = provider(
+                apiType = ApiType.OPENAI_RESPONSES,
+                transport = ModelTransport.OPENAI_RESPONSES
+            ).copy(baseUrl = "https://relay.invalid/team/v1/responses"),
+            body = body,
+            requests = requests,
+            usage = RecordingUsage(),
+            diagnostics = RecordingDiagnostics()
+        )
+
+        router.streamChat(listOf(ChatMessage(Role.USER, "say hello"))).toList()
+
+        assertEquals("https://relay.invalid/team/v1/responses", requests.single().url.toString())
+    }
+
+    @Test
     fun responsesStreamPassesContentAndUsageThroughTransportInterfaces() = runBlocking {
         val body = """
             data: {"type":"response.output_text.delta","delta":"Hello "}

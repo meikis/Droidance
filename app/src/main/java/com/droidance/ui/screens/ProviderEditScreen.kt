@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.droidance.R
 import com.droidance.core.model.llm.models.ReasoningEffort
+import com.droidance.core.model.llm.session.ModelTransport
 import com.droidance.ui.theme.*
 import com.droidance.ui.viewmodel.ProviderEditViewModel
 
@@ -229,6 +230,46 @@ fun ProviderEditScreen(
                 )
             }
 
+            // ====== API 协议 ======
+            SectionField(label = stringResource(R.string.provider_protocol)) {
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = uiState.transportKind?.let { stringResource(it.protocolLabelRes()) }.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        isError = uiState.transportKind == null,
+                        placeholder = { Text(stringResource(R.string.provider_protocol_required)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        shape = AppShapes.Control,
+                        colors = droidanceFieldColors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf(ModelTransport.GENERIC_CHAT_COMPLETIONS, ModelTransport.OPENAI_RESPONSES).forEach { transport ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(transport.protocolLabelRes())) },
+                                onClick = { viewModel.selectProtocol(transport); expanded = false }
+                            )
+                        }
+                    }
+                }
+                uiState.requestUrl?.let { url ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        url,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             // ====== API Key ======
             SectionField(label = stringResource(R.string.provider_api_key)) {
                 var passwordVisible by remember { mutableStateOf(false) }
@@ -331,6 +372,12 @@ fun ProviderEditScreen(
 }
 
 // ====== 子组件 ======
+
+@androidx.annotation.StringRes
+private fun ModelTransport.protocolLabelRes(): Int = when (this) {
+    ModelTransport.GENERIC_CHAT_COMPLETIONS -> R.string.provider_protocol_chat_completions
+    ModelTransport.OPENAI_RESPONSES -> R.string.provider_protocol_responses
+}
 
 @androidx.annotation.StringRes
 private fun ReasoningEffort?.reasoningLabelRes(): Int = when (this) {
@@ -441,6 +488,7 @@ private fun ProviderFormError.messageRes(): Int = when (this) {
     ProviderFormError.NAME_REQUIRED -> R.string.provider_name_required
     ProviderFormError.URL_REQUIRED -> R.string.provider_url_required
     ProviderFormError.INVALID_URL -> R.string.provider_invalid_url
+    ProviderFormError.PROTOCOL_REQUIRED -> R.string.provider_protocol_required
     ProviderFormError.KEY_REQUIRED -> R.string.provider_key_required
     ProviderFormError.MODEL_REQUIRED -> R.string.provider_model_required
 }

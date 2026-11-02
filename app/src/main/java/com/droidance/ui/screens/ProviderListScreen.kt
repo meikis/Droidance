@@ -140,6 +140,7 @@ fun ProviderListScreen(
                         onEdit = { onNavigateToEdit(config.id) },
                         onToggle = {
                             if (!config.isEnabled && (config.baseUrl.isBlank() || config.apiKey.isBlank() ||
+                                !config.isTransportConfigured() ||
                                 (config.models.isEmpty() && config.defaultModel.isBlank()))) onNavigateToEdit(config.id)
                             else viewModel.toggleProvider(config.id)
                         },

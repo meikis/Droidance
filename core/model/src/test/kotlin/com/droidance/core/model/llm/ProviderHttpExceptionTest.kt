@@ -4,6 +4,7 @@
 package com.droidance.core.model.llm
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,6 +20,55 @@ class ProviderHttpExceptionTest {
         assertNull(parse("invalid"))
         assertNull(parse(null))
     }
+    @Test fun permissionDenialIsSeparateFromAuthentication() {
+        val body = """{"error":{"code":"forbidden","message":"Your plan does not include this model"}}"""
+        val denied = ProviderHttpException.fromResponse(403, "provider", body)
+        assertEquals(ProviderErrorCategory.PERMISSION_DENIED, denied.category)
+        assertEquals("Your plan does not include this model", denied.publicReason)
+        val unauthorized = ProviderHttpException.fromResponse(401, "provider", body)
+        assertEquals(ProviderErrorCategory.AUTHENTICATION, unauthorized.category)
+        assertNull(unauthorized.publicReason)
+    }
+
+    @Test fun permissionReasonIsReadFromCommonBodyShapes() {
+        fun reason(body: String) = ProviderHttpException.fromResponse(403, "provider", body).publicReason
+        assertEquals("denied", reason("""{"error":"denied"}"""))
+        assertEquals("denied", reason("""{"message":"denied"}"""))
+        assertEquals("denied", reason("""{"msg":"denied"}"""))
+        assertEquals("denied", reason("""{"detail":"denied"}"""))
+        assertEquals("denied", reason(""""denied""""))
+        assertEquals("Access denied", reason("Access denied"))
+        assertEquals("Forbidden", reason("Forbidden"))
+        assertNull(reason("<html><body>403 Forbidden</body></html>"))
+        assertNull(reason("""{"error":{"code":403}}"""))
+        assertNull(reason("null"))
+        assertNull(reason(""))
+    }
+
+    @Test fun permissionReasonNeverCarriesSecretsAndStaysShort() {
+        val apiKey = "plain-config-value"
+        fun reason(message: String) = requireNotNull(ProviderHttpException.fromResponse(
+            403, "provider", """{"error":{"message":"$message"}}""",
+            redactor = TransportDiagnosticRedactor(apiKey)
+        ).publicReason)
+        for ((message, secret) in listOf(
+            "Key $apiKey is blocked" to apiKey,
+            "Key sk-abc123def456ghi789 is blocked" to "sk-abc123def456ghi789",
+            "Key sk-ab***yz is blocked" to "sk-ab***yz",
+            "Header Bearer abc.def-123 was refused" to "abc.def-123",
+            "Token a1B2c3D4e5F6g7H8i9J0k1L2m3N4 was refused" to "a1B2c3D4e5F6g7H8i9J0k1L2m3N4",
+            "See https://relay.example/billing?token=abc for details" to "relay.example",
+            "Account owner@example.com is suspended" to "owner@example.com",
+            "Address 203.0.113.9 is not allowed" to "203.0.113.9"
+        )) {
+            val redacted = reason(message)
+            assertFalse(message, redacted.contains(secret))
+            assertTrue(message, redacted.contains("[REDACTED]"))
+        }
+        assertEquals("line one line two", reason("line one\\n  line two"))
+        assertEquals(200, reason("x ".repeat(500)).length)
+    }
+
     @Test fun recognizesOnlyTheExplicitImageEndpointRejection() {
         val exact = """{"error":{"code":404,"message":"No endpoints found that support image input"}}"""
         assertEquals("IMAGE_INPUT_UNAVAILABLE", ProviderHttpException.fromResponse(404, "provider", exact).category.name)

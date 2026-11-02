@@ -5,12 +5,14 @@ package com.droidance.core.model.llm
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 enum class ProviderErrorCategory {
     AUTHENTICATION,
+    PERMISSION_DENIED,
     RATE_LIMIT,
     BILLING,
     MODEL_UNAVAILABLE,
@@ -31,7 +33,9 @@ class ProviderHttpException(
     val category: ProviderErrorCategory,
     providerName: String,
     responseBody: String,
-    val retryAfterMs: Long? = null
+    val retryAfterMs: Long? = null,
+    /** Redacted server explanation that is safe to show; only permission denials carry one. */
+    val publicReason: String? = null
 ) : Exception(
     "$providerName request failed: status=$statusCode" +
         providerCode?.let { ", code=$it" }.orEmpty() +
@@ -39,17 +43,21 @@ class ProviderHttpException(
 ) {
     companion object {
         private const val MAX_BODY_CHARS = 1_000
+        private const val MAX_REASON_CHARS = 200
+        private const val REDACTED = "[REDACTED]"
 
         fun fromResponse(
             statusCode: Int,
             providerName: String,
             responseBody: String,
             retryAfter: String? = null,
-            nowEpochMs: Long = System.currentTimeMillis()
+            nowEpochMs: Long = System.currentTimeMillis(),
+            redactor: TransportDiagnosticRedactor = TransportDiagnosticRedactor("")
         ): ProviderHttpException {
             val code = extractProviderCode(responseBody)?.lowercase()
             val category = when {
-                statusCode == 401 || statusCode == 403 -> ProviderErrorCategory.AUTHENTICATION
+                statusCode == 401 -> ProviderErrorCategory.AUTHENTICATION
+                statusCode == 403 -> ProviderErrorCategory.PERMISSION_DENIED
                 statusCode == 429 -> ProviderErrorCategory.RATE_LIMIT
                 statusCode == 402 -> ProviderErrorCategory.BILLING
                 statusCode == 404 && isImageEndpointUnavailable(responseBody) -> ProviderErrorCategory.IMAGE_INPUT_UNAVAILABLE
@@ -63,9 +71,35 @@ class ProviderHttpException(
                 statusCode >= 500 -> ProviderErrorCategory.SERVER
                 else -> ProviderErrorCategory.UNKNOWN
             }
+            val publicReason = if (category == ProviderErrorCategory.PERMISSION_DENIED) {
+                extractServerReason(responseBody)?.let { redactReason(redactor.text(it)) }
+            } else null
             return ProviderHttpException(statusCode, code, category, providerName, responseBody,
-                parseRetryAfter(retryAfter, nowEpochMs))
+                parseRetryAfter(retryAfter, nowEpochMs), publicReason)
         }
+
+        /** Gateways often answer with an HTML page, which explains nothing worth showing. */
+        private fun extractServerReason(body: String): String? {
+            val trimmed = body.trim()
+            if (trimmed.startsWith("<")) return null
+            val root = runCatching { Json.parseToJsonElement(trimmed) }.getOrNull() ?: return trimmed
+            val objectRoot = root as? JsonObject ?: return (root as? JsonPrimitive)?.contentOrNull
+            return sequenceOf(
+                (objectRoot["error"] as? JsonObject)?.get("message"),
+                objectRoot["error"],
+                objectRoot["message"],
+                objectRoot["msg"],
+                objectRoot["detail"]
+            ).mapNotNull { (it as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content }
+                .firstOrNull(String::isNotBlank)
+        }
+
+        private fun redactReason(reason: String): String? = REASON_SECRET_PATTERNS
+            .fold(reason) { text, pattern -> text.replace(pattern, REDACTED) }
+            .replace(WHITESPACE, " ")
+            .trim()
+            .take(MAX_REASON_CHARS)
+            .takeIf(String::isNotBlank)
 
         private fun parseRetryAfter(value: String?, nowEpochMs: Long): Long? {
             val trimmed = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
@@ -129,6 +163,15 @@ class ProviderHttpException(
             return normalized in knownCodes || normalized.substringAfterLast('.') in knownCodes
         }
 
+        private val WHITESPACE = Regex("\\s+")
+        private val REASON_SECRET_PATTERNS = listOf(
+            Regex("(?i)\\bhttps?://\\S+"),
+            Regex("(?i)\\bbearer\\s+\\S+"),
+            Regex("(?i)\\b(?:sk|pk|rk|ak|key)-[a-z0-9*._-]{4,}"),
+            Regex("[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+"),
+            Regex("\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b"),
+            Regex("\\b(?=[a-zA-Z0-9_-]*[a-zA-Z])(?=[a-zA-Z0-9_-]*\\d)[a-zA-Z0-9_-]{24,}\\b")
+        )
         private val CONTEXT_LIMIT_CODES = setOf(
             "context_length_exceeded",
             "max_context_length_exceeded"

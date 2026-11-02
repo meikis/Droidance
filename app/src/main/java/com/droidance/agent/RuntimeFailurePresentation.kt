@@ -29,6 +29,7 @@ fun runtimeFailureMessageResource(error: Throwable): Int {
             if (error.outputLimitReached) R.string.chat_output_limited else R.string.execution_model_request_failed
         error is com.droidance.core.model.llm.OpenAIResponsesUnterminatedException -> R.string.execution_model_invalid_response
         provider?.category == ProviderErrorCategory.AUTHENTICATION -> R.string.chat_provider_auth_failed
+        provider?.category == ProviderErrorCategory.PERMISSION_DENIED -> R.string.chat_provider_permission_denied
         provider?.category == ProviderErrorCategory.RATE_LIMIT -> R.string.chat_provider_rate_limited
         error is UnknownHostException || error is ConnectException -> R.string.chat_network_unavailable
         error is InterruptedIOException -> R.string.execution_model_request_timeout

@@ -155,9 +155,6 @@ object OpenAIResponsesProtocol {
         val cacheWriteTokens: Int? = null
     )
 
-    fun endpoint(baseUrl: String): String =
-        "${baseUrl.trim().trimEnd('/')}/responses"
-
     fun buildRequest(
         model: String,
         messages: List<ChatMessage>,

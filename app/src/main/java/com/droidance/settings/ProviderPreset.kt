@@ -3,6 +3,7 @@
 
 package com.droidance.settings
 
+import com.droidance.core.model.llm.ProviderEndpoint
 import com.droidance.core.model.llm.models.ApiType
 import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.core.model.llm.session.ModelTransport
@@ -26,6 +27,23 @@ data class ProviderPreset(
         baseUrl = baseUrl,
         isEnabled = false
     )
+}
+
+/**
+ * Default, then custom, enabled preset and disabled preset entries; an entry is custom when its
+ * address is not in the catalog. Display only: the stored order selects the default Provider.
+ */
+fun List<ProviderConfig>.inDisplayOrder(presets: List<ProviderPreset>): List<ProviderConfig> {
+    val presetRoots = presets.mapTo(HashSet()) { ProviderEndpoint.apiRoot(it.baseUrl).lowercase() }
+    val defaultId = firstOrNull(ProviderConfig::isAvailableForRequests)?.id
+    return sortedBy { config ->
+        when {
+            config.id == defaultId -> 0
+            ProviderEndpoint.apiRoot(config.baseUrl).lowercase() !in presetRoots -> 1
+            config.isEnabled -> 2
+            else -> 3
+        }
+    }
 }
 
 object ProviderPresetCatalog {

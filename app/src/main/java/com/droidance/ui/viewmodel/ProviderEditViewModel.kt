@@ -5,6 +5,7 @@ package com.droidance.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import com.droidance.settings.ProviderConfigManager
+import com.droidance.core.model.llm.ProviderEndpoint
 import com.droidance.core.model.llm.models.ApiType
 import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.core.model.llm.models.ReasoningEffort
@@ -43,22 +44,7 @@ class ProviderEditViewModel @Inject constructor(
             editingId = id
             val config = configManager.getConfig(id) ?: return
             editingConfig = config
-            val models = config.models.ifEmpty {
-                listOf(config.defaultModel).filter { it.isNotBlank() }
-            }
-            val defaultModel = config.defaultModel.takeIf { it in models }
-                ?: models.firstOrNull().orEmpty()
-            _uiState.value = ProviderEditUiState(
-                name = config.name,
-                apiType = config.apiType,
-                transportKind = config.transportKind,
-                baseUrl = config.baseUrl,
-                apiKey = config.apiKey,
-                models = models,
-                defaultModel = defaultModel,
-                isEnabled = config.isEnabled || config.apiKey.isBlank(),
-                reasoningPreference = config.reasoningPreference
-            )
+            _uiState.value = config.toEditState()
         } else {
             editingId = null
             editingConfig = null
@@ -89,6 +75,10 @@ class ProviderEditViewModel @Inject constructor(
 
     fun updateBaseUrl(url: String) {
         _uiState.update { it.copy(baseUrl = url) }
+    }
+
+    fun selectProtocol(transport: ModelTransport) {
+        _uiState.update { it.withProtocol(transport) }
     }
 
     fun updateApiKey(key: String) {
@@ -140,25 +130,10 @@ class ProviderEditViewModel @Inject constructor(
         if (state.validationError != null) return false
         val models = mergeModels(state.models, parseModelInput(state.modelInput))
         if (state.name.isBlank() || state.baseUrl.isBlank() || state.apiKey.isBlank() || models.isEmpty()) return false
-        val existing = editingConfig
-        if (state.isEnabled && existing != null && !existing.isTransportConfigured()) {
-            _uiState.update { it.copy(saveFailed = true) }
-            return false
-        }
-        val defaultModel = state.defaultModel.takeIf { it in models } ?: models.first()
-        val config = ProviderConfig(
+        val config = state.toConfig(
             id = editingId ?: UUID.randomUUID().toString(),
-            name = state.name.trim(),
-            apiType = state.apiType,
-            transportKind = state.transportKind,
-            transportDiagnostic = existing?.transportDiagnostic,
-            baseUrl = state.baseUrl.trim(),
-            apiKey = state.apiKey.trim(),
             models = models,
-            defaultModel = defaultModel,
-            isEnabled = state.isEnabled,
-            contextWindowTokens = existing?.contextWindowTokens ?: 128_000,
-            reasoningPreference = state.reasoningPreference
+            contextWindowTokens = editingConfig?.contextWindowTokens ?: 128_000
         )
         val saved = runCatching { configManager.updateConfig(config) }.isSuccess
         _uiState.update { it.copy(saveFailed = !saved) }
@@ -196,20 +171,68 @@ data class ProviderEditUiState(
     val reasoningPreference: ReasoningEffort? = null,
     val saveFailed: Boolean = false
 ) {
+    private val hasSupportedUrl: Boolean
+        get() = runCatching {
+            val uri = java.net.URI(baseUrl.trim())
+            uri.scheme?.lowercase(java.util.Locale.ROOT) in listOf("https", "http") && !uri.host.isNullOrBlank() && uri.userInfo == null
+        }.getOrDefault(false)
+
+    val requestUrl: String?
+        get() = transportKind?.takeIf { hasSupportedUrl }?.let { ProviderEndpoint.resolve(baseUrl, it) }
+
     val validationError: ProviderFormError?
         get() = when {
             name.isBlank() -> ProviderFormError.NAME_REQUIRED
             baseUrl.isBlank() -> ProviderFormError.URL_REQUIRED
-            !runCatching {
-                val uri = java.net.URI(baseUrl.trim())
-                uri.scheme?.lowercase(java.util.Locale.ROOT) in listOf("https", "http") && !uri.host.isNullOrBlank() && uri.userInfo == null
-            }.getOrDefault(false) -> ProviderFormError.INVALID_URL
+            !hasSupportedUrl -> ProviderFormError.INVALID_URL
+            transportKind == null -> ProviderFormError.PROTOCOL_REQUIRED
             apiKey.isBlank() -> ProviderFormError.KEY_REQUIRED
             models.all { it.isBlank() } && modelInput.split(',', '，', ';', '；', '、', '\n', '\r', '\t').all { it.isBlank() } -> ProviderFormError.MODEL_REQUIRED
             else -> null
         }
+
+    /** Selecting the current protocol keeps a stored CUSTOM entry as it is. */
+    fun withProtocol(transport: ModelTransport): ProviderEditUiState =
+        if (transport == transportKind) this else copy(
+            transportKind = transport,
+            apiType = when (transport) {
+                ModelTransport.OPENAI_RESPONSES -> ApiType.OPENAI_RESPONSES
+                ModelTransport.GENERIC_CHAT_COMPLETIONS -> ApiType.OPENAI_COMPATIBLE
+            }
+        )
+
+    /** Saving carries the protocol the form shows, which settles any pending confirmation. */
+    internal fun toConfig(id: String, models: List<String>, contextWindowTokens: Int): ProviderConfig = ProviderConfig(
+        id = id,
+        name = name.trim(),
+        apiType = apiType,
+        transportKind = transportKind,
+        baseUrl = baseUrl.trim(),
+        apiKey = apiKey.trim(),
+        models = models,
+        defaultModel = defaultModel.takeIf { it in models } ?: models.first(),
+        isEnabled = isEnabled,
+        contextWindowTokens = contextWindowTokens,
+        reasoningPreference = reasoningPreference
+    )
+}
+
+/** An entry that cannot run yet becomes enabled once the form completes it. */
+internal fun ProviderConfig.toEditState(): ProviderEditUiState {
+    val editableModels = models.ifEmpty { listOf(defaultModel).filter { it.isNotBlank() } }
+    return ProviderEditUiState(
+        name = name,
+        apiType = apiType,
+        transportKind = resolvedTransportOrNull(),
+        baseUrl = baseUrl,
+        apiKey = apiKey,
+        models = editableModels,
+        defaultModel = defaultModel.takeIf { it in editableModels } ?: editableModels.firstOrNull().orEmpty(),
+        isEnabled = isEnabled || apiKey.isBlank() || !isTransportConfigured(),
+        reasoningPreference = reasoningPreference
+    )
 }
 
 enum class ProviderFormError {
-    NAME_REQUIRED, URL_REQUIRED, INVALID_URL, KEY_REQUIRED, MODEL_REQUIRED
+    NAME_REQUIRED, URL_REQUIRED, INVALID_URL, PROTOCOL_REQUIRED, KEY_REQUIRED, MODEL_REQUIRED
 }

@@ -1198,6 +1198,7 @@ internal suspend fun TaskTurnSession.runModelRound(repairPurpose: RepairPurpose)
         val permanentError = providerFailure?.let { failure ->
             imageInputRejected || failure.category in setOf(
                 ProviderErrorCategory.AUTHENTICATION,
+                ProviderErrorCategory.PERMISSION_DENIED,
                 ProviderErrorCategory.CONTEXT_LIMIT,
                 ProviderErrorCategory.REQUEST_REJECTED
             ) || (failure.statusCode in 400..499 &&
@@ -1236,6 +1237,10 @@ internal suspend fun TaskTurnSession.runModelRound(repairPurpose: RepairPurpose)
             runtimeFailureSummary = when {
                 imageInputRejected -> fallbackText("termination_model_image_unavailable")
                 providerFailure?.category == ProviderErrorCategory.BILLING -> fallbackText("termination_model_billing")
+                providerFailure?.category == ProviderErrorCategory.PERMISSION_DENIED ->
+                    providerFailure.publicReason?.let { reason ->
+                        fallbackText("termination_model_permission_denied_reason", mapOf("reason" to reason))
+                    } ?: fallbackText("termination_model_permission_denied")
                 else -> null
             },
             evidenceText = evidenceLedger.buildOperatorEvidenceText(),

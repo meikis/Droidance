@@ -44,6 +44,19 @@ class LocalizedPublicFallbacksTest {
         }
     }
 
+    @Test fun permissionNoticesPointAtKeyPermissionsOrPlanAndOnlyOneCarriesTheReason() {
+        notices.validate()
+        for (language in listOf("zh", "en")) {
+            val plain = notices.text(language, "termination_model_permission_denied")
+            val withReason = notices.text(language, "termination_model_permission_denied_reason")
+            assertTrue(withReason.startsWith(plain))
+            assertFalse(plain.contains("{reason}"))
+            assertTrue(withReason.endsWith("{reason}"))
+        }
+        assertTrue(notices.text("zh", "termination_model_permission_denied").contains("权限或套餐"))
+        assertTrue(notices.text("en", "termination_model_permission_denied").contains("permissions or plan"))
+    }
+
     @Test fun imageInputNoticeRequiresAnImageCapableServiceWithoutChangingUserSettings() {
         notices.validate()
         val chinese = notices.text("zh", "termination_model_image_unavailable")

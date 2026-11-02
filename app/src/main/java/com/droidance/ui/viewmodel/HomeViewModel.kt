@@ -27,6 +27,7 @@ import com.droidance.core.agent.MessageSource
 import com.droidance.agent.ConversationSubmissionMode
 import com.droidance.core.agent.device.ExecutionSpace
 import com.droidance.core.model.llm.ModelStreamPlan
+import com.droidance.core.model.llm.providerHttpException
 import com.droidance.settings.ProviderConfigManager
 import com.droidance.settings.ComposerSettings
 import com.droidance.settings.ComposerSettingsRepository
@@ -101,7 +102,7 @@ class HomeViewModel @Inject constructor(
     val composerInitialText: String get() = if (autoSendInitialPrompt) "" else initialPrompt.orEmpty()
     private var initialPromptConsumed = false
 
-    private val _composerModels = MutableStateFlow(composerModelOptions(providerConfigManager.getEnabledConfigs()))
+    private val _composerModels = MutableStateFlow(composerModelOptions(providerConfigManager.getEnabledConfigs(), providerConfigManager.presets))
     val composerModels: StateFlow<List<ComposerModelOption>> = _composerModels
     private val _composerPreferences = MutableStateFlow(restoredComposerPreferences(
         composerSettingsRepository.read(), _composerModels.value
@@ -109,7 +110,7 @@ class HomeViewModel @Inject constructor(
     val composerPreferences: StateFlow<ComposerPreferences> = _composerPreferences
 
     fun refreshComposerModels() {
-        _composerModels.value = composerModelOptions(providerConfigManager.getEnabledConfigs())
+        _composerModels.value = composerModelOptions(providerConfigManager.getEnabledConfigs(), providerConfigManager.presets)
         if (!_isProcessing.value) {
             _composerPreferences.value = restoredComposerPreferences(composerSettingsRepository.read(), _composerModels.value)
         }
@@ -634,9 +635,13 @@ class HomeViewModel @Inject constructor(
         return PublicAssistantText.sanitize(text)
     }
 
-    private fun friendlyError(e: Exception): String = ContextCompat.getContextForLanguage(context).getString(
-        com.droidance.agent.runtimeFailureMessageResource(e)
-    )
+    private fun friendlyError(e: Exception): String {
+        val localized = ContextCompat.getContextForLanguage(context)
+        val message = localized.getString(com.droidance.agent.runtimeFailureMessageResource(e))
+        return e.providerHttpException()?.publicReason?.let { reason ->
+            localized.getString(R.string.chat_provider_service_reason, message, reason)
+        } ?: message
+    }
 
     private fun getCurrentTime(): String {
         return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())

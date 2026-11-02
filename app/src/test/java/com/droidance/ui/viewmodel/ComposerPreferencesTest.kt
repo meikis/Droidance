@@ -9,6 +9,7 @@ import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.core.model.llm.models.ReasoningEffort
 import com.droidance.core.model.llm.session.ModelTransport
 import com.droidance.settings.ComposerSettings
+import com.droidance.settings.ProviderPreset
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -62,9 +63,28 @@ class ComposerPreferencesTest {
 
     @Test fun pickerUsesOnlyConfiguredEnabledModelsAndKeepsProviderIdentity() {
         val enabled = provider().copy(models = listOf("small", "large", "small", ""))
-        val options = composerModelOptions(listOf(enabled, provider("other"), provider("disabled").copy(isEnabled = false), provider("unknown").copy(transportKind = null)))
+        val options = composerModelOptions(listOf(enabled, provider("other"), provider("disabled").copy(isEnabled = false), provider("unknown").copy(transportKind = null)), emptyList())
         assertEquals(listOf("primary", "primary", "other", "other"), options.map { it.providerId })
         assertEquals(listOf("small", "large", "small", "large"), options.map { it.modelId })
         assertEquals("model-name", ComposerModelOption("p", "p", "namespace/model-name").displayName)
+    }
+
+    @Test fun pickerPlacesCustomProvidersAheadOfPresetsWithoutChangingTheRequestPlan() {
+        val preset = ProviderPreset("catalog", "catalog", "https://catalog.invalid/v1",
+            ApiType.OPENAI_COMPATIBLE, ModelTransport.GENERIC_CHAT_COMPLETIONS)
+        val defaultPreset = provider("default").copy(baseUrl = preset.baseUrl)
+        val laterPreset = provider("later").copy(baseUrl = preset.baseUrl)
+        val custom = provider("custom")
+        val stored = listOf(defaultPreset, laterPreset, custom)
+
+        val options = composerModelOptions(stored, listOf(preset))
+
+        assertEquals(listOf("default", "custom", "later"), options.map { it.providerId }.distinct())
+        assertEquals(defaultPreset.id, options.first().providerId)
+        val selected = options.first { it.providerId == custom.id && it.modelId == "large" }
+        val plan = requireNotNull(composerModelPlan(ComposerPreferences(model = selected), stored))
+        assertEquals(custom.id, plan.providerId)
+        assertEquals("large", plan.initialModel)
+        assertNull(composerModelPlan(ComposerPreferences(), stored))
     }
 }

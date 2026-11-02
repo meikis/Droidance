@@ -73,6 +73,25 @@ class ProviderConfigManagerRegressionTest {
     }
 
     @Test
+    fun displayOrderLeavesPersistedOrderAndDefaultProviderUnchanged() {
+        val manager = ProviderConfigManager(isolatedContext)
+        val presetUrl = manager.presets.first().baseUrl
+        val selected = provider("selected").copy(baseUrl = presetUrl)
+        val custom = provider("custom")
+        manager.addConfig(selected)
+        manager.addConfig(custom)
+        val stored = manager.getAllConfigs()
+
+        val displayed = stored.inDisplayOrder(manager.presets)
+
+        assertEquals(selected.id, displayed.first().id)
+        assertEquals(custom.id, displayed[1].id)
+        assertEquals(stored, manager.getAllConfigs())
+        assertEquals(selected.id, manager.resolveProvider()?.id)
+        assertEquals(stored, ProviderConfigManager(isolatedContext).getAllConfigs())
+    }
+
+    @Test
     fun freshInstallSeedsDisabledPresetsOnlyOnce() {
         val manager = ProviderConfigManager(isolatedContext)
         assertEquals(manager.presets.map { it.createConfig() }, manager.getAllConfigs())

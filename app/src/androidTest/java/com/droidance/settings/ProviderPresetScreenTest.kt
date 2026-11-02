@@ -12,6 +12,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.droidance.R
+import com.droidance.core.model.llm.models.ApiType
+import com.droidance.core.model.llm.models.ProviderConfig
+import com.droidance.core.model.llm.models.ProviderTransportDiagnostic
 import com.droidance.core.model.llm.session.ModelTransport
 import com.droidance.ui.screens.ProviderEditScreen
 import com.droidance.ui.viewmodel.ProviderEditViewModel
@@ -66,6 +69,34 @@ class ProviderPresetScreenTest {
             assertEquals(config.copy(apiKey = "ui-test-key", isEnabled = true,
                 models = listOf("user-selected-model"), defaultModel = "user-selected-model"),
                 ProviderConfigManager(context).getConfig(config.id))
+        }
+    }
+
+    @Test fun protocolChoiceConfirmsAnEntryAndShowsTheRequestUrl() {
+        val pending = ProviderConfig(
+            id = "pending", name = "Relay", apiType = ApiType.CUSTOM,
+            transportDiagnostic = ProviderTransportDiagnostic.TRANSPORT_CONFIRMATION_REQUIRED,
+            baseUrl = "https://relay.example/team/v1", apiKey = "ui-test-key",
+            models = listOf("relay-model"), defaultModel = "relay-model", isEnabled = false
+        )
+        manager.addConfig(pending)
+        val editor = ProviderEditViewModel(manager)
+        var saved = false
+        compose.setContent {
+            MaterialTheme { ProviderEditScreen(pending.id, { saved = true }, editor) }
+        }
+        val required = context.getString(R.string.provider_protocol_required)
+        compose.onNodeWithText(context.getString(R.string.common_save)).assertIsNotEnabled()
+        compose.onNodeWithText(required).performScrollTo().performClick()
+        compose.onNodeWithText(context.getString(R.string.provider_protocol_responses)).performClick()
+        compose.onNodeWithText("https://relay.example/team/v1/responses").assertExists()
+        compose.onNodeWithText(context.getString(R.string.common_save)).performClick()
+        compose.runOnIdle {
+            assertTrue(saved)
+            val stored = requireNotNull(ProviderConfigManager(context).getConfig(pending.id))
+            assertEquals(ModelTransport.OPENAI_RESPONSES, stored.resolvedTransportOrNull())
+            assertEquals(ApiType.OPENAI_RESPONSES, stored.apiType)
+            assertTrue(stored.isAvailableForRequests())
         }
     }
 

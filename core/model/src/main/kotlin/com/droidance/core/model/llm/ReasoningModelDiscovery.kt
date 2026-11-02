@@ -20,7 +20,7 @@ class ReasoningModelDiscovery(httpClient: OkHttpClient) {
 
     suspend fun fetch(config: ProviderConfig): String? {
         val request = runCatching {
-            Request.Builder().url("${config.baseUrl.trim().trimEnd('/')}/models")
+            Request.Builder().url("${ProviderEndpoint.apiRoot(config.baseUrl)}/models")
                 .apply { if (config.apiKey.isNotBlank()) header("Authorization", "Bearer ${config.apiKey}") }
                 .get().build()
         }.getOrNull() ?: return null
