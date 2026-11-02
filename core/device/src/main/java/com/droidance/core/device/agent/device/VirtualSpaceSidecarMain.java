@@ -7,12 +7,10 @@ import com.droidance.core.agent.device.*;
 
 import com.droidance.core.device.agent.device.*;
 
-import android.app.KeyguardManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Build;
+import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
@@ -33,8 +31,15 @@ public final class VirtualSpaceSidecarMain {
     private static final long STALE_PROCESS_EXIT_WAIT_MS = 100L;
     private static final int STALE_PROCESS_EXIT_RETRIES = 20;
     private static final long SCREEN_OFF_APP_PROBE_MS = 2000L;
+    private static final long SCREEN_STATE_POLL_MS = 1000L;
+    private static final int SCREEN_OFF = 0;
+    private static final int SCREEN_LOCKED = 1;
+    private static final int SCREEN_UNLOCKED = 2;
     private static java.io.RandomAccessFile leaseFile;
     private static java.nio.channels.FileLock leaseLock;
+    private static Object windowManager;
+    private static java.lang.reflect.Method keyguardLockedMethod;
+    private static boolean keyguardProbeFailed;
 
     private VirtualSpaceSidecarMain() {}
 
@@ -74,7 +79,7 @@ public final class VirtualSpaceSidecarMain {
             writeLog("INFO sidecar context created pkg=" + sidecarContext.getPackageName(), null);
             VirtualSpaceSidecarService service = new VirtualSpaceSidecarService(sidecarContext);
             writeLog("INFO service created", null);
-            registerScreenLifecycle(sidecarContext, service, targetPackage);
+            startScreenLifecycle(sidecarContext, service, targetPackage);
             boolean broadcastOk = service.broadcastBinder(sidecarContext, targetPackage);
             writeLog("INFO broadcastBinder returned=" + broadcastOk + " err=" + service.getLastError(), null);
             if (!broadcastOk) {
@@ -91,41 +96,68 @@ public final class VirtualSpaceSidecarMain {
         }
     }
 
-    private static void registerScreenLifecycle(
+    /**
+     * app_process is unknown to ActivityManager, so registerReceiver silently registers nothing.
+     * Polling on the main looper needs no system registration and pauses while the device sleeps.
+     */
+    private static void startScreenLifecycle(
             Context context,
             VirtualSpaceSidecarService service,
             String targetPackage
     ) {
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        filter.addAction(Intent.ACTION_USER_PRESENT);
-        BroadcastReceiver receiver = new BroadcastReceiver() {
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            private int observed = readScreenState(power);
+
             @Override
-            public void onReceive(Context receiverContext, Intent intent) {
-                String action = intent != null ? intent.getAction() : null;
-                if (Intent.ACTION_SCREEN_OFF.equals(action)) {
-                    service.onScreenLocked();
-                } else if (Intent.ACTION_USER_PRESENT.equals(action)) {
-                    service.onScreenUnlocked();
-                    service.broadcastBinder(receiverContext, targetPackage);
-                } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
-                    KeyguardManager keyguard = (KeyguardManager) receiverContext.getSystemService(Context.KEYGUARD_SERVICE);
-                    if (keyguard != null && keyguard.isKeyguardLocked()) {
-                        service.onScreenLocked();
-                    } else {
-                        service.onScreenUnlocked();
+            public void run() {
+                try {
+                    int current = readScreenState(power);
+                    if (current != observed) {
+                        observed = current;
+                        writeLog("INFO screen state changed to " + current, null);
+                        if (current == SCREEN_UNLOCKED) {
+                            service.onScreenUnlocked();
+                        } else {
+                            service.onScreenLocked();
+                        }
+                        if (current != SCREEN_OFF) service.broadcastBinder(context, targetPackage);
                     }
-                    service.broadcastBinder(receiverContext, targetPackage);
+                } catch (Throwable t) {
+                    writeLog("WARN screen state check failed: " + safeMessage(t), t);
                 }
+                handler.postDelayed(this, SCREEN_STATE_POLL_MS);
             }
-        };
-        if (Build.VERSION.SDK_INT >= 33) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            context.registerReceiver(receiver, filter);
+        });
+        writeLog("INFO screen lifecycle polling started", null);
+    }
+
+    private static int readScreenState(PowerManager power) {
+        if (!power.isInteractive()) return SCREEN_OFF;
+        return isKeyguardLocked() ? SCREEN_LOCKED : SCREEN_UNLOCKED;
+    }
+
+    /** KeyguardManager cannot be constructed in app_process; it needs app shared memory. */
+    private static boolean isKeyguardLocked() {
+        if (keyguardProbeFailed) return false;
+        try {
+            if (keyguardLockedMethod == null) {
+                IBinder binder = (IBinder) Class.forName("android.os.ServiceManager")
+                        .getMethod("getService", String.class)
+                        .invoke(null, Context.WINDOW_SERVICE);
+                windowManager = Class.forName("android.view.IWindowManager$Stub")
+                        .getMethod("asInterface", IBinder.class)
+                        .invoke(null, binder);
+                keyguardLockedMethod = Class.forName("android.view.IWindowManager")
+                        .getMethod("isKeyguardLocked");
+            }
+            return Boolean.TRUE.equals(keyguardLockedMethod.invoke(windowManager));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            keyguardProbeFailed = true;
+            writeLog("WARN keyguard state unavailable: " + safeMessage(e), null);
+            return false;
         }
-        writeLog("INFO screen lifecycle receiver registered", null);
     }
 
     private static void ensureSupportedIdentity() {

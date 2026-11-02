@@ -16,6 +16,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 - After Wi-Fi drops, pairing settings keep showing Connected while the background control service is running, and reading notifications no longer needs the live wireless debugging connection.
 - A restarted app can reconnect to the background control service without Wi-Fi while the screen is off.
+- The virtual display now recovers when you lock or unlock the phone during a task.
 
 ## [0.1.1] - 2026-11-01
 

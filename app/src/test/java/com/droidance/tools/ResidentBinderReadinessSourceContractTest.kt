@@ -118,6 +118,17 @@ class ResidentBinderReadinessSourceContractTest {
     }
 
     @Test
+    fun sidecarFollowsScreenStateWithoutSystemReceivers() {
+        val sidecar = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarMain.java").readText()
+
+        assertFalse(sidecar.contains("context.registerReceiver("))
+        assertFalse(sidecar.contains("KeyguardManager keyguard"))
+        assertTrue(sidecar.contains("startScreenLifecycle(sidecarContext, service, targetPackage)"))
+        assertTrue(sidecar.contains("service.onScreenLocked()"))
+        assertTrue(sidecar.contains("service.onScreenUnlocked()"))
+    }
+
+    @Test
     fun readNotificationsUsesTheUnifiedDeviceShellChannel() {
         val registrar = projectFile("app/src/main/java/com/droidance/tools/NotificationToolRegistrar.kt").readText()
 
