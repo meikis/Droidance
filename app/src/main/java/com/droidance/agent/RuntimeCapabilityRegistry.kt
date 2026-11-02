@@ -173,6 +173,9 @@ class RuntimeCapabilityRegistry @Inject constructor(
         val current = snapshot
         if (!force && System.currentTimeMillis() - current.updatedAtMs < 5_000) return current
         val virtualBridgeAvailable = virtualSpaceSidecarBridge.isShellBridgeAvailable()
+        if (!virtualBridgeAvailable && airModePairingManager.isPreviouslyPaired) {
+            virtualSpaceSidecarBridge.requestResidentBinder()
+        }
         val virtualHealthReady = virtualSpaceHealthDisplayId != null &&
             virtualSpaceHealthReason.isBlank() &&
             virtualBridgeAvailable

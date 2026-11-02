@@ -72,6 +72,7 @@ public final class VirtualSpaceSidecarMain {
             VirtualSpaceSidecarService service = new VirtualSpaceSidecarService(sidecarContext);
             writeLog("INFO service created", null);
             registerScreenLifecycle(sidecarContext, service, targetPackage);
+            registerBinderRequests(sidecarContext, service, targetPackage);
             boolean broadcastOk = service.broadcastBinder(sidecarContext, targetPackage);
             writeLog("INFO broadcastBinder returned=" + broadcastOk + " err=" + service.getLastError(), null);
             if (!broadcastOk) {
@@ -123,6 +124,36 @@ public final class VirtualSpaceSidecarMain {
             context.registerReceiver(receiver, filter);
         }
         writeLog("INFO screen lifecycle receiver registered", null);
+    }
+
+    /**
+     * 熄屏时周期广播暂停，无 ADB 时重启后的 app 只能靠这条请求取回 binder。
+     * 发送方限定为持有 ADB 授予权限的 app；回复仍只发给 targetPackage。注册失败不影响常驻通道。
+     */
+    private static void registerBinderRequests(
+            Context context,
+            VirtualSpaceSidecarService service,
+            String targetPackage
+    ) {
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context receiverContext, Intent intent) {
+                service.broadcastBinder(receiverContext, targetPackage);
+            }
+        };
+        IntentFilter filter = new IntentFilter(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_REQUEST);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter,
+                        SidecarBinderReceiver.BINDER_REQUEST_SENDER_PERMISSION, null, Context.RECEIVER_EXPORTED);
+            } else {
+                context.registerReceiver(receiver, filter,
+                        SidecarBinderReceiver.BINDER_REQUEST_SENDER_PERMISSION, null);
+            }
+            writeLog("INFO binder request receiver registered", null);
+        } catch (RuntimeException e) {
+            writeLog("WARN binder request receiver failed: " + safeMessage(e), null);
+        }
     }
 
     private static void ensureSupportedIdentity() {

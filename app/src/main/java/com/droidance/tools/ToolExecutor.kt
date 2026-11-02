@@ -984,7 +984,7 @@ class ToolExecutor @Inject constructor(
         )
         NotificationToolRegistrar(
             ::register,
-            adbShell,
+            deviceShellCommandChannel,
             installedAppsManager,
             appTakeoverStore,
             ruleConfigManager,

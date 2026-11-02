@@ -23,6 +23,7 @@ import com.droidance.settings.SystemSettingsNavigator
 import com.droidance.settings.AppThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -44,6 +45,7 @@ class SettingsViewModel @Inject constructor(
     private val languageManager: LanguageManager,
     private val providerConfigManager: ProviderConfigManager,
     private val airModePairingManager: AirModePairingManager,
+    private val virtualSpaceSidecarBridge: com.droidance.core.device.agent.device.VirtualSpaceSidecarBridge,
     private val diagnosticsCollector: com.droidance.core.device.debug.DiagnosticsCollector,
     private val debugLogManager: com.droidance.debug.DebugLogManager,
     private val markdownFileManager: com.droidance.memory.MarkdownFileManager,
@@ -98,6 +100,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             airModePairingManager.failure.collect { failure ->
                 _uiState.update { it.copy(airBridgeFailure = failure) }
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                val alive = virtualSpaceSidecarBridge.isResidentBinderAlive()
+                _uiState.update { it.copy(airResidentChannelAvailable = alive) }
+                delay(AIR_RESIDENT_CHANNEL_REFRESH_MS)
             }
         }
     }
@@ -520,12 +529,21 @@ data class SettingsUiState(
     val airPairingNotificationAvailability: AirPairingNotificationAvailability =
         AirPairingNotificationAvailability.AVAILABLE,
     val airBridgeFailure: AirPairingFailure? = null,
+    val airResidentChannelAvailable: Boolean = false,
 
     // Debug 导出
     val debugExporting: Boolean = false,
     val dataClearing: DataClearTarget? = null,
     val dataActionMessage: String = ""
-)
+) {
+    /** The resident sidecar keeps device control after Wi-Fi loss closes the live ADB connection. */
+    val airDeviceConnected: Boolean
+        get() = airBridgeState == AirModePairingManager.PairingState.CONNECTED ||
+            (airBridgeState == AirModePairingManager.PairingState.IDLE &&
+                airPreviouslyPaired && !airPairingRequired && airResidentChannelAvailable)
+}
+
+private const val AIR_RESIDENT_CHANNEL_REFRESH_MS = 2_000L
 
 enum class UsageRange(val days: Int?) {
     SEVEN_DAYS(7),

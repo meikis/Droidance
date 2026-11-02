@@ -51,7 +51,7 @@ fun AirPairingScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pairingState = state.airBridgeState
-    val connected = pairingState == PairingState.CONNECTED
+    val connected = state.airDeviceConnected
     val inProgress = pairingState in setOf(
         PairingState.DISCOVERING,
         PairingState.AWAITING_CODE,
@@ -170,10 +170,11 @@ private fun AirPairingStatusCard(
     onOpenPairingDialog: () -> Unit
 ) {
     val pairingState = state.airBridgeState
-    val connected = pairingState == PairingState.CONNECTED
+    val connected = state.airDeviceConnected
     val stateText = when (pairingState) {
         PairingState.IDLE ->
             when {
+                connected -> stringResource(R.string.settings_air_state_connected)
                 state.airPairingRequired -> stringResource(R.string.settings_air_state_pairing_required)
                 state.airPreviouslyPaired -> stringResource(R.string.settings_air_state_paired)
                 else -> stringResource(R.string.settings_air_state_unpaired)
@@ -208,7 +209,7 @@ private fun AirPairingStatusCard(
                 }
                 // 进行中留一条回到系统无线调试页的通路——用户切回 App 后不必取消重来
                 when {
-                    pairingState == PairingState.IDLE && state.airPreviouslyPaired -> {
+                    pairingState == PairingState.IDLE && state.airPreviouslyPaired && !connected -> {
                         Spacer(Modifier.width(12.dp))
                         SettingsPillButton(
                             text = stringResource(R.string.settings_air_reset_pairing),
@@ -243,16 +244,17 @@ private fun AirPairingStatusCard(
                     SettingsInsetDivider()
                     AirPairingNotificationRow(onOpenDialog = onOpenPairingDialog)
                 }
-                PairingState.CONNECTED -> {
-                    SettingsInsetDivider()
-                    Text(
-                        stringResource(R.string.air_pairing_connected_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                }
-                PairingState.IDLE -> Unit
+                PairingState.CONNECTED, PairingState.IDLE -> Unit
+            }
+
+            if (connected) {
+                SettingsInsetDivider()
+                Text(
+                    stringResource(R.string.air_pairing_connected_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
             }
         }
 

@@ -108,6 +108,7 @@ private fun ReadinessSection(
                 subtitle = when (state.airBridgeState) {
                     AirModePairingManager.PairingState.IDLE ->
                         when {
+                            state.airDeviceConnected -> stringResource(R.string.settings_air_state_connected)
                             state.airPairingRequired -> stringResource(R.string.settings_air_state_pairing_required)
                             state.airPreviouslyPaired -> stringResource(R.string.settings_air_state_paired)
                             else -> stringResource(R.string.settings_air_state_unpaired)

@@ -10,10 +10,12 @@ import com.droidance.core.agent.device.*
 import com.droidance.core.device.agent.device.*
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.IBinder
 import android.os.RemoteException
+import android.os.SystemClock
 import android.view.SurfaceControl
 import com.droidance.core.device.air.AirModePairingManager
 import com.droidance.core.device.tools.AdbShellExecutor
@@ -31,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicLong
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -64,6 +67,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     private val displayModes = ConcurrentHashMap<Int, RuntimeMode>()
     private val displaySizes = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val protocolCompatibility = ConcurrentHashMap<IBinder, Boolean>()
+    private val lastBinderRequestAtMs = AtomicLong(0L)
 
     // sidecar 是独立 app_process 子进程；AIDL 是同步阻塞的双向 Binder transact，进程卡住时
     // 调用方线程会被无限期挂起——既不抛异常也不返回。这曾是"后台任务卡住上百分钟只能手动取消"的
@@ -133,6 +137,17 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     fun isResidentBinderAlive(mode: RuntimeMode): Boolean =
         isRegisteredServiceAlive(mode)
+
+    /** Asks a resident sidecar for its Binder; only local IPC, so it works without Wi-Fi or ADB. */
+    fun requestResidentBinder() {
+        val now = SystemClock.elapsedRealtime()
+        val last = lastBinderRequestAtMs.get()
+        if (last != 0L && now - last < BINDER_REQUEST_INTERVAL_MS) return
+        if (!lastBinderRequestAtMs.compareAndSet(last, now)) return
+        runCatching {
+            context.sendBroadcast(Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_REQUEST))
+        }
+    }
 
     fun isChannelAvailableForMode(mode: RuntimeMode?): Boolean =
         when (mode) {
@@ -1885,6 +1900,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         private const val ADB_BIND_RETRIES = 50
         private const val RESIDENT_REBIND_RETRIES = 30
         private const val BIND_POLL_MS = 200L
+        private const val BINDER_REQUEST_INTERVAL_MS = 3_000L
         private const val PROCESS_PROBE_TIMEOUT_MS = 2_000L
         private const val PROCESS_EXIT_RETRIES = 20
         private const val GRACEFUL_EXIT_RETRIES = 5

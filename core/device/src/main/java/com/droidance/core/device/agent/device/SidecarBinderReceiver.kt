@@ -45,6 +45,8 @@ class SidecarBinderReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_SIDECAR_BINDER_READY = "com.droidance.action.SIDECAR_BINDER_READY"
+        const val ACTION_SIDECAR_BINDER_REQUEST = "com.droidance.action.SIDECAR_BINDER_REQUEST"
+        const val BINDER_REQUEST_SENDER_PERMISSION = "android.permission.WRITE_SECURE_SETTINGS"
         const val EXTRA_BINDER_CONTAINER = "binder_container"
         const val EXTRA_SIDECAR_UID = "sidecar_uid"
         const val EXTRA_SIDECAR_PROTOCOL_VERSION = "sidecar_protocol_version"

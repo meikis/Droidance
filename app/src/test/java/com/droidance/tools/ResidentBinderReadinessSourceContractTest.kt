@@ -109,6 +109,25 @@ class ResidentBinderReadinessSourceContractTest {
     }
 
     @Test
+    fun restartedAppRequestsResidentBinderWithoutAdb() {
+        val registry = projectFile("app/src/main/java/com/droidance/agent/RuntimeCapabilityRegistry.kt").readText()
+        val bridge = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarBridge.kt").readText()
+        val sidecar = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarMain.java").readText()
+
+        assertTrue(registry.contains("virtualSpaceSidecarBridge.requestResidentBinder()"))
+        assertTrue(bridge.contains("Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_REQUEST)"))
+        assertTrue(sidecar.contains("SidecarBinderReceiver.BINDER_REQUEST_SENDER_PERMISSION"))
+    }
+
+    @Test
+    fun readNotificationsUsesTheUnifiedDeviceShellChannel() {
+        val registrar = projectFile("app/src/main/java/com/droidance/tools/NotificationToolRegistrar.kt").readText()
+
+        assertTrue(registrar.contains("private val deviceShell: DeviceShellCommandChannel"))
+        assertFalse(registrar.contains("adbShell"))
+    }
+
+    @Test
     fun capabilityRegistryKeepsAdbAndBinderSignalsSeparateWithTransportDiagnostic() {
         val registry = projectFile("app/src/main/java/com/droidance/agent/RuntimeCapabilityRegistry.kt").readText()
 

@@ -33,7 +33,7 @@ import java.util.Locale
 
 class NotificationToolRegistrar(
     private val registerTool: (Tool) -> Unit,
-    private val adbShell: AdbShellExecutor,
+    private val deviceShell: DeviceShellCommandChannel,
     private val installedAppsManager: InstalledAppsManager,
     private val appTakeoverStore: AppTakeoverStore,
     private val ruleConfigManager: RuleConfigManager,
@@ -62,14 +62,14 @@ class NotificationToolRegistrar(
                 val filterApp = arguments.jsonString("app")
                 val watcher = com.droidance.automation.NotificationWatcher.instance
                 if (watcher != null) return ToolProtocolResult.success(formatWatcherNotifications(watcher, filterApp))
-                if (!adbShell.isAvailable()) {
+                if (!deviceShell.isAvailable()) {
                     return ToolProtocolResult.notExecuted(
                         code = "NOTIFICATION_ACCESS_UNAVAILABLE",
                         retryable = false
                     )
                 }
-                val result = adbShell.exec("dumpsys notification --noredact 2>/dev/null | grep -A 3 'android.title\\|android.text' | head -60", 10_000)
-                return if (result.exitCode == 0) ToolProtocolResult.success(result.stdout.ifBlank { "No notifications" })
+                val result = deviceShell.exec("dumpsys notification --noredact 2>/dev/null | grep -A 3 'android.title\\|android.text' | head -60", 10_000)
+                return if (result.success) ToolProtocolResult.success(result.stdout.ifBlank { "No notifications" })
                 else ToolProtocolResult.failed("NOTIFICATION_READ_FAILED", true)
             }
         })
