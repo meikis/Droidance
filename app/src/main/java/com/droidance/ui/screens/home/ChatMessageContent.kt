@@ -1076,7 +1076,6 @@ internal fun ChatBubble(
     imageBytes: List<ByteArray> = emptyList(),
     turnPresentation: TurnPresentationUiState? = null,
     tokenUsage: TokenUsageTotals? = null,
-    onOpenTokenUsage: () -> Unit = {},
     liveIntervention: String = "",
     loadTimelineAttachment: suspend (DetailAttachmentReadModel) -> ByteArray? = { null },
     canOpenVirtualSpace: Boolean = false,
@@ -1174,9 +1173,7 @@ internal fun ChatBubble(
                         )
                     }
                     if (tokenUsage != null) {
-                        Spacer(Modifier.weight(1f))
-                        TokenUsageButton(tokenUsage, onOpenTokenUsage, incomplete = isStreaming,
-                            showChevron = true)
+                        TokenUsageLabel(tokenUsage)
                     }
                 }
             }
@@ -1303,9 +1300,7 @@ internal fun ChatBubble(
                 )
             }
             if (!isUser && tokenUsage != null) {
-                Spacer(Modifier.weight(1f))
-                TokenUsageButton(tokenUsage, onOpenTokenUsage, incomplete = isStreaming,
-                    showChevron = true)
+                TokenUsageLabel(tokenUsage)
             }
         }
     }

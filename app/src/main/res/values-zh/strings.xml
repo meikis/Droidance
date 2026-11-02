@@ -742,13 +742,4 @@
     <string name="air_adb_persistence_usb_title">请开启 USB 调试</string>
     <string name="air_adb_persistence_usb_required">请到开发者选项开启 USB 调试，以保持本机端口重连可用。</string>
     <string name="connection_local_unavailable_title">本机调试连接中断</string>
-    <string name="chat_token_count">%1$s tokens</string>
-    <string name="chat_token_usage_open">查看用量：%1$s</string>
-    <string name="chat_token_usage_title">用量</string>
-    <string name="chat_token_usage_conversation">对话累计</string>
-    <string name="chat_token_usage_input">输入用量（含缓存）</string>
-    <string name="chat_token_usage_cached">其中缓存命中</string>
-    <string name="chat_token_usage_running">模型请求结束后更新用量。</string>
-    <string name="chat_token_usage_unavailable">用量尚未记录或服务商未返回用量。</string>
-    <string name="chat_token_usage_incomplete">部分请求缺少用量，以 + 标记的数值为已知消耗。</string>
 </resources>

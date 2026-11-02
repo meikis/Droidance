@@ -745,13 +745,4 @@
     <string name="air_adb_persistence_usb_title">Enable USB debugging</string>
     <string name="air_adb_persistence_usb_required">Enable USB debugging in Developer options to keep local reconnection available.</string>
     <string name="connection_local_unavailable_title">Local debugging connection interrupted</string>
-    <string name="chat_token_count">%1$s tokens</string>
-    <string name="chat_token_usage_open">View token usage: %1$s</string>
-    <string name="chat_token_usage_title">Token usage</string>
-    <string name="chat_token_usage_conversation">Conversation usage</string>
-    <string name="chat_token_usage_input">Input, including cache</string>
-    <string name="chat_token_usage_cached">Cached input</string>
-    <string name="chat_token_usage_running">Usage updates as model requests finish.</string>
-    <string name="chat_token_usage_unavailable">Token usage was not recorded or returned by the provider.</string>
-    <string name="chat_token_usage_incomplete">Some requests have no reported usage. Values with + show known usage.</string>
 </resources>
