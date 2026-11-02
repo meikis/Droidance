@@ -28,6 +28,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.coroutines.coroutineContext
+import com.droidance.core.agent.debug.recordRuntimeFailure
 
 internal class TaskTurnSession(
     internal val services: TaskTurnServices,
@@ -629,12 +630,17 @@ internal class TaskTurnSession(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                val reference = java.util.UUID.randomUUID().toString().take(8)
+                debugLogManager.recordRuntimeFailure(reference,
+                    "phase=operator turn=${durableTurn.scope.turnId} round=$rounds tools=${executedToolNames.joinToString(",")} diagnostic=$lastExecutionDiagnostic", error)
                 debugLogManager.appendEvent("Agent execution exception: ${error::class.java.simpleName}: ${error.message.orEmpty().take(500)}")
                 settlePendingDurableRound("RUNTIME_EXCEPTION")
                 TurnResult(hasToolCalls = totalToolCalls > 0, toolNames = executedToolNames.toList(),
                     summary = fallbackText("termination_internal_error"),
                     evidenceText = evidenceLedger.buildOperatorEvidenceText(), rounds = rounds,
                     failureReason = TurnFailureReason.RUNTIME_EXCEPTION, terminal = TurnTerminal.SYSTEM_ERROR,
+                    runtimeFailureSummary = fallbackText("termination_internal_error_detail", mapOf(
+                        "error_type" to error.javaClass.simpleName, "reference" to reference)),
                     stopDiagnostic = "${error::class.java.simpleName}: ${error.message.orEmpty().take(500)}")
             }
         } while (!trySealInput())

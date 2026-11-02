@@ -162,8 +162,9 @@ internal suspend fun TaskTurnSession.runModelRound(repairPurpose: RepairPurpose)
                         retainEmptyDisplayObservation(autoResult)
                         return null
                     }
-                    if (autoResult.diagnosticCode in ruleConfigManager.harnessPolicy().humanAssistance.observationUnavailableDiagnostics) {
-                        onManualTakeoverNeeded(fallbackText("observation_unavailable_handoff"))
+                    val recoveryHandoff = ruleConfigManager.harnessPolicy().humanAssistance.recoveryHandoffs[autoResult.diagnosticCode]
+                    if (recoveryHandoff != null) {
+                        onManualTakeoverNeeded(fallbackText(recoveryHandoff))
                         if (!isPaused()) return ModelRoundOutcome.Terminal(groundedGuardStop())
                         waitForActiveExecution()
                         currentObservationLease = null
@@ -1236,18 +1237,17 @@ internal suspend fun TaskTurnSession.runModelRound(repairPurpose: RepairPurpose)
             summary = "LLM call failed: ${e.message?.take(800)}",
             runtimeFailureSummary = when {
                 imageInputRejected -> fallbackText("termination_model_image_unavailable")
-                providerFailure?.category == ProviderErrorCategory.BILLING -> fallbackText("termination_model_billing")
-                providerFailure?.category == ProviderErrorCategory.AUTHENTICATION -> fallbackText("termination_model_authentication")
                 providerFailure?.category == ProviderErrorCategory.PERMISSION_DENIED ->
                     providerFailure.publicReason?.let { reason ->
                         fallbackText("termination_model_permission_denied_reason", mapOf("reason" to reason))
                     } ?: fallbackText("termination_model_permission_denied")
-                else -> null
+                else -> fallbackText(modelFailureNoticeKey(e))
             },
             evidenceText = evidenceLedger.buildOperatorEvidenceText(),
             operatorOutput = fullContent,
             rounds = rounds,
             failureReason = TurnFailureReason.MODEL_UNAVAILABLE,
+            stopDiagnostic = providerFailure?.let { "PROVIDER_${it.category.name}_HTTP_${it.statusCode}" } ?: failureClass,
             terminal = TurnTerminal.SYSTEM_ERROR
         ))
     }

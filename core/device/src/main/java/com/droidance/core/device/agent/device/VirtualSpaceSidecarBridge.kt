@@ -1219,14 +1219,21 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                 decodeTransferJpeg(bytes, binding.displayId)
             }
 
+    @Volatile private var frameFailure: Pair<SidecarSessionBinding, String>? = null
+
+    fun captureFailureDetail(binding: SidecarSessionBinding): String =
+        frameFailure?.takeIf { it.first == binding }?.second.orEmpty()
+
     fun captureFrame(binding: SidecarSessionBinding, forceFresh: Boolean, sampleSide: Int): FrameSnapshot? {
         if (binding.displayId == 0) return capturePng(binding)?.let {
             FrameSnapshot(it, System.currentTimeMillis())
         }
         // Consume and close inside the timed worker. A late Binder reply after cancellation
         // must not leave a descriptor stranded in an abandoned Future result.
-        return callBoundValue(binding, markSidecarSuspectOnFailure = false) { service ->
-            service.captureFreshFrame(binding.displayId, sampleSide)?.use { frame ->
+        val result = callBoundValue(binding, markSidecarSuspectOnFailure = false) { service ->
+            val captured = service.captureFreshFrame(binding.displayId, sampleSide)
+                ?: throw IllegalStateException(service.lastError.ifBlank { "No fresh frame returned" })
+            captured.use { frame ->
                 if (Thread.currentThread().isInterrupted) return@use null
                 val facts = frame.metadata
                 val producedAtMs = facts.getLong("frameAtMs")
@@ -1258,7 +1265,11 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                         .forEach { (field, metric) -> if (facts.containsKey(field)) put(metric, facts.getLong(field)) }
                 })
             }
-        }.getOrNull()
+        }
+        frameFailure = binding to (result.exceptionOrNull()?.let {
+            "${it.javaClass.simpleName}: ${it.message.orEmpty().take(500)}"
+        } ?: if (result.getOrNull() == null) "Frame metadata or image validation failed" else "")
+        return result.getOrNull()
     }
 
     /**

@@ -71,7 +71,8 @@ class SidecarScreenCapture @Inject constructor(
             System.currentTimeMillis() - started
         )
         if (bytes == null || !(looksLikePng(bytes) || looksLikeJpeg(bytes))) {
-            lastFailureReason = "[BACKEND_FRAME_FAILED] Frozen sidecar did not return a valid image"
+            lastFailureReason = "[BACKEND_FRAME_FAILED] " + sidecarBridge.captureFailureDetail(binding)
+                .ifBlank { "Frozen sidecar did not return a valid image" }
             return null
         }
         if (executionContext.isVirtualSpace) {

@@ -17,6 +17,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ModelRequestResilienceIntegrationTest {
+    @Test fun stoppedReplyPlanningFailureKeepsTheOriginalCauseAndLeavesNoOpenRound() = runBlocking {
+        val model = FakeModelClient()
+        val client = object : ModelClient by model {
+            override fun planStreamChat(messages: List<ChatMessage>, hasImage: Boolean): ModelStreamPlan {
+                if (messages.any { it.content.contains("\"failure_reason\"") }) error("closing request planning failed")
+                return model.planStreamChat(messages, hasImage)
+            }
+        }
+        val fixture = TaskCoordinatorTestFixture(modelClientOverride = client, stoppedReplyEnabled = true)
+        val started = fixture.startTurn("closing-plan-failure", "Inspect the page", activate = false)
+        model.nextStreamFailure = ModelStreamTimeoutException("first_output")
+        val result = fixture.coordinator.coordinateTask("Inspect the page", "", started.active, "", null,
+            started.executionStrategy, toolProfile = started.profile, mode = started.mode)
+        fixture.complete(started, result)
+        assertEquals(TurnFailureReason.MODEL_TIMEOUT, result.failureReason)
+        assertEquals("termination_model_timeout", result.runtimeFailureSummary)
+        assertEquals(1, model.recordedRequests.size)
+        assertTrue(fixture.diagnostics.any { it.contains("phase=stopped_task_reply") })
+        assertTrue(fixture.eventStore.unfinishedTurnScopesForRecovery().isEmpty())
+    }
+
     @Test fun entryRetriesTransientTransportAndHttpFailuresBeforePublication() = runBlocking {
         for (failure in listOf(java.net.SocketException("connection reset")) +
             listOf(408, 409, 429, 500, 503).map { ProviderHttpException.fromResponse(it, "fixture", "{}") }) {
@@ -157,6 +178,7 @@ class ModelRequestResilienceIntegrationTest {
         }
         assertEquals(TurnFailureReason.MODEL_TIMEOUT, result.failureReason)
         assertEquals(2, client.requests)
+        assertEquals("termination_model_timeout", result.runtimeFailureSummary)
         assertTrue(stoppedReplyCancelled)
         assertTrue(fixture.toolExecutor.deviceCalls.isEmpty())
         assertTrue(fixture.events(started).filter { it.eventKind == AgentEventKind.MODEL_ROUND_COMPLETED }

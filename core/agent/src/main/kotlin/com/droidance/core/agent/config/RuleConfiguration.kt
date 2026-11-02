@@ -334,14 +334,14 @@ data class CommunicationContract(
 
 @Serializable
 data class HumanAssistancePolicy(
-    @SerialName("observation_unavailable_diagnostics")
-    val observationUnavailableDiagnostics: List<String>,
+    @SerialName("recovery_handoffs")
+    val recoveryHandoffs: Map<String, String>,
     @SerialName("allowed_boundary_types")
     val allowedBoundaryTypes: List<String>
 ) {
     fun validate() {
-        validateUniqueValues("human_assistance.observation_unavailable_diagnostics", observationUnavailableDiagnostics)
-        require(observationUnavailableDiagnostics.all { it.matches(Regex("[A-Z][A-Z0-9_]*")) })
+        require(recoveryHandoffs.keys.all { it.matches(Regex("[A-Z][A-Z0-9_]*")) })
+        require(recoveryHandoffs.values.all { it.matches(Regex("[a-z][a-z0-9_]*")) })
         validateUniqueValues("human_assistance.allowed_boundary_types", allowedBoundaryTypes)
         require(allowedBoundaryTypes.all { it.matches(Regex("[a-z][a-z0-9_]*")) })
     }

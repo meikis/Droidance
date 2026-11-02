@@ -178,8 +178,9 @@ memory_context:
   recall_detail_max_chars: 6000
 
 human_assistance:
-  observation_unavailable_diagnostics:
-    - OBSERVATION_UNAVAILABLE
+  recovery_handoffs:
+    OBSERVATION_UNAVAILABLE: observation_unavailable_handoff
+    INPUT_PERMISSION_DENIED: input_permission_denied_handoff
   allowed_boundary_types:
     - live_verification
     - secret_credential

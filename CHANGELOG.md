@@ -8,6 +8,17 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Custom rule overrides must replace `human_assistance.observation_unavailable_diagnostics` with `recovery_handoffs` and include the current localized runtime notice keys; see [Rules](docs/RULES.md#tunable-configuration).
+
+### Fixed
+
+- Transient screenshot exceptions use the bounded frame recovery path instead of immediately ending the task.
+- Blocked input permissions pause the task with recovery instructions instead of being reported as a disconnected control channel.
+- Model connection, rate-limit, request-format and availability failures retain their specific notices even when a stopped-task explanation is unavailable.
+- Execution failures retain a diagnostic reference and stack locations for data export.
+
 ## [0.1.4] - 2026-11-02
 
 ### Added

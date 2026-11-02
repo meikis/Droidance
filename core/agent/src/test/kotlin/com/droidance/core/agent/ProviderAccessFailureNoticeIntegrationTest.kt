@@ -11,6 +11,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ProviderAccessFailureNoticeIntegrationTest {
+    @Test fun rejectedFormatAndUnavailableModelNeverBecomeInternalErrors() {
+        for ((body, expected) in listOf(
+            """{"error":{"code":"invalid_request_error","message":"private-body"}}""" to "termination_model_request_rejected",
+            """{"error":{"code":"model_not_found","message":"private-body"}}""" to "termination_model_not_found",
+            """{"error":{"code":"context_length_exceeded","message":"private-body"}}""" to "termination_model_context_limit")) {
+            val (result, requests) = runRejected(400, body)
+            assertEquals(1, requests)
+            assertEquals(expected, result.runtimeFailureSummary)
+            assertEquals(expected, RuntimeUiResultPolicy.failureSummary(result) { "wrong fallback" })
+        }
+    }
+
     private fun runRejected(status: Int, body: String): Pair<TurnResult, Int> = runBlocking {
         val fixture = TaskCoordinatorTestFixture(stoppedReplyEnabled = true)
         val started = fixture.startTurn("denied", "Inspect the requested source")

@@ -108,16 +108,17 @@
     "recall_detail_max_chars": 6000
   },
   "human_assistance": {
-    "observation_unavailable_diagnostics": [
-      "OBSERVATION_UNAVAILABLE"
-    ],
     "allowed_boundary_types": [
       "live_verification",
       "secret_credential",
       "payment_authorization",
       "irreversible_confirmation",
       "user_judgment"
-    ]
+    ],
+    "recovery_handoffs": {
+      "OBSERVATION_UNAVAILABLE": "observation_unavailable_handoff",
+      "INPUT_PERMISSION_DENIED": "input_permission_denied_handoff"
+    }
   },
   "tool_safety": {
     "confirmation_tools": [

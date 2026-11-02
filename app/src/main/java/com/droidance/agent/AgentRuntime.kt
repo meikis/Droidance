@@ -3,6 +3,8 @@
 
 package com.droidance.agent
 
+import com.droidance.core.agent.debug.recordRuntimeFailure
+
 import com.droidance.core.agent.*
 import com.droidance.core.device.agent.*
 
@@ -1553,18 +1555,22 @@ host = object : com.droidance.core.agent.TurnHost {
             )
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
+            val reference = java.util.UUID.randomUUID().toString().take(8)
+            debugLogManager.recordRuntimeFailure(reference, "phase=agent_runtime", e)
             debugLogManager.appendEvent(
                 "Agent runtime failed: ${e::class.java.simpleName}: ${e.message.orEmpty().take(240)}"
             )
             val failureText = evidenceLedger.wrapInternalEvidence(
-                ruleConfigManager.terminationFallback(reasonMarker = "runtime_exception")
+                ruleConfigManager.publicFallback("termination_internal_error_detail")
+                    .replace("{error_type}", e.javaClass.simpleName).replace("{reference}", reference)
             )
             TurnResult(
                 hasToolCalls = false,
                 summary = failureText,
                 operatorOutput = failureText,
                 terminal = TurnTerminal.SYSTEM_ERROR,
-                failureReason = TurnFailureReason.RUNTIME_EXCEPTION
+                failureReason = TurnFailureReason.RUNTIME_EXCEPTION,
+                stopDiagnostic = "RUNTIME_EXCEPTION:$reference:${e.javaClass.simpleName}"
             )
         } finally {
             // Do not retain a notifier across tasks.

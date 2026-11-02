@@ -38,8 +38,13 @@ Each round records `system_prompt_chars` and `tool_schema_chars` (with a per-too
 | `screen_action_batch` | Allowed screen primitives, wait/capture limits and `max_drag_repeat` per drag |
 | `vision_frame` | Screenshot size and JPEG quality sent to the model |
 | `memory_context` | How much memory and Skill catalog text enters a task |
+| `human_assistance.recovery_handoffs` | Map device diagnostic codes to localized pause notices in `public_fallbacks.md`; resuming invalidates the old frame and observes again |
 
 Unit tests check relations between values (for example, the stream-idle deadline cannot exceed the round timeout), not the values themselves, so tuning a value does not require editing tests.
+
+Custom `harness_policy.yaml` overrides must replace `human_assistance.observation_unavailable_diagnostics` with the `recovery_handoffs` mapping. Use `OBSERVATION_UNAVAILABLE: observation_unavailable_handoff` and `INPUT_PERMISSION_DENIED: input_permission_denied_handoff` from the bundled policy. Custom `public_fallbacks.md` overrides must also include the current bundled notice keys in both languages. Overrides replace whole documents; the runtime does not merge an older format with the bundled configuration.
+
+Screenshot recovery retries only reads on the frozen execution backend and can reattach that display's frame surface. The retry count comes from `runtime_thresholds.frame_recovery_repeats`, and the delay from `virtual_space.render_wait_poll_ms`. Unknown input delivery is never automatically replayed. A restarted sidecar has a different execution identity and cannot silently replace the backend of a committed task.
 
 ## Model capabilities
 

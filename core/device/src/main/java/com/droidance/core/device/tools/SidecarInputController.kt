@@ -66,12 +66,12 @@ class SidecarInputController @Inject constructor(
             diagnostics.recordInjection(args.substringBefore(' '), frozen.runtimeMode.name,
                 "bound-sidecar:${frozen.displayId}", result.ok, result.detail)
             DeviceInputResult(result.ok, result.detail, actionEvent = event.takeIf { result.ok },
-                diagnosticCode = if (result.ok) null else "CHANNEL_DOWN")
+                diagnosticCode = sidecarInputDiagnostic(result))
         }
     }
     suspend fun keyevent(keycode: Int): DeviceInputResult = withContext(Dispatchers.IO) {
         val result = sidecarBridge.injectKey(binding(), keycode)
-        DeviceInputResult(result.ok, result.detail, diagnosticCode = if (result.ok) null else "CHANNEL_DOWN")
+        DeviceInputResult(result.ok, result.detail, diagnosticCode = sidecarInputDiagnostic(result))
     }
     suspend fun combo(name: String): DeviceInputResult = withContext(Dispatchers.IO) {
         val codes = when (name.lowercase().replace(" ", "")) {
@@ -84,7 +84,7 @@ class SidecarInputController @Inject constructor(
             else -> return@withContext DeviceInputResult(false, "Unsupported key combination")
         }
         val result = sidecarBridge.injectKeyCombo(binding(), codes)
-        DeviceInputResult(result.ok, result.detail, diagnosticCode = if (result.ok) null else "CHANNEL_DOWN")
+        DeviceInputResult(result.ok, result.detail, diagnosticCode = sidecarInputDiagnostic(result))
     }
     suspend fun awaitInputFocus(timeoutMs: Long): com.droidance.core.device.agent.device.InputFocusReadiness = withContext(Dispatchers.IO) {
         val executionContext = executionContextStore.current() ?: return@withContext com.droidance.core.device.agent.device.InputFocusReadiness(null, "INPUT_EXECUTION_UNAVAILABLE")
@@ -118,7 +118,7 @@ class SidecarInputController @Inject constructor(
             return@withContext DeviceInputResult(
                 success = false,
                 message = "${channelMarker}text input failed: ${sidecarResult.detail}",
-                diagnosticCode = "CHANNEL_DOWN".takeIf { sidecarResult.channelUnavailable }
+                diagnosticCode = sidecarInputDiagnostic(sidecarResult)
             )
         }
 
@@ -126,7 +126,8 @@ class SidecarInputController @Inject constructor(
         DeviceInputResult(
             success = evidence.eventInjected,
             message = "Text input ${evidence.outcome.name.lowercase()}: ${sidecarResult.detail}",
-            textInputEvidence = evidence
+            textInputEvidence = evidence,
+            diagnosticCode = sidecarInputDiagnostic(sidecarResult).takeUnless { evidence.eventInjected }
         )
     }
 
@@ -149,7 +150,7 @@ class SidecarInputController @Inject constructor(
             val execution = executionContextStore.requireCurrent()
             val binding = com.droidance.core.device.agent.device.SidecarSessionBinding(execution.mode, execution.displayId, execution.backendSessionId)
             if (!sidecarBridge.isBoundSessionAlive(binding)) return@withContext DeviceInputResult(false,
-                "Continuous touch unavailable on the frozen backend", diagnosticCode = "GESTURE_BACKEND_UNAVAILABLE")
+                "Continuous touch unavailable on the frozen backend", diagnosticCode = "CHANNEL_DOWN")
             val cancellationBinding = binding
             val first = points.first(); val last = points.last()
             val event = ExecutedActionEvent.Swipe(first.first, first.second, last.first, last.second, durationMs)
@@ -158,36 +159,41 @@ class SidecarInputController @Inject constructor(
                 var attemptedDown = false
                 var released = false
                 var current = first
+                var lastDelivery: VirtualSpaceSidecarBridge.CommandResult? = null
+                fun failed(message: String, fallbackCode: String) = DeviceInputResult(false,
+                    "$message: ${lastDelivery?.detail.orEmpty()}",
+                    diagnosticCode = lastDelivery?.let(::sidecarInputDiagnostic) ?: fallbackCode)
                 suspend fun send(action: Int, point: Pair<Int, Int>): Boolean {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     if (executionContextStore.current()?.executionId != execution.executionId) return false
                     current = point
                     return sidecarBridge.injectTouch(binding, action, point.first, point.second,
-                        downTime, android.os.SystemClock.uptimeMillis()).ok
+                        downTime, android.os.SystemClock.uptimeMillis()).also { lastDelivery = it }.ok
                 }
                 try {
                     attemptedDown = true
                     if (!send(android.view.MotionEvent.ACTION_DOWN, first))
-                        return@execute DeviceInputResult(false, "Touch down failed", diagnosticCode = "GESTURE_DOWN_FAILED")
+                        return@execute failed("Touch down failed", "GESTURE_DOWN_FAILED")
                     for (index in 1 until points.size) {
                         val due = downTime + holdMs + ((durationMs - holdMs).coerceAtLeast(1).toLong() * index / (points.size - 1))
                         kotlinx.coroutines.delay((due - android.os.SystemClock.uptimeMillis()).coerceAtLeast(0))
                         if (!send(android.view.MotionEvent.ACTION_MOVE, points[index]))
-                            return@execute DeviceInputResult(false, "Path interrupted at point $index", diagnosticCode = "GESTURE_MOVE_FAILED")
+                            return@execute failed("Path interrupted at point $index", "GESTURE_MOVE_FAILED")
                     }
                     // Stationary moves age the earlier motion out of the velocity window.
                     val restUntil = android.os.SystemClock.uptimeMillis() + releaseRestMs
                     while (android.os.SystemClock.uptimeMillis() < restUntil) {
                         kotlinx.coroutines.delay(RELEASE_REST_INTERVAL_MS)
                         if (!send(android.view.MotionEvent.ACTION_MOVE, last))
-                            return@execute DeviceInputResult(false, "Path interrupted while resting", diagnosticCode = "GESTURE_MOVE_FAILED")
+                            return@execute failed("Path interrupted while resting", "GESTURE_MOVE_FAILED")
                     }
                     released = send(android.view.MotionEvent.ACTION_UP, last)
                     DeviceInputResult(released,
                         "Continuous path ${if (released) "delivered" else "release failed"}; points=${points.size}; " +
                             "start=${first.first},${first.second}; end=${last.first},${last.second}; " +
                             "elapsed_ms=${android.os.SystemClock.uptimeMillis() - downTime}; channel=sidecar-touch; display=${execution.displayId}",
-                        actionEvent = event, diagnosticCode = if (released) null else "GESTURE_RELEASE_FAILED")
+                        actionEvent = event, diagnosticCode = if (released) null else
+                            lastDelivery?.let(::sidecarInputDiagnostic) ?: "GESTURE_RELEASE_FAILED")
                 } finally {
                     if (attemptedDown && !released) withContext(kotlinx.coroutines.NonCancellable) {
                         sidecarBridge.injectTouch(cancellationBinding, android.view.MotionEvent.ACTION_CANCEL, current.first, current.second,

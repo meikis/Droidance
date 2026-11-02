@@ -11,6 +11,26 @@ import org.junit.Test
 import java.io.File
 
 class StoppedTaskReplyPolicyTest {
+    @Test fun unavailableExplanationPreservesTheActualFailureCategory() {
+        for ((reason, key) in mapOf(
+            TurnFailureReason.MODEL_UNAVAILABLE to "termination_model_unavailable",
+            TurnFailureReason.CHANNEL_DOWN to "termination_channel_down",
+            TurnFailureReason.MODEL_TIMEOUT to "termination_model_timeout",
+            TurnFailureReason.RUNTIME_EXCEPTION to "termination_internal_error")) {
+            val result = TurnResult(true, summary = "private diagnostic", terminal = TurnTerminal.SYSTEM_ERROR,
+                failureReason = reason).withRuntimeFailureNotice { it }
+            assertEquals(key, RuntimeUiResultPolicy.failureSummary(result) { "wrong fallback" })
+        }
+        val explicit = TurnResult(true, summary = "failure", terminal = TurnTerminal.SYSTEM_ERROR,
+            failureReason = TurnFailureReason.MODEL_UNAVAILABLE, runtimeFailureSummary = "specific provider notice")
+        assertSame(explicit, explicit.withRuntimeFailureNotice { error("already has a notice") })
+        val guard = TurnResult(true, summary = "failure", terminal = TurnTerminal.SYSTEM_ERROR,
+            failureReason = TurnFailureReason.GUARD_STOP, stopDiagnostic = "INPUT_PERMISSION_DENIED")
+        assertEquals("termination_input_permission_denied", guard.withRuntimeFailureNotice { it }.runtimeFailureSummary)
+        val done = explicit.copy(terminal = TurnTerminal.DONE, runtimeFailureSummary = null)
+        assertSame(done, done.withRuntimeFailureNotice { error("successful result") })
+    }
+
     private fun policy(): StoppedTaskReplyPolicy {
         val base = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
             .first { File(it, "app/src/main/assets/rules/stopped_task_reply.md").isFile }

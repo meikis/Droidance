@@ -10,6 +10,51 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FrameChannelRecoveryTest {
+    @Test fun cancellationDuringRetryDelayDoesNotResetOrKeepCapturing() = runBlocking {
+        var captures = 0
+        var resets = 0
+        try {
+            kotlinx.coroutines.withTimeout(50) {
+                captureWithFrameRecovery<String>(3, capture = { captures++; null },
+                    reset = { resets++; true }, report = { _, _ -> }, retryDelayMs = 5000)
+            }
+            fail("expected timeout")
+        } catch (_: kotlinx.coroutines.TimeoutCancellationException) { }
+        assertEquals(1, captures)
+        assertEquals(0, resets)
+    }
+
+    @Test fun transientReadExceptionRecoversWithoutResettingOrReplayingInput() = runBlocking {
+        var captures = 0
+        val failures = mutableListOf<String>()
+        val frame = captureWithFrameRecovery(3,
+            capture = { if (++captures == 1) throw java.io.IOException("temporary") else "fresh" },
+            reset = { error("healthy channel must not be reset") }, report = { _, _ -> },
+            onFailure = { stage, _ -> failures += stage })
+        assertEquals("fresh", frame)
+        assertEquals(2, captures)
+        assertEquals(listOf("capture"), failures)
+    }
+
+    @Test fun failedResetStillRequiresAndCanRecoverAFreshFrame() = runBlocking {
+        var captures = 0
+        val failures = mutableListOf<String>()
+        val frame = captureWithFrameRecovery(2,
+            capture = { if (++captures <= 2) throw IllegalStateException("unavailable") else "fresh" },
+            reset = { throw java.io.IOException("reset unavailable") }, report = { _, _ -> },
+            onFailure = { stage, _ -> failures += stage })
+        assertEquals("fresh", frame)
+        assertEquals(listOf("capture", "capture", "reset"), failures)
+    }
+
+    @Test fun persistentReadFailuresExhaustTheBudgetAndPreserveDiagnostics() = runBlocking {
+        val failures = mutableListOf<String>()
+        assertNull(captureWithFrameRecovery<String>(2,
+            capture = { throw IllegalStateException("broken surface") }, reset = { false },
+            report = { _, _ -> }, onFailure = { stage, _ -> failures += stage }))
+        assertEquals(listOf("capture", "capture", "capture_after_reset"), failures)
+    }
+
     @Test fun healthyFrameDoesNotResetChannel() = runBlocking {
         val frame = captureWithFrameRecovery(2, { "pixels" }, { error("unexpected reset") }, { _, _ -> })
         assertEquals("pixels", frame)

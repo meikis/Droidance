@@ -20,14 +20,27 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import com.droidance.core.agent.debug.recordRuntimeFailure
 
 internal suspend fun TaskTurnSession.explainStoppedTask(result: TurnResult): TurnResult {
+    val stopped = result.withRuntimeFailureNotice { fallbackText(it) }
+    return try {
+        requestStoppedTaskExplanation(stopped)
+    } catch (error: Exception) {
+        if (error is kotlinx.coroutines.CancellationException) throw error
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        debugLogManager.recordRuntimeFailure(durableTurn.scope.turnId,
+            "phase=stopped_task_reply reason=${stopped.failureReason}", error)
+        settlePendingDurableRound("STOPPED_REPLY_UNAVAILABLE")
+        stopped
+    }
+}
+
+private suspend fun TaskTurnSession.requestStoppedTaskExplanation(result: TurnResult): TurnResult {
     val policy = Json.decodeFromString<StoppedTaskReplyPolicy>(
         ruleConfigManager.readMarkdownSection("stopped_task_reply.md", "policy")
     ).also { it.validate() }
-    if (!stoppedReplyContextAvailable || !policy.eligible(result)) return result.copy(
-        runtimeFailureSummary = result.runtimeFailureSummary ?: fallbackText("termination_internal_error")
-            .takeIf { result.terminal == TurnTerminal.SYSTEM_ERROR })
+    if (!stoppedReplyContextAvailable || !policy.eligible(result)) return result
     val stoppedReplyCancellationGeneration = llmRouter.currentCancellationGeneration()
     kotlinx.coroutines.currentCoroutineContext().ensureActive()
     if (llmRouter.wasCancellationRequestedSince(stoppedReplyCancellationGeneration) || isPaused()) return result

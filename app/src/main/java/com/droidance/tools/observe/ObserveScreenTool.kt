@@ -14,6 +14,7 @@ import com.droidance.agent.LocalActionVerifier
 import com.droidance.core.device.agent.device.DeviceBackend
 import com.droidance.config.RuleConfigManager
 import com.droidance.debug.DebugLogManager
+import com.droidance.core.agent.debug.recordRuntimeFailure
 import com.droidance.core.device.debug.DiagnosticsCollector
 import com.droidance.core.agent.tools.ModelCoordinateMapper
 import com.droidance.core.agent.tools.ToolProtocolResult
@@ -239,7 +240,12 @@ class ObserveScreenTool @Inject constructor(
                     diagnostics.recordObservation(displayId, stage, success,
                         if (success) "" else if (stage == "reset") virtualSpaceManager.get().lastFailureReason()
                         else deviceBackend.screenFailureMessage())
-                }
+                },
+                onFailure = { stage, error ->
+                    debugLogManager.recordRuntimeFailure(executionContext.executionId,
+                        "phase=observation_$stage display=$displayId backend=${executionContext.backendSessionId}", error)
+                },
+                retryDelayMs = ruleConfigManager.harnessPolicy().virtualSpace.renderWaitPollMs
             )
         } else captureObservedFrame()
         if (frame == null) {

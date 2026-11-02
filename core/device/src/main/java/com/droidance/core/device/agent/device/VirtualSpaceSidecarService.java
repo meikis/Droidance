@@ -1639,6 +1639,8 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             evidence.append(" detail=").append(detail);
         }
         lastInputEvidence = evidence.toString();
+        if (ok) lastError = "";
+        else if (detail != null && !detail.isEmpty()) lastError = detail;
         if (INPUT_PATH_REFLECTION.equals(path) && ok) {
             lastReflectionFailure = "";
         }

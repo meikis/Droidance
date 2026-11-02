@@ -8,7 +8,7 @@ These local notices describe runtime termination only; they do not certify task 
     "en": {
       "termination_default": "The task stopped before completion could be confirmed.",
       "termination_task_time_limit": "The task reached its time limit before completion could be confirmed.",
-      "termination_channel_down": "The device control channel became unavailable before the task finished.",
+      "termination_channel_down": "The device control service disconnected before the task finished. Open Settings > Device connection and restore the connection before retrying. The last operation may be unconfirmed; task records are retained.",
       "termination_virtual_display_unsupported": "This device cannot run apps on a background display. Droidance needs Android 11 or later on a phone that supports secondary displays, which low-memory and Android Go devices do not.",
       "termination_air_channel_recovery_required": "Wireless debugging pairing is still valid, but the background control service stopped. Connect Wi-Fi and enable wireless debugging, then retry. No new pairing is needed.",
       "termination_air_pairing_required": "Wireless debugging authorization is no longer valid. Open wireless debugging and pair again with a new code, then retry.",
@@ -20,7 +20,7 @@ These local notices describe runtime termination only; they do not certify task 
       "termination_model_permission_denied": "The model service denied this request. The task has stopped and remains incomplete. Check your API key permissions or plan.",
       "termination_model_permission_denied_reason": "The model service denied this request. The task has stopped and remains incomplete. Check your API key permissions or plan. Service reason: {reason}",
       "termination_runtime_exception": "The agent runtime stopped because of an internal error.",
-      "termination_internal_error": "The task stopped because of an execution error. Completion has not been verified; retained records must not be treated as a completed result.",
+      "termination_internal_error": "An application execution error stopped the task. Export data in Settings > Data to inspect the retained diagnostic record. Completion has not been verified.",
       "termination_app_screen_required": "A usable target-app screen was not obtained, so further screen actions were withheld. The task stopped before completion.",
       "termination_tool_timeout": "A device operation exceeded its time limit and execution stopped. Completed steps remain in the task details; the task is not confirmed complete.",
       "termination_observation_unavailable": "A fresh screen observation could not be obtained. Execution stopped; earlier receipts remain in the task details and completion is unverified.",
@@ -32,12 +32,22 @@ These local notices describe runtime termination only; they do not certify task 
       "app_takeover_start_failed": "The background check stopped unexpectedly before completion. Check the task history and execution channel before retrying.",
       "task_deadline_reached": "The task reached its deadline. Further execution has stopped; interrupted effects remain unverified in the task history.",
       "app_takeover_deadline_reached": "The persistent goal reached its deadline. Further execution has stopped; completion has not been confirmed. Effects interrupted at the deadline remain unverified in the task history.",
-      "app_takeover_last_saved_progress": "Last saved progress (before the deadline; later effects may be unverified):"
+      "app_takeover_last_saved_progress": "Last saved progress (before the deadline; later effects may be unverified):",
+      "termination_input_permission_denied": "The system blocked automated taps or keys. Check the developer options for debugging input permissions, then retry. The task is incomplete.",
+      "termination_input_delivery_failed": "The device did not accept the tap or key. Restore an interactive app screen, then retry. The last operation has not been confirmed.",
+      "input_permission_denied_handoff": "The system blocked automated taps or keys, so the task is paused. On Xiaomi/Redmi, enable USB debugging (Security settings); on OPPO/OnePlus/realme, disable permission monitoring. On other devices, check debugging input permissions in developer options. Return here and select Continue after restoring permission; I will read the current screen before proceeding.",
+      "termination_model_network": "The connection to the model service failed and automatic retries did not restore it. Check the network or provider connection, then retry. Task records are retained.",
+      "termination_model_rate_limit": "The model service is limiting requests and automatic recovery could not continue within its retry budget. Wait a while or check your provider limits, then retry.",
+      "termination_model_context_limit": "The model service rejected the request because its context limit was exceeded. Check the selected model and context settings; task records are retained.",
+      "termination_model_request_rejected": "The model service rejected the request format or parameters. Check the provider protocol and model settings. Task records are retained.",
+      "termination_model_not_found": "The selected model is unavailable from this provider. Check the model name and provider availability, then retry.",
+      "termination_model_response_invalid": "The model response was incomplete or could not be read after automatic recovery. Check the provider protocol or try again. Task records are retained.",
+      "termination_internal_error_detail": "An application execution error occurred ({error_type}; reference {reference}). The task is incomplete. Export data in Settings > Data to inspect the retained diagnostic record."
     },
     "zh": {
       "termination_default": "任务已停止，尚未确认完成。",
       "termination_task_time_limit": "任务已达到时长上限，尚未确认完成。",
-      "termination_channel_down": "设备控制通道已断开，任务尚未完成。",
+      "termination_channel_down": "设备控制服务的连接已中断，任务尚未完成。请到“设置 → 设备连接”恢复连接后重试。最后一步的效果可能尚未确认，任务记录已保留。",
       "termination_virtual_display_unsupported": "这台设备无法在后台屏幕运行 App。Droidance 需要 Android 11 及以上且支持副屏的手机，低内存设备和 Android Go 设备不支持。",
       "termination_air_channel_recovery_required": "无线调试配对仍有效，但后台控制服务已停止。请连接 Wi-Fi 并开启无线调试后重试，无需重新配对。",
       "termination_air_pairing_required": "无线调试授权已失效。请打开无线调试，使用新的配对码重新配对后重试。",
@@ -49,7 +59,7 @@ These local notices describe runtime termination only; they do not certify task 
       "termination_model_permission_denied": "模型服务拒绝了本次请求，任务已停止，尚未完成。请检查 API 密钥的权限或套餐。",
       "termination_model_permission_denied_reason": "模型服务拒绝了本次请求，任务已停止，尚未完成。请检查 API 密钥的权限或套餐。服务端原因：{reason}",
       "termination_runtime_exception": "运行时出现内部错误，任务已停止。",
-      "termination_internal_error": "任务因执行异常停止，尚未确认完成。已有记录已保留，但不能作为已完成的任务结果。",
+      "termination_internal_error": "应用执行出错，任务尚未完成。请在“设置 → 数据”中导出数据查看具体诊断，已有任务记录已保留。",
       "termination_app_screen_required": "未取得可操作的目标应用画面，后续屏幕操作未执行。任务已停止，尚未完成。",
       "termination_tool_timeout": "设备操作超时，执行已停止。已完成步骤的回执保留在任务详情中，任务尚未确认完成。",
       "termination_observation_unavailable": "无法取得新的屏幕画面，执行已停止。已有操作回执保留在任务详情中，任务尚未确认完成。",
@@ -61,7 +71,17 @@ These local notices describe runtime termination only; they do not certify task 
       "app_takeover_start_failed": "后台检查发生异常，未能完成。请检查任务记录和执行通道后重试。",
       "task_deadline_reached": "任务已到截止时间，已停止继续执行；截止时被中断的操作结果仍需从任务记录中核实。",
       "app_takeover_deadline_reached": "持续任务已到截止时间，已停止继续操作，尚未确认整个目标完成。截止时被中断的操作结果仍需从任务记录中核实。",
-      "app_takeover_last_saved_progress": "最近一次保存的进展（保存后发生的操作可能尚未核实）："
+      "app_takeover_last_saved_progress": "最近一次保存的进展（保存后发生的操作可能尚未核实）：",
+      "termination_input_permission_denied": "系统拦截了自动点击或按键。请检查开发者选项中的调试控制权限，恢复后重试。任务尚未完成。",
+      "termination_input_delivery_failed": "设备未接受本次点击或按键。请恢复可操作的应用画面后重试，最后一步的实际效果尚未确认。",
+      "input_permission_denied_handoff": "系统拦截了自动点击或按键，任务已暂停。小米、红米请开启“USB 调试（安全设置）”；OPPO、一加、realme 请关闭“权限监控”；其他机型请检查开发者选项中的调试控制权限。恢复后返回这里点击“继续”，我会重新读取当前画面再继续任务。",
+      "termination_model_network": "连接模型服务失败，自动重试后仍未恢复。请检查网络或服务商连接后重试，任务记录已保留。",
+      "termination_model_rate_limit": "模型服务限制了请求频率，未能在自动恢复的重试额度内继续。请稍后重试，或检查服务商的请求限制。",
+      "termination_model_context_limit": "请求超过了模型服务的上下文限制。请检查所选模型和上下文设置，任务记录已保留。",
+      "termination_model_request_rejected": "模型服务拒绝了请求格式或参数。请检查服务商协议和模型设置，任务记录已保留。",
+      "termination_model_not_found": "服务商当前无法提供所选模型。请检查模型名称及服务商的可用状态后重试。",
+      "termination_model_response_invalid": "模型回复不完整或无法解析，自动恢复后仍未取得可用回复。请检查服务商协议或重试，任务记录已保留。",
+      "termination_internal_error_detail": "应用执行出错（{error_type}，诊断编号 {reference}），任务尚未完成。请在“设置 → 数据”中导出数据，查看已保留的诊断记录。"
     }
   }
 }

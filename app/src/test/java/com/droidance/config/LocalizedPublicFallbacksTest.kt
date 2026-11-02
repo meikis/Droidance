@@ -14,6 +14,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalizedPublicFallbacksTest {
+    @Test fun recoveryHandoffsAndFailureNoticesHaveBothLanguagesAndResolvableParameters() {
+        notices.validate()
+        for (language in listOf("en", "zh")) {
+            for (key in listOf("input_permission_denied_handoff", "termination_input_permission_denied",
+                "termination_input_delivery_failed", "termination_model_network", "termination_model_rate_limit",
+                "termination_model_request_rejected", "termination_model_response_invalid", "termination_model_context_limit",
+                "termination_model_not_found")) assertTrue(notices.text(language, key).isNotBlank())
+            val detail = notices.text(language, "termination_internal_error_detail")
+            assertTrue(detail.contains("{reference}"))
+            assertTrue(detail.contains("{error_type}"))
+        }
+        assertTrue(notices.text("zh", "input_permission_denied_handoff").contains("继续"))
+        assertTrue(notices.text("en", "input_permission_denied_handoff").contains("Continue"))
+    }
+
     private val notices = Json.decodeFromString<LocalizedPublicFallbacks>(markdownSection(
         File("src/main/assets/rules/public_fallbacks.md").readText(), "translations"
     ))

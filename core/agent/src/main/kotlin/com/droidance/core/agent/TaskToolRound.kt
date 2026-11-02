@@ -1133,12 +1133,13 @@ internal suspend fun TaskTurnSession.runToolRound(modelRound: ModelRoundOutput):
                 result.executionStatus == ToolExecutionStatus.FAILED) {
                 retainEmptyDisplayObservation(result)
             }
-            if (toolDiagnosticCode in ruleConfigManager.harnessPolicy().humanAssistance.observationUnavailableDiagnostics) {
+            val recoveryHandoff = ruleConfigManager.harnessPolicy().humanAssistance.recoveryHandoffs[toolDiagnosticCode]
+            if (recoveryHandoff != null) {
                 currentObservationLease = null
                 terminalObservationRefVisibleToModel = null
                 toolExecutor.invalidateModelFrameBinding()
                 toolExecutor.invalidatePendingObservation()
-                onManualTakeoverNeeded(fallbackText("observation_unavailable_handoff"))
+                onManualTakeoverNeeded(fallbackText(recoveryHandoff))
                 if (!isPaused()) return ToolRoundOutcome.Terminal(groundedGuardStop())
                 waitForActiveExecution()
                 freshObservationRequired = true

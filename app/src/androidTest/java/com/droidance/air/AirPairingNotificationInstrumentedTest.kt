@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.droidance.core.agent.debug.DebugLogAppender
 import com.droidance.core.device.air.AirModeNotificationController
 import com.droidance.core.device.air.AirModePairingManager
+import com.droidance.core.device.air.AdbLifecycleGate
 import java.net.ServerSocket
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -59,7 +60,7 @@ class AirPairingNotificationInstrumentedTest {
     @Test
     fun discoveryAlertsOnlyWhenThePairingServiceAppearsAndRefreshesSilently() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val pairing = AirModePairingManager(context, scope, controller, log)
+        val pairing = AirModePairingManager(context, scope, controller, log, AdbLifecycleGate())
         val nsd = context.getSystemService(NsdManager::class.java)
         val registered = CountDownLatch(1)
         val listener = object : NsdManager.RegistrationListener {

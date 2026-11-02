@@ -34,8 +34,21 @@ fun TurnResult.withStoppedTaskReply(reply: String): TurnResult {
         runtimeFailureSummary = null, contentStreamed = false, rounds = rounds + 1)
 }
 
+/** Every error keeps a useful local notice even when another model request cannot be made. */
+internal fun TurnResult.withRuntimeFailureNotice(text: (String) -> String): TurnResult {
+    if (terminal != TurnTerminal.SYSTEM_ERROR || !runtimeFailureSummary.isNullOrBlank()) return this
+    val key = when (failureReason) {
+        TurnFailureReason.RUNTIME_EXCEPTION, TurnFailureReason.NONE -> "termination_internal_error"
+        TurnFailureReason.GUARD_STOP -> guardStopNoticeKey(stopDiagnostic)
+        else -> "termination_${failureReason.name.lowercase(java.util.Locale.ROOT)}"
+    }
+    return copy(runtimeFailureSummary = text(key))
+}
+
 /** Only execution diagnostics select these localized runtime notices; no task semantics. */
 internal fun guardStopNoticeKey(diagnostic: String?): String = when (diagnostic) {
+    "INPUT_PERMISSION_DENIED" -> "termination_input_permission_denied"
+    "INPUT_DELIVERY_FAILED" -> "termination_input_delivery_failed"
     "FOREGROUND_IS_DROIDANCE", "CURRENT_SCREEN_REQUIRED" -> "termination_app_screen_required"
     "TOOL_EXECUTION_TIMEOUT" -> "termination_tool_timeout"
     "OBSERVATION_RECOVERY_BUDGET_EXHAUSTED", "PRE_ACTION_OBSERVATION_UNAVAILABLE",

@@ -136,7 +136,9 @@ class RuntimePolicyTest {
         assertFalse(runtime.contains("private fun localizedTaskString("))
         assertFalse(markerBlock.contains("runCatching"))
         assertTrue(markerBlock.contains("ruleConfigManager.terminationFallback("))
-        assertTrue(rescueBlock.contains("reasonMarker = \"runtime_exception\""))
+        assertTrue(rescueBlock.contains("publicFallback(\"termination_internal_error_detail\")"))
+        assertTrue(rescueBlock.contains("recordRuntimeFailure(reference"))
+        assertTrue(rescueBlock.contains(".replace(\"{reference}\", reference)"))
         assertFalse(rescueBlock.contains("R.string.execution_tool_failed"))
         assertFalse(rescueBlock.contains("R.string.execution_no_result"))
     }
