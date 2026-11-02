@@ -8,6 +8,10 @@ import com.droidance.core.agent.device.*
 import com.droidance.core.device.agent.device.*
 
 internal object ResidentSidecarProcessCommands {
+    fun listSupervisorPidsCommand(): String =
+        "ps -A -o UID,PID,ARGS | " +
+            "awk '(\$1 == \"shell\" || \$1 == \"2000\") && /[D]ROIDANCE_SIDECAR_MAIN/ { print \$2 }'"
+
     fun listPidsCommand(
         uid: Int,
         protocolVersion: Int? = null
@@ -91,7 +95,8 @@ internal object ResidentSidecarProcessCommands {
     fun evidenceCommand(): String =
         "echo adb_enabled=\$(settings get global adb_enabled) " +
             "adb_wifi_enabled=\$(settings get global adb_wifi_enabled) " +
-            "adbd=\$(getprop init.svc.adbd); " +
+            "adbd=\$(getprop init.svc.adbd) adbd_start_boottime_ns=\$(getprop ro.boottime.adbd) " +
+            "tcp_port=\$(getprop service.adb.tcp.port); ps -A -o PID,STIME,ETIME,NAME | grep '[a]dbd$'; " +
             "ps -A -o UID,PID,PPID,PGID,ETIME,ARGS | grep -E '[V]irtualSpaceSidecarMain|[D]ROIDANCE_SIDECAR' | cut -c1-120; " +
             "cat $LOG_PATH.1 2>/dev/null | tail -c 32768; tail -c 65536 $LOG_PATH 2>/dev/null"
 

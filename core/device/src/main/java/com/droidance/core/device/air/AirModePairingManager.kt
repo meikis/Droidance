@@ -9,6 +9,11 @@ import android.provider.Settings
 import com.droidance.core.agent.debug.DebugLogAppender
 import com.droidance.core.agent.di.ApplicationScope
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,6 +25,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.ServerSocket
+import java.security.SecureRandom
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -32,7 +41,8 @@ class AirModePairingManager @Inject constructor(
     @ApplicationContext private val context: Context,
     @ApplicationScope private val appScope: CoroutineScope,
     private val notificationController: AirModeNotificationController,
-    private val debugLogAppender: DebugLogAppender
+    private val debugLogAppender: DebugLogAppender,
+    private val lifecycleGate: AdbLifecycleGate
 ) {
     enum class PairingState { IDLE, DISCOVERING, AWAITING_CODE, PAIRING, CONNECTING, CONNECTED }
     enum class PairingTrustState { UNPAIRED, PAIRED, PAIRING_REQUIRED }
@@ -57,7 +67,11 @@ class AirModePairingManager @Inject constructor(
         val wifiTransportAvailable: Boolean?,
         val secureSettingsGranted: Boolean,
         val wirelessDebuggingEnabled: Boolean?,
-        val activeEndpoint: ActiveAirEndpoint?
+        val activeEndpoint: ActiveAirEndpoint?,
+        val persistenceEnabled: Boolean,
+        val localPort: Int?,
+        val usbDebuggingEnabled: Boolean?,
+        val adbdEvidence: String
     )
 
     private companion object {
@@ -72,9 +86,25 @@ class AirModePairingManager @Inject constructor(
         const val CONNECT_RETRY_DELAY_MS = 5_000L
         const val KEY_AIR_PAIRED = "air_paired"
         const val KEY_AIR_PAIRING_REQUIRED = "air_pairing_required"
+        const val KEY_PERSISTENCE = "air_adb_persistence"
+        const val KEY_LOCAL_PORT = "air_local_adb_port"
+        const val KEY_LOCAL_PORT_BOOT = "air_local_adb_boot"
+        const val LOCAL_PORT_SOURCE = "local_tcpip"
+        const val ADBD_EVIDENCE_COMMAND = "echo adbd_state=\$(getprop init.svc.adbd) " +
+            "adbd_start_boottime_ns=\$(getprop ro.boottime.adbd) tcp_port=\$(getprop service.adb.tcp.port) " +
+            "usb=\$(settings get global adb_enabled) wireless=\$(settings get global adb_wifi_enabled); " +
+            "ps -A -o PID,STIME,ETIME,NAME | grep '[a]dbd$'; cat /proc/uptime"
+
     }
 
     private val prefs = context.getSharedPreferences("droidance_settings", Context.MODE_PRIVATE)
+    private val _persistenceEnabled = MutableStateFlow(prefs.getBoolean(KEY_PERSISTENCE, false))
+    val persistenceEnabled: StateFlow<Boolean> = _persistenceEnabled.asStateFlow()
+    val shouldMaintainResidentChannel: Boolean get() = !automaticReconnectSuspended
+    val hasLocalAdbPort: Boolean get() = _persistenceEnabled.value && savedLocalPort() != null
+    @Volatile private var automaticReconnectSuspended = false
+    @Volatile private var lastAdbdEvidence = ""
+    @Volatile private var persistenceJob: Job? = null
     private val _state = MutableStateFlow(PairingState.IDLE)
     val state: StateFlow<PairingState> = _state.asStateFlow()
     private val _pairingTrustState = MutableStateFlow(initialPairingTrustState())
@@ -97,24 +127,6 @@ class AirModePairingManager @Inject constructor(
 
     val isPreviouslyPaired: Boolean
         get() = _pairingTrustState.value == PairingTrustState.PAIRED && privateKeyFile().exists()
-
-    init {
-        if (isPairingRequired) {
-            prefs.edit()
-                .remove(KEY_AIR_PAIRED)
-                .putBoolean(KEY_AIR_PAIRING_REQUIRED, true)
-                .apply()
-            _failure.value = AirPairingFailure.PAIRING_REQUIRED
-            runCatching { notificationController.showPairingRequired() }
-        } else if (isPreviouslyPaired && isWifiTransportAvailable()) {
-            runCatching { notificationController.cancel() }
-            appScope.launch(Dispatchers.IO) {
-                ensureWirelessDebuggingEnabled()
-                _state.value = PairingState.CONNECTING
-                startConnectDiscovery()
-            }
-        }
-    }
 
     @Volatile private var pendingHost: String? = null
     @Volatile private var pendingPort: Int = 0
@@ -139,6 +151,124 @@ class AirModePairingManager @Inject constructor(
     @Volatile private var connectDiscovery: AirMdnsDiscovery? = null
     @Volatile private var connectScanJob: Job? = null
     private val connectionMutex = Mutex()
+    private val connectAttemptGeneration = AtomicLong()
+
+    init {
+        if (isPairingRequired) {
+            prefs.edit().remove(KEY_AIR_PAIRED).putBoolean(KEY_AIR_PAIRING_REQUIRED, true).apply()
+            _failure.value = AirPairingFailure.PAIRING_REQUIRED
+            runCatching { notificationController.showPairingRequired() }
+        } else if (isPreviouslyPaired) {
+            runCatching { notificationController.cancel() }
+            appScope.launch(Dispatchers.IO) { ensureConnectedIfPaired() }
+        }
+    }
+
+    private fun bootCount(): Int = Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
+
+    private fun savedLocalPort(): Int? = prefs.getInt(KEY_LOCAL_PORT, -1)
+        .takeIf { it in 49152..65535 && bootCount() >= 0 && prefs.getInt(KEY_LOCAL_PORT_BOOT, -2) == bootCount() }
+
+    fun isUsbDebuggingEnabled(): Boolean? = runCatching {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED) == 1
+    }.getOrNull()
+
+    fun enableAdbPersistence() {
+        prefs.edit().putBoolean(KEY_PERSISTENCE, true).apply()
+        _persistenceEnabled.value = true
+        automaticReconnectSuspended = false
+        ensureConnectedIfPaired()
+    }
+
+    /** Waits for the task lane, closes the listener before stopping the sidecar, then drops trust. */
+    suspend fun stopAdbPersistence(resetTrust: Boolean, stopSidecar: () -> Unit): Boolean = lifecycleGate.whileIdle {
+        automaticReconnectSuspended = true
+        persistenceJob?.cancel()
+        stopConnectAttempt()
+        connectionMutex.withLock {
+            val port = savedLocalPort()
+            if (port != null && !closeLocalListener(port)) {
+                _failure.value = AirPairingFailure.LOCAL_PORT_CLOSE_FAILED
+                logPairingEvent("AIR local_tcpip close_failed port=$port; key and port retained")
+                automaticReconnectSuspended = false
+                markShellDown("AIR local TCP listener close failed", scheduleReconnect = false)
+                scheduleReconnectIfPaired()
+                return@withLock false
+            }
+            prefs.edit().putBoolean(KEY_PERSISTENCE, false).remove(KEY_LOCAL_PORT).remove(KEY_LOCAL_PORT_BOOT).apply()
+            _persistenceEnabled.value = false
+            stopSidecar()
+            if (resetTrust) resetPairing() else disconnect()
+            _failure.value = null
+            true
+        }
+    }
+
+    private fun listenerHasClosed(port: Int): Boolean = runCatching {
+        Socket().use { it.connect(InetSocketAddress(LOCAL_ADB_HOST, port), 250) }
+    }.isFailure
+
+    private fun localTcpProperty(): String? = runCatching {
+        val process = ProcessBuilder("/system/bin/getprop", "service.adb.tcp.port").start()
+        if (!process.waitFor(2, TimeUnit.SECONDS)) { process.destroyForcibly(); null }
+        else process.inputStream.bufferedReader().use { it.readText().trim() }
+    }.getOrNull()
+
+    private fun closeLocalListener(port: Int): Boolean {
+        if (localTcpProperty() == "0" && listenerHasClosed(port)) return true
+        val candidates = mutableListOf<AirAdbClient>()
+        activeConnection?.let { candidates.add(it) }
+        // TLS remains useful when the first classic-ADB approval has not been granted yet.
+        if (isWifiTransportAvailable()) {
+            AirAdbPortPolicy.connectPorts(
+                prefs.getInt("air_last_connect_port", -1).takeIf { it in 1..65535 }, getAdbWifiPort()
+            ).forEach { candidates.add(AirAdbClient(LOCAL_ADB_HOST, it, loadOrCreateAdbKey())) }
+        }
+        candidates.add(AirAdbClient(LOCAL_ADB_HOST, port, loadOrCreateAdbKey(), true))
+        try {
+            for (connection in candidates) {
+                val response = runCatching { connection.restartUsb() }
+                logPairingEvent("AIR local_tcpip close_response port=$port response=${response.getOrNull()?.take(160)} error=${response.exceptionOrNull()?.javaClass?.simpleName}")
+                if (response.getOrNull()?.contains("restarting in USB mode") != true && localTcpProperty() != "0") continue
+                // A response acknowledges the request; wait for the old listener to close too.
+                repeat(20) {
+                    if (listenerHasClosed(port)) return true
+                    Thread.sleep(250)
+                }
+            }
+            return false
+        } finally {
+            candidates.filter { it !== activeConnection }.forEach { it.close() }
+        }
+    }
+
+    /** A real authenticated connection per periodic job refreshes the system's key usage time. */
+    suspend fun keepAlive() {
+        if (!isPreviouslyPaired || automaticReconnectSuspended) return
+        val port = savedLocalPort()?.takeIf { _persistenceEnabled.value }
+        if (port != null) {
+            val probe = AirAdbClient(LOCAL_ADB_HOST, port, loadOrCreateAdbKey(), true)
+            try {
+                probe.connect()
+                check(probe.shell(AIR_HEALTH_CHECK_COMMAND).contains(AIR_HEALTH_CHECK_MARKER))
+                recordLocalAttempt(port, "keepalive_ready", probe)
+            } catch (error: Exception) {
+                recordLocalAttempt(port, "keepalive_failed:${error.javaClass.simpleName}:${error.message.orEmpty().take(120)}")
+            } finally { probe.close() }
+        }
+        ensureConnectedIfPaired()
+    }
+
+    private fun recordLocalAttempt(port: Int, result: String, connection: AirAdbClient? = null) {
+        lastAdbdEvidence = runCatching {
+            if (connection != null) connection.shell(ADBD_EVIDENCE_COMMAND) else {
+                val process = ProcessBuilder("/system/bin/sh", "-c", ADBD_EVIDENCE_COMMAND).redirectErrorStream(true).start()
+                if (!process.waitFor(2, TimeUnit.SECONDS)) { process.destroyForcibly(); "adbd evidence timed out" }
+                else process.inputStream.bufferedReader().use { it.readText().take(1200) }
+            }
+        }.getOrElse { "adbd evidence unavailable: ${it.javaClass.simpleName}" }.take(1200)
+        logPairingEvent("AIR local_tcpip attempt at_ms=${System.currentTimeMillis()} boot=${bootCount()} port=$port result=$result evidence=[$lastAdbdEvidence]")
+    }
 
     private fun privateKeyFile(): File = File(context.filesDir, "air_key")
     private fun publicKeyFile(): File = File(context.filesDir, "air_key.pub")
@@ -165,7 +295,11 @@ class AirModePairingManager @Inject constructor(
         wifiTransportAvailable = wifiTransportAvailable,
         secureSettingsGranted = hasSecureSettingsPermission(),
         wirelessDebuggingEnabled = isWirelessDebuggingEnabled(),
-        activeEndpoint = activeEndpoint
+        activeEndpoint = activeEndpoint,
+        persistenceEnabled = _persistenceEnabled.value,
+        localPort = savedLocalPort(),
+        usbDebuggingEnabled = isUsbDebuggingEnabled(),
+        adbdEvidence = lastAdbdEvidence
     )
 
     /**
@@ -180,6 +314,7 @@ class AirModePairingManager @Inject constructor(
         notificationController.availability()
 
     fun startDiscovery(): Boolean {
+        automaticReconnectSuspended = false
         if (_state.value in setOf(PairingState.DISCOVERING, PairingState.AWAITING_CODE) && queuedPairCode == null) {
             return refreshPairingNotificationIfAwaiting()
         }
@@ -274,23 +409,22 @@ class AirModePairingManager @Inject constructor(
 
     fun reconnect(): Boolean {
         if (!isPreviouslyPaired || _state.value != PairingState.IDLE) return false
-        if (!isWifiTransportAvailable()) {
+        automaticReconnectSuspended = false
+        if (!hasLocalAdbPort && !isWifiTransportAvailable()) {
             if (wifiTransportAvailable == false) _failure.value = AirPairingFailure.WIFI_UNAVAILABLE
             return false
         }
         _failure.value = null
         _state.value = PairingState.CONNECTING
-        appScope.launch(Dispatchers.IO) {
-            ensureWirelessDebuggingEnabled()
-            startConnectDiscovery()
-        }
+        startConnectDiscovery()
         return true
     }
 
     fun ensureConnectedIfPaired() {
-        if (!isPreviouslyPaired || _state.value != PairingState.IDLE || !isWifiTransportAvailable()) return
-        ensureWirelessDebuggingEnabled()
-        reconnect()
+        if (!isPreviouslyPaired || automaticReconnectSuspended) return
+        if (isShellReady) {
+            preparePersistenceIfNeeded()
+        } else if (_state.value == PairingState.IDLE) reconnect()
     }
 
     fun onWifiNetworkChanged(trigger: String, wifiAvailable: Boolean) {
@@ -300,18 +434,17 @@ class AirModePairingManager @Inject constructor(
                 "state=${_state.value.name.lowercase()}, trust=${_pairingTrustState.value.name.lowercase()})"
         )
         if (!isPreviouslyPaired) return
-
+        // The classic local listener is independent of wireless debugging and its network callbacks.
+        if (activeEndpoint?.source == LOCAL_PORT_SOURCE) return
         stopConnectAttempt()
         markShellDown(
             "AIR WiFi transport changed: trigger=${trigger.take(40)} available=$wifiAvailable",
             scheduleReconnect = false
         )
-        if (wifiAvailable) {
+        if (hasLocalAdbPort || wifiAvailable) {
             _failure.value = null
-            scheduleReconnectIfPaired()
-        } else {
-            _failure.value = AirPairingFailure.WIFI_UNAVAILABLE
-        }
+            scheduleReconnectIfPaired(delayMs = 0)
+        } else _failure.value = AirPairingFailure.WIFI_UNAVAILABLE
     }
 
     fun hasSecureSettingsPermission(): Boolean =
@@ -328,7 +461,8 @@ class AirModePairingManager @Inject constructor(
      * 这里只恢复开关，不伪造端口：设备重启后的动态端口仍由 Settings/mDNS 发现。
      */
     fun ensureWirelessDebuggingEnabled(): Boolean {
-        if (!isPreviouslyPaired || !isWifiTransportAvailable() || !hasSecureSettingsPermission()) return false
+        if (!isPreviouslyPaired || !isWifiTransportAvailable() || !hasSecureSettingsPermission() ||
+            activeEndpoint?.source == LOCAL_PORT_SOURCE) return false
         if (isWirelessDebuggingEnabled() == true) return true
         return runCatching {
             Settings.Global.putInt(context.contentResolver, "adb_wifi_enabled", 1)
@@ -564,6 +698,7 @@ class AirModePairingManager @Inject constructor(
     }
 
     private fun stopConnectAttempt() {
+        connectAttemptGeneration.incrementAndGet()
         reconnectJob?.cancel()
         reconnectJob = null
         connectScanJob?.cancel()
@@ -577,6 +712,10 @@ class AirModePairingManager @Inject constructor(
         connection: AirAdbClient? = activeConnection,
         scheduleReconnect: Boolean = true
     ) {
+        if (connection != null && activeConnection != null && connection !== activeConnection) {
+            connection.runCatching { close() }
+            return
+        }
         shellHealthState = ShellHealthState.DOWN
         lastShellFailure = message.take(240)
         lastShellCheckedAtMs = System.currentTimeMillis()
@@ -592,23 +731,94 @@ class AirModePairingManager @Inject constructor(
     }
 
     private fun scheduleReconnectIfPaired(delayMs: Long = RECONNECT_DELAY_MS) {
-        if (!isPreviouslyPaired || !isWifiTransportAvailable() || reconnectJob?.isActive == true) return
+        if (!isPreviouslyPaired || automaticReconnectSuspended || (!hasLocalAdbPort && !isWifiTransportAvailable()) || reconnectJob?.isActive == true) return
         reconnectJob = appScope.launch(Dispatchers.IO) {
             delay(delayMs)
-            if (
-                _state.value != PairingState.IDLE ||
-                !isPreviouslyPaired ||
-                !isWifiTransportAvailable()
-            ) return@launch
-            ensureWirelessDebuggingEnabled()
+            if (_state.value != PairingState.IDLE || !isPreviouslyPaired || automaticReconnectSuspended) return@launch
             _state.value = PairingState.CONNECTING
-            debugLogAppender.appendEvent("AIR reconnect attempt started after ${delayMs}ms")
             startConnectDiscovery()
         }
     }
 
-    private suspend fun doConnect(host: String, port: Int, source: String) = connectionMutex.withLock {
-        check(!isConnectionBlockedByPairingRequirement()) {
+    private fun preparePersistenceIfNeeded() {
+        if (!_persistenceEnabled.value || activeEndpoint?.source == LOCAL_PORT_SOURCE ||
+            !isWifiTransportAvailable() || isUsbDebuggingEnabled() != true || persistenceJob?.isActive == true) return
+        persistenceJob = appScope.launch(Dispatchers.IO) {
+            connectionMutex.withLock {
+                val connection = activeConnection ?: return@withLock
+                val endpoint = activeEndpoint ?: return@withLock
+                if (endpoint.source == LOCAL_PORT_SOURCE) return@withLock
+                val switched = runCatching { openLocalListener(connection) }
+                if (switched.isFailure) {
+                    logPairingEvent("AIR local_tcpip setup_failed: ${switched.exceptionOrNull()?.javaClass?.simpleName}")
+                    markShellDown("AIR local TCP listener setup failed")
+                } else if (switched.getOrDefault(false)) {
+                    markShellDown("AIR adbd restarting for local TCP listener", scheduleReconnect = false)
+                    scheduleReconnectIfPaired(delayMs = 0)
+                }
+            }
+        }
+    }
+
+    private fun chooseLocalPort(): Int {
+        val random = SecureRandom()
+        repeat(32) {
+            val candidate = 49152 + random.nextInt(16384)
+            if (runCatching {
+                ServerSocket().use { it.bind(InetSocketAddress(LOCAL_ADB_HOST, candidate)) }
+            }.isSuccess) return candidate
+        }
+        error("No available high TCP port")
+    }
+
+    /** Called with the connection lock. A busy task defers this mutation without blocking recovery. */
+    private suspend fun openLocalListener(connection: AirAdbClient): Boolean {
+        if (!_persistenceEnabled.value || !isWifiTransportAvailable() || isUsbDebuggingEnabled() != true) return false
+        return lifecycleGate.tryWhileIdle {
+            withContext(NonCancellable) {
+                if (!_persistenceEnabled.value || automaticReconnectSuspended || !isWifiTransportAvailable() ||
+                    isUsbDebuggingEnabled() != true) return@withContext false
+                val port = savedLocalPort() ?: chooseLocalPort().also {
+                    check(bootCount() >= 0) { "Cannot identify the current boot" }
+                    check(prefs.edit().putInt(KEY_LOCAL_PORT, it).putInt(KEY_LOCAL_PORT_BOOT, bootCount()).commit())
+                }
+                val current = connection.shell("getprop service.adb.tcp.port").trim().toIntOrNull()
+                if (current == port) return@withContext true
+                _state.value = PairingState.CONNECTING
+                // Persist before the command: adbd can restart before it returns a response.
+                logPairingEvent("AIR local_tcpip opening port=$port boot=${bootCount()}")
+                val response = runCatching { connection.restartTcpip(port) }
+                logPairingEvent("AIR local_tcpip open_response port=$port response=${response.getOrNull()?.take(160)} error=${response.exceptionOrNull()?.javaClass?.simpleName}")
+                // Keep task admission closed while the asynchronous daemon restart settles.
+                repeat(3) {
+                    delay(1_000)
+                    val probe = AirAdbClient(LOCAL_ADB_HOST, port, loadOrCreateAdbKey(), true)
+                    try {
+                        probe.connect()
+                        check(probe.shell("getprop service.adb.tcp.port").trim() == port.toString())
+                        recordLocalAttempt(port, "opened", probe)
+                        return@withContext true
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        recordLocalAttempt(port, "open_probe_failed:${error.javaClass.simpleName}:${error.message.orEmpty().take(120)}")
+                    } finally { probe.close() }
+                }
+                true
+            }
+        } ?: false
+    }
+
+    /** Checks a cached socket before recovery; CONNECTED alone cannot detect an adbd restart. */
+    fun probeConnection() {
+        if (automaticReconnectSuspended) return
+        if (!isShellReady) { ensureConnectedIfPaired(); return }
+        val output = shell(AIR_HEALTH_CHECK_COMMAND, 3_000)
+        if (!output.contains(AIR_HEALTH_CHECK_MARKER) && isShellReady) markShellDown("AIR recovery probe failed")
+    }
+
+    private suspend fun doConnect(host: String, port: Int, source: String, generation: Long) = connectionMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        check(generation == connectAttemptGeneration.get() && !automaticReconnectSuspended && !isConnectionBlockedByPairingRequirement()) {
             "ADB pairing authorization must be restored before reconnecting"
         }
         if (isShellReady) {
@@ -619,166 +829,160 @@ class AirModePairingManager @Inject constructor(
         activeConnection = null
         activeEndpoint = null
         val endpoint = ActiveAirEndpoint(host = host, port = port, source = source)
-        val connection = AirAdbClient(host, port, adbKey)
+        val local = source == LOCAL_PORT_SOURCE
+        val connection = AirAdbClient(host, port, adbKey, allowUserAuthorization = local)
         try {
-            connection.connect()
-        } catch (error: Throwable) {
-            if (AirAdbConnectionFailurePolicy.requiresPairing(error)) {
-                markPairingRequired(
-                    connection,
-                    "ADB authorization rejected: ${error.message.orEmpty().take(120)}"
-                )
-            } else {
-                connection.runCatching { close() }
+            try {
+                connection.connect()
+            } catch (error: Throwable) {
+                if (generation == connectAttemptGeneration.get() && !automaticReconnectSuspended &&
+                    !local && AirAdbConnectionFailurePolicy.requiresPairing(error)) {
+                    markPairingRequired(
+                        connection,
+                        "ADB authorization rejected: ${error.message.orEmpty().take(120)}"
+                    )
+                } else {
+                    connection.runCatching { close() }
+                }
+                throw error
             }
-            throw error
-        }
-        val healthOutput = runCatching {
-            connection.shell(AIR_HEALTH_CHECK_COMMAND)
-        }.getOrElse { error ->
-            failConnection(
-                connection,
-                AirPairingFailure.ADB_HEALTH_CHECK_FAILED,
-                "ADB health check failed: ${error::class.java.simpleName}: ${error.message.orEmpty().take(120)}"
+            currentCoroutineContext().ensureActive()
+            val healthOutput = runCatching {
+                connection.shell(AIR_HEALTH_CHECK_COMMAND)
+            }.getOrElse { error ->
+                failConnection(
+                    connection,
+                    AirPairingFailure.ADB_HEALTH_CHECK_FAILED,
+                    "ADB health check failed: ${error::class.java.simpleName}: ${error.message.orEmpty().take(120)}"
+                )
+                throw error
+            }
+            if (!healthOutput.contains(AIR_HEALTH_CHECK_MARKER)) {
+                failConnection(
+                    connection,
+                    AirPairingFailure.ADB_HEALTH_RESPONSE_MISSING,
+                    "ADB health check did not return the ready marker"
+                )
+                throw IllegalStateException("ADB health check did not return ready marker")
+            }
+            val identityOutput = runCatching {
+                connection.shell("id")
+            }.getOrElse { error ->
+                failConnection(
+                    connection,
+                    AirPairingFailure.ADB_IDENTITY_CHECK_FAILED,
+                    "ADB shell identity check failed: ${error::class.java.simpleName}: ${error.message.orEmpty().take(120)}"
+                )
+                throw error
+            }
+            if (!identityOutput.contains("uid=")) {
+                failConnection(
+                    connection,
+                    AirPairingFailure.ADB_IDENTITY_RESPONSE_MISSING,
+                    "ADB shell identity check did not return uid"
+                )
+                throw IllegalStateException("ADB shell identity check did not return uid")
+            }
+            val packageName = context.packageName
+            val permissionOutput = runCatching {
+                connection.shell("pm grant $packageName android.permission.WRITE_SECURE_SETTINGS")
+                connection.shell(
+                    "cmd package check-permission android.permission.WRITE_SECURE_SETTINGS $packageName 0"
+                )
+            }.getOrDefault("")
+            if (permissionOutput.contains("granted", ignoreCase = true) || hasSecureSettingsPermission()) {
+                prefs.edit().putBoolean("air_secure_settings_granted", true).apply()
+            }
+            currentCoroutineContext().ensureActive()
+            check(generation == connectAttemptGeneration.get()) { "ADB connection attempt was superseded" }
+            if (!local) prefs.edit().putInt("air_last_connect_port", port).apply()
+            if (!local && openLocalListener(connection)) {
+                connection.close()
+                markShellDown("AIR adbd restarting for local TCP listener", scheduleReconnect = false)
+                scheduleReconnectIfPaired(delayMs = RECONNECT_DELAY_MS)
+                return
+            }
+            currentCoroutineContext().ensureActive()
+            check(generation == connectAttemptGeneration.get()) { "ADB connection attempt was superseded" }
+            if (local) recordLocalAttempt(port, "connected", connection)
+            activeConnection = connection
+            activeEndpoint = ActiveAirEndpoint(
+                host = endpoint.host,
+                port = endpoint.port,
+                source = endpoint.source,
+                endpointId = endpoint.endpointId
             )
-            throw error
+            shellSessionGeneration += 1L
+            markShellReady("$healthOutput\n$identityOutput")
+            connectDiscovery?.stop()
+            connectDiscovery = null
+            // Keep TLS bootstrap candidates separate from the opt-in classic TCP listener.
+            markPairingTrusted(connectPort = port.takeUnless { local })
+            pairingTimeoutJob?.cancel()
+            pairingTimeoutJob = null
+            _failure.value = null
+            _state.value = PairingState.CONNECTED
+        } finally {
+            if (activeConnection !== connection) connection.close()
         }
-        if (!healthOutput.contains(AIR_HEALTH_CHECK_MARKER)) {
-            failConnection(
-                connection,
-                AirPairingFailure.ADB_HEALTH_RESPONSE_MISSING,
-                "ADB health check did not return the ready marker"
-            )
-            throw IllegalStateException("ADB health check did not return ready marker")
-        }
-        val identityOutput = runCatching {
-            connection.shell("id")
-        }.getOrElse { error ->
-            failConnection(
-                connection,
-                AirPairingFailure.ADB_IDENTITY_CHECK_FAILED,
-                "ADB shell identity check failed: ${error::class.java.simpleName}: ${error.message.orEmpty().take(120)}"
-            )
-            throw error
-        }
-        if (!identityOutput.contains("uid=")) {
-            failConnection(
-                connection,
-                AirPairingFailure.ADB_IDENTITY_RESPONSE_MISSING,
-                "ADB shell identity check did not return uid"
-            )
-            throw IllegalStateException("ADB shell identity check did not return uid")
-        }
-        val packageName = context.packageName
-        val permissionOutput = runCatching {
-            connection.shell("pm grant $packageName android.permission.WRITE_SECURE_SETTINGS")
-            connection.shell(
-                "cmd package check-permission android.permission.WRITE_SECURE_SETTINGS $packageName 0"
-            )
-        }.getOrDefault("")
-        if (permissionOutput.contains("granted", ignoreCase = true) || hasSecureSettingsPermission()) {
-            prefs.edit().putBoolean("air_secure_settings_granted", true).apply()
-        }
-        activeConnection = connection
-        activeEndpoint = ActiveAirEndpoint(
-            host = endpoint.host,
-            port = endpoint.port,
-            source = endpoint.source,
-            endpointId = endpoint.endpointId
-        )
-        shellSessionGeneration += 1L
-        markShellReady("$healthOutput\n$identityOutput")
-        connectDiscovery?.stop()
-        connectDiscovery = null
-        connectScanJob?.cancel()
-        connectScanJob = null
-        // 记住本次成功端口，仅作为同一无线调试 TLS 服务仍存活时的快速候选；WiFi 断开或切换后
-        // Android 会关闭旧服务，必须等待 WiFi 恢复并由 Settings/mDNS 取得当前端口。
-        markPairingTrusted(connectPort = port)
-        ensureWirelessDebuggingEnabled()
-        pairingTimeoutJob?.cancel()
-        pairingTimeoutJob = null
-        _failure.value = null
-        _state.value = PairingState.CONNECTED
     }
 
     private fun startConnectDiscovery() {
-        if (isConnectionBlockedByPairingRequirement()) return
-        if (!isWifiTransportAvailable()) {
-            _state.value = PairingState.IDLE
-            return
-        }
-        // 优先：从 Settings.Global 读取 connect 端口（Android 11+ 有效），再尝试标准 adb tcpip 端口。
-        connectDiscovery?.stop()
-        connectDiscovery = AirMdnsDiscovery(
-            context = context,
-            appScope = appScope,
-            serviceType = TLS_CONNECT_SERVICE,
-            onResolved = { host, port ->
-                if (
-                    _state.value == PairingState.CONNECTED ||
-                    isConnectionBlockedByPairingRequirement()
-                ) return@AirMdnsDiscovery
-                appScope.launch(Dispatchers.IO) {
-                    runCatching { doConnect(preferLocalAdbHost(host), port, "mdns") }
-                        .onFailure {
-                            if (
-                                !isConnectionBlockedByPairingRequirement() &&
-                                _state.value != PairingState.CONNECTED
-                            ) {
-                                val failure = AirPairingFailure.ADB_CONNECTION_FAILED
-                                _failure.value = failure
-                                logPairingEvent(
-                                    "ADB connection failed: ${it::class.java.simpleName}: ${it.message.orEmpty().take(120)}"
-                                )
-                                runCatching { notificationController.showConnectionFailure(failure) }
-                                _state.value = PairingState.IDLE
-                            }
-                        }
-                }
-            },
-            onDiagnostic = { detail -> debugLogAppender.appendEvent("AIR connect mDNS: $detail") }
-        ).also { it.start() }
-
+        if (isConnectionBlockedByPairingRequirement() || automaticReconnectSuspended) return
+        val generation = connectAttemptGeneration.incrementAndGet()
         connectScanJob?.cancel()
+        connectDiscovery?.stop()
+        connectDiscovery = null
         connectScanJob = appScope.launch(Dispatchers.IO) {
-            val lastPort = prefs.getInt("air_last_connect_port", -1).takeIf { it in 1..65535 }
-            val ports = AirAdbPortPolicy.connectPorts(lastPort = lastPort, settingsPort = getAdbWifiPort())
-            if (ports.isNotEmpty()) {
-                val hosts = listOfNotNull(LOCAL_ADB_HOST, getWifiIpAddress()).distinct()
-                for (port in ports) {
-                    for (host in hosts) {
-                        if (
-                            _state.value == PairingState.CONNECTED ||
-                            isConnectionBlockedByPairingRequirement()
-                        ) return@launch
-                        val attempt = runCatching { doConnect(host, port, "port_scan") }
-                        if (attempt.isSuccess || isPairingRequired) return@launch
-                    }
-                }
-                // 端口候选失败时不立即中止，继续等 mDNS 接力
+            val localPort = savedLocalPort()?.takeIf { _persistenceEnabled.value }
+            if (localPort != null) {
+                val attempt = runCatching { doConnect(LOCAL_ADB_HOST, localPort, LOCAL_PORT_SOURCE, generation) }
+                    .onFailure { if (it !is CancellationException) recordLocalAttempt(localPort, "connect_failed:${it.javaClass.simpleName}:${it.message.orEmpty().take(120)}") }
+                currentCoroutineContext().ensureActive()
+                if (attempt.isSuccess && isShellReady) return@launch
             }
-            // 等 mDNS 兜底（最多 20 秒）
+            if (!isWifiTransportAvailable()) {
+                _state.value = PairingState.IDLE
+                _failure.value = if (localPort != null) AirPairingFailure.LOCAL_ADB_CONNECTION_FAILED else AirPairingFailure.WIFI_UNAVAILABLE
+                scheduleReconnectIfPaired(CONNECT_RETRY_DELAY_MS)
+                return@launch
+            }
+            if (generation != connectAttemptGeneration.get() || isConnectionBlockedByPairingRequirement() || automaticReconnectSuspended) return@launch
+            _state.value = PairingState.CONNECTING
+            // Only the bootstrap path restores wireless debugging. Local reconnect never needs it.
+            ensureWirelessDebuggingEnabled()
+            connectDiscovery = AirMdnsDiscovery(
+                context = context, appScope = appScope, serviceType = TLS_CONNECT_SERVICE,
+                onResolved = { host, port ->
+                    if (generation == connectAttemptGeneration.get() && !isConnectionBlockedByPairingRequirement() && _state.value == PairingState.CONNECTING) {
+                        appScope.launch(Dispatchers.IO) { runCatching { doConnect(preferLocalAdbHost(host), port, "mdns", generation) } }
+                    }
+                },
+                onDiagnostic = { detail -> debugLogAppender.appendEvent("AIR connect mDNS: $detail") }
+            ).also { it.start() }
+            val ports = AirAdbPortPolicy.connectPorts(
+                lastPort = prefs.getInt("air_last_connect_port", -1).takeIf { it in 1..65535 },
+                settingsPort = getAdbWifiPort()
+            )
+            for (port in ports) {
+                for (host in listOfNotNull(LOCAL_ADB_HOST, getWifiIpAddress()).distinct()) {
+                    currentCoroutineContext().ensureActive()
+                    if (_state.value != PairingState.CONNECTING || isConnectionBlockedByPairingRequirement()) return@launch
+                    runCatching { doConnect(host, port, "port_scan", generation) }
+                    if (_state.value != PairingState.CONNECTING || isPairingRequired) return@launch
+                }
+            }
             repeat(20) {
                 delay(1_000)
-                if (
-                    _state.value == PairingState.CONNECTED ||
-                    isConnectionBlockedByPairingRequirement()
-                ) return@launch
+                if (_state.value != PairingState.CONNECTING || isConnectionBlockedByPairingRequirement()) return@launch
             }
-            if (!isConnectionBlockedByPairingRequirement() && _state.value != PairingState.CONNECTED) {
-                val failure = AirPairingFailure.ADB_ENDPOINT_NOT_FOUND
-                _failure.value = failure
-                logPairingEvent("ADB connect discovery timed out without a usable endpoint")
-                runCatching { notificationController.showConnectionFailure(failure) }
-                connectDiscovery?.stop()
-                connectDiscovery = null
-                _state.value = PairingState.IDLE
-                if (isWifiTransportAvailable()) {
-                    debugLogAppender.appendEvent("AIR reconnect retry scheduled after connect discovery timeout")
-                    scheduleReconnectIfPaired(CONNECT_RETRY_DELAY_MS)
-                }
-            }
+            connectDiscovery?.stop()
+            connectDiscovery = null
+            _failure.value = AirPairingFailure.ADB_ENDPOINT_NOT_FOUND
+            logPairingEvent("ADB connect discovery timed out without a usable endpoint")
+            runCatching { notificationController.showConnectionFailure(AirPairingFailure.ADB_ENDPOINT_NOT_FOUND) }
+            _state.value = PairingState.IDLE
+            scheduleReconnectIfPaired(CONNECT_RETRY_DELAY_MS)
         }
     }
 
@@ -819,6 +1023,9 @@ class AirModePairingManager @Inject constructor(
     }
 
     fun disconnect() {
+        pairingAttemptGeneration.incrementAndGet()
+        pairingDiscoveryGeneration.incrementAndGet()
+        automaticReconnectSuspended = true
         discoveryTimeoutJob?.cancel()
         discoveryTimeoutJob = null
         stopConnectAttempt()
@@ -833,7 +1040,7 @@ class AirModePairingManager @Inject constructor(
         notificationController.cancel()
     }
 
-    fun resetPairing() {
+    private fun resetPairing() {
         disconnect()
         prefs.edit()
             .remove(KEY_AIR_PAIRED)

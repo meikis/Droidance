@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
  * ServiceManager.getService.
  */
 object SidecarBinderRegistry {
+    private val deathEvents = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val deaths: kotlinx.coroutines.flow.SharedFlow<Unit> = deathEvents
     private val binders = ConcurrentHashMap<Int, IBinder>()
 
     // 诊断：app 端通过广播收到 binder 的次数，区分"sidecar 没发广播"和"app 没收到广播"
@@ -47,7 +49,7 @@ object SidecarBinderRegistry {
      */
     private fun watchForDeath(uid: Int, binder: IBinder): Boolean =
         try {
-            binder.linkToDeath({ binders.remove(uid, binder) }, 0)
+            binder.linkToDeath({ if (binders.remove(uid, binder)) deathEvents.tryEmit(Unit) }, 0)
             true
         } catch (_: RemoteException) {
             false

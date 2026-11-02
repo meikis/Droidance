@@ -151,6 +151,29 @@ fun AirPairingScreen(
                 )
             }
             item { AirPairingStatusCard(state = state, viewModel = viewModel, onOpenPairingDialog = { showPairingDialog = true }) }
+            item {
+                SettingsCardGroup {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.air_adb_persistence), style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.air_adb_persistence_exposure),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = state.airPersistenceEnabled,
+                            onCheckedChange = viewModel::setAdbPersistence,
+                            enabled = !state.airPersistenceChanging)
+                    }
+                    if (state.airPersistenceEnabled && state.airUsbDebuggingEnabled != true) {
+                        SettingsInsetDivider()
+                        TextButton(onClick = viewModel::openDeveloperOptions,
+                            modifier = Modifier.padding(horizontal = 8.dp)) {
+                            Text(stringResource(R.string.air_adb_persistence_usb_required))
+                        }
+                    }
+                }
+            }
             if (!connected) item { SettingsSectionHeader(stringResource(R.string.air_pairing_steps)) }
             if (!connected) item {
                 AirPairingStepsCard()
@@ -214,7 +237,7 @@ private fun AirPairingStatusCard(
                         Spacer(Modifier.width(12.dp))
                         SettingsPillButton(
                             text = stringResource(R.string.settings_air_reset_pairing),
-                            onClick = viewModel::resetAirPairing
+                            onClick = { if (!state.airPersistenceChanging) viewModel.resetAirPairing() }
                         )
                     }
                     pairingState != PairingState.IDLE && !connected -> {
@@ -260,7 +283,7 @@ private fun AirPairingStatusCard(
         }
 
         val failure = state.airBridgeFailure
-        if (failure != null && !connected) {
+        if (failure != null && (!connected || failure == com.droidance.core.device.air.AirPairingFailure.LOCAL_PORT_CLOSE_FAILED)) {
             Text(
                 stringResource(failure.messageRes()),
                 style = MaterialTheme.typography.bodySmall,

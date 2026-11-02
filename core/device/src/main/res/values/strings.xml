@@ -38,4 +38,6 @@
     <string name="settings_air_adb_endpoint_not_found">No wireless ADB endpoint was found. Make sure Wireless debugging is on.</string>
     <string name="runtime_air_channel_lost_title">Standard control channel disconnected</string>
     <string name="runtime_air_channel_lost_text">Open Droidance to check the connection, and enable Wi-Fi and wireless debugging. Pair again if authorization has expired.</string>
+    <string name="settings_air_local_port_close_failed">Could not confirm that the debugging port is closed. Pairing and port records were kept; reconnect with Wi-Fi and try again.</string>
+    <string name="settings_air_local_adb_connection_failed">Could not connect to the local debugging port. Keep USB debugging enabled and approve the system debugging authorization prompt.</string>
 </resources>

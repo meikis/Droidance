@@ -9,6 +9,11 @@ import com.droidance.core.device.agent.device.*
 
 import android.os.Binder
 import android.os.IBinder
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -48,6 +53,18 @@ class SidecarBinderRegistryTest {
 
         assertSame(restarted, SidecarBinderRegistry.get(2000))
         SidecarBinderRegistry.clear(restarted)
+    }
+
+    @Test
+    fun binderDeathImmediatelyNotifiesRecovery() = runBlocking {
+        val binder = LiveBinder()
+        val death = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(1_000) { SidecarBinderRegistry.deaths.first() }
+        }
+        SidecarBinderRegistry.set(2000, binder)
+        binder.recipient!!.binderDied()
+        death.await()
+        org.junit.Assert.assertNull(SidecarBinderRegistry.get(2000))
     }
 
     private class LiveBinder : Binder() {

@@ -49,6 +49,7 @@ class AppTakeoverCoordinator @Inject constructor(
     private val store: AppTakeoverStore,
     private val promptBuilder: AppTakeoverPromptBuilder,
     private val agentRuntime: AgentRuntime,
+    private val adbLifecycleGate: com.droidance.core.device.air.AdbLifecycleGate,
     private val deviceExecutionGuard: DeviceExecutionGuard,
     private val capabilityRegistry: RuntimeCapabilityRegistry,
     private val virtualSpaceManager: VirtualSpaceManager,
@@ -140,7 +141,7 @@ class AppTakeoverCoordinator @Inject constructor(
         agentRuntime.refreshAppTakeoverResidency()
     }
 
-    private suspend fun executeWithinDeadline(claim: ClaimedAppTakeoverRun) {
+    private suspend fun executeWithinDeadline(claim: ClaimedAppTakeoverRun): Unit = adbLifecycleGate.withTask {
         val config = thresholds()
         val attempts = if (config.appTakeoverExecutionRetryDelayMs > 0) 2 else 1
         var failure: Exception? = null
@@ -191,7 +192,7 @@ class AppTakeoverCoordinator @Inject constructor(
                     agentRuntime.debugLogManager.appendEvent(
                         "app_takeover health_check=unchanged package=${claim.watch.packageName} model_skipped=true"
                     )
-                    return
+                    return@withTask
                 }
                 val initialScreenFrame = captureExecutionFrame(strategy)
                     ?: error("[APP_TAKEOVER_PREFLIGHT_FAILED] retained display returned no native observation")
@@ -225,7 +226,7 @@ class AppTakeoverCoordinator @Inject constructor(
                         "status=${result.status.ifBlank { "implicit" }} " +
                         "next_check_seconds=${result.nextCheckSeconds} goal_complete=${result.goalComplete}"
                 )
-                return
+                return@withTask
             } catch (cancelled: CancellationException) {
                 store.failRun(
                     runId = claim.runId,

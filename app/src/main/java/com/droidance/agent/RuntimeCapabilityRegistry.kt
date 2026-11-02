@@ -84,6 +84,12 @@ class RuntimeCapabilityRegistry @Inject constructor(
     @Volatile private var virtualSpaceHealthReason: String = ""
 
     init {
+        appScope.launch(Dispatchers.IO) {
+            com.droidance.core.device.agent.device.SidecarBinderRegistry.deaths.collect {
+                debugLogManager.appendPersistentEvent("air-pairing", "resident sidecar Binder died; probing local ADB immediately")
+                recoverResidentChannel()
+            }
+        }
         // 配对/连接成功即主动建立唯一的全能力常驻 sidecar，不等首次设备操作惰性启动。
         // The virtual display keeps using its resident Binder after the live ADB connection ends.
         appScope.launch {
@@ -102,6 +108,8 @@ class RuntimeCapabilityRegistry @Inject constructor(
             var previouslyReady = false
             while (true) {
                 runCatching {
+                    airModePairingManager.ensureConnectedIfPaired()
+                    if (!virtualSpaceSidecarBridge.isResidentBinderAlive()) recoverResidentChannel()
                     val current = refresh(force = true)
                     val mode = requestedMode() ?: availability.observedMode ?: currentResolution(current).recommendedMode
                     val ready = when (mode) {
@@ -147,9 +155,17 @@ class RuntimeCapabilityRegistry @Inject constructor(
         return replaced
     }
 
+    private fun recoverResidentChannel() {
+        if (!airModePairingManager.shouldMaintainResidentChannel) return
+        airModePairingManager.probeConnection()
+        airModePairingManager.ensureConnectedIfPaired()
+        if (airModePairingManager.isShellReady) ensureResidentChannel()
+    }
+
     /** 全能力常驻 sidecar：ensureResidentChannel 幂等，重复触发安全。 */
     private fun ensureResidentChannel() {
         appScope.launch(Dispatchers.IO) {
+            if (!airModePairingManager.shouldMaintainResidentChannel || !airModePairingManager.isShellReady) return@launch
             val mode = runCatching { currentStrategy().selection.effectiveMode }.getOrNull() ?: return@launch
             val metrics = android.content.res.Resources.getSystem().displayMetrics
             val ok = runCatching {

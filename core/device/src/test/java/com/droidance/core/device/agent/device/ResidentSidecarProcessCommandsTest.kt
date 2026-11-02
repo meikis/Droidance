@@ -96,6 +96,15 @@ class ResidentSidecarProcessCommandsTest {
         assertTrue(command.contains("sleep 5"))
     }
 
+    @Test
+    fun supervisorProbeFindsTheBackoffOwnerWithoutMatchingItsOwnCommand() {
+        val command = ResidentSidecarProcessCommands.listSupervisorPidsCommand()
+        val regex = Regex("DROIDANCE_SIDECAR_MAIN")
+        assertFalse(regex.containsMatchIn(command))
+        assertTrue(command.contains("2000"))
+        assertTrue(regex.containsMatchIn(launchCommand().substringAfter("setsid sh -c ")))
+    }
+
     private fun launchCommand() = ResidentSidecarProcessCommands.launchCommand(
         apkPath = "/data/app/base.apk",
         mainClass = "com.droidance.core.device.agent.device.VirtualSpaceSidecarMain",

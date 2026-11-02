@@ -98,6 +98,11 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            airModePairingManager.persistenceEnabled.collect { enabled ->
+                _uiState.update { it.copy(airPersistenceEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
             airModePairingManager.failure.collect { failure ->
                 _uiState.update { it.copy(airBridgeFailure = failure) }
             }
@@ -105,7 +110,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 val alive = virtualSpaceSidecarBridge.isResidentBinderAlive()
-                _uiState.update { it.copy(airResidentChannelAvailable = alive) }
+                _uiState.update { it.copy(airResidentChannelAvailable = alive, airUsbDebuggingEnabled = airModePairingManager.isUsbDebuggingEnabled()) }
                 delay(AIR_RESIDENT_CHANNEL_REFRESH_MS)
             }
         }
@@ -215,18 +220,29 @@ class SettingsViewModel @Inject constructor(
         return started
     }
     fun stopAirPairing() { airModePairingManager.disconnect() }
-    fun resetAirPairing() {
-        // Stop first: the live ADB shell can still clean up, and the supervisor must not outlive trust.
+    fun setAdbPersistence(enabled: Boolean) {
+        if (_uiState.value.airPersistenceChanging) return
+        if (enabled) {
+            airModePairingManager.enableAdbPersistence()
+            if (airModePairingManager.isUsbDebuggingEnabled() != true) {
+                systemSettingsNavigator.openDeveloperOptions()
+            }
+        } else stopAdbPersistence(resetTrust = false)
+    }
+
+    fun openDeveloperOptions() { systemSettingsNavigator.openDeveloperOptions() }
+
+    fun resetAirPairing() { stopAdbPersistence(resetTrust = true) }
+
+    private fun stopAdbPersistence(resetTrust: Boolean) {
+        if (_uiState.value.airPersistenceChanging) return
+        _uiState.update { it.copy(airPersistenceChanging = true) }
         appScope.launch(Dispatchers.IO) {
-            runCatching { virtualSpaceSidecarBridge.stopResidentChannel() }
-            airModePairingManager.resetPairing()
-        }
-        _uiState.update {
-            it.copy(
-                airBridgeState = AirModePairingManager.PairingState.IDLE,
-                airPreviouslyPaired = false,
-                airPairingRequired = false
-            )
+            try {
+                airModePairingManager.stopAdbPersistence(resetTrust) {
+                    virtualSpaceSidecarBridge.stopResidentChannel()
+                }
+            } finally { _uiState.update { it.copy(airPersistenceChanging = false) } }
         }
     }
 
@@ -534,6 +550,9 @@ data class SettingsUiState(
         AirPairingNotificationAvailability.AVAILABLE,
     val airBridgeFailure: AirPairingFailure? = null,
     val airResidentChannelAvailable: Boolean = false,
+    val airPersistenceEnabled: Boolean = false,
+    val airPersistenceChanging: Boolean = false,
+    val airUsbDebuggingEnabled: Boolean? = null,
 
     // Debug 导出
     val debugExporting: Boolean = false,

@@ -739,4 +739,9 @@
     <string name="ui_month_pattern">LLLL yyyy</string>
     <string name="ui_date_input">Enter a date</string>
     <string name="ui_date_calendar">Choose from calendar</string>
+    <string name="air_adb_persistence">ADB persistence</string>
+    <string name="air_adb_persistence_exposure">Opens a debugging port on all network interfaces of this device; ADB key authorization is required.</string>
+    <string name="air_adb_persistence_usb_title">Enable USB debugging</string>
+    <string name="air_adb_persistence_usb_required">Enable USB debugging in Developer options to keep local reconnection available.</string>
+    <string name="connection_local_unavailable_title">Local debugging connection interrupted</string>
 </resources>

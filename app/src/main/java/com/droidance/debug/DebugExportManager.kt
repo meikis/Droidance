@@ -68,7 +68,11 @@ class DebugExportManager @Inject constructor(
                 airShellLastCheckedAtMs = airShellHealth.lastCheckedAtMs,
                 airActiveEndpoint = airShellHealth.activeEndpoint?.endpointId.orEmpty(),
                 airEndpointSource = airShellHealth.activeEndpoint?.source.orEmpty(),
-                airShellLastProbeOutput = airShellHealth.probeOutput
+                airShellLastProbeOutput = airShellHealth.probeOutput,
+                airAdbPersistenceEnabled = airShellHealth.persistenceEnabled,
+                airLocalAdbPort = airShellHealth.localPort,
+                airUsbDebuggingEnabled = airShellHealth.usbDebuggingEnabled,
+                adbdEvidence = airShellHealth.adbdEvidence
             )
 
             diagnostics.writeSidecarEvidence(sidecarBridge.readSidecarEvidence())

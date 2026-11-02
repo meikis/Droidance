@@ -63,7 +63,10 @@ internal class DeviceConnectionViewModel @Inject constructor(
                     pairingRequired = air.isPairingRequired,
                     wifiAvailable = shell.wifiTransportAvailable,
                     wirelessDebuggingEnabled = shell.wirelessDebuggingEnabled,
-                    connectionFailed = air.failure.value != null
+                    connectionFailed = air.failure.value != null,
+                    persistenceEnabled = shell.persistenceEnabled,
+                    localPortAvailable = air.hasLocalAdbPort,
+                    usbDebuggingEnabled = shell.usbDebuggingEnabled
                 ).status()
             }.getOrDefault(DeviceConnectionStatus.CHECKING)
         }
@@ -82,6 +85,7 @@ internal class DeviceConnectionViewModel @Inject constructor(
         dismiss()
         when (action) {
             DeviceConnectionAction.PAIR -> onOpenPairing()
+            DeviceConnectionAction.DEVELOPER_SETTINGS -> openSettings(settings::openDeveloperOptions)
             DeviceConnectionAction.WIRELESS_SETTINGS -> openSettings(settings::openWirelessDebuggingSettings)
             DeviceConnectionAction.WIFI_SETTINGS -> openSettings(settings::openWifiSettings)
             DeviceConnectionAction.RETRY -> viewModelScope.launch {

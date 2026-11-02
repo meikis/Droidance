@@ -179,6 +179,26 @@ class DeviceConnectionUiStateTest {
         assertFalse(state.dialogVisible)
     }
 
+    @Test fun localReconnectDoesNotRequireWifiOrWirelessDebugging() {
+        val local = paired.copy(persistenceEnabled = true, localPortAvailable = true,
+            usbDebuggingEnabled = true, pairingState = PairingState.CONNECTING,
+            wifiAvailable = false, wirelessDebuggingEnabled = false)
+        assertEquals(DeviceConnectionStatus.RECONNECTING, local.status())
+        assertEquals(DeviceConnectionStatus.READY, local.copy(transportAvailable = true).status())
+        assertEquals(DeviceConnectionStatus.LOCAL_UNAVAILABLE,
+            local.copy(wifiAvailable = true, connectionFailed = true).status())
+        assertEquals(DeviceConnectionStatus.LOCAL_UNAVAILABLE,
+            local.copy(wifiAvailable = false, connectionFailed = true).status())
+    }
+
+    @Test fun disabledUsbDebuggingWithPersistenceOffersDeveloperOptions() {
+        val local = paired.copy(persistenceEnabled = true, localPortAvailable = true,
+            usbDebuggingEnabled = false, wifiAvailable = false)
+        assertEquals(DeviceConnectionStatus.USB_DISABLED, local.status())
+        assertEquals(DeviceConnectionAction.DEVELOPER_SETTINGS, local.status().action)
+        assertEquals(DeviceConnectionStatus.READY, local.copy(transportAvailable = true).status())
+    }
+
     private fun DeviceConnectionUiState.confirm(status: DeviceConnectionStatus, sinceMs: Long = 0L) =
         observe(status, sinceMs).observe(status, sinceMs + DeviceConnectionUiState.FAILURE_CONFIRMATION_MS)
 }

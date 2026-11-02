@@ -10,6 +10,12 @@ import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import com.droidance.core.device.air.AirModePairingManager
 import com.droidance.automation.AutomationManager
 import com.droidance.debug.DebugLogManager
@@ -50,24 +56,36 @@ class KeepAliveJobService : JobService() {
         }
     }
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var work: Job? = null
+
     override fun onStartJob(params: JobParameters?): Boolean {
         Log.i(TAG, "KeepAlive job triggered, service running: ${TaskExecutionService.instance != null}")
         runCatching { TaskExecutionService.startStandby(applicationContext) }
             .onFailure { Log.w(TAG, "Restart standby service failed: ${it.message}") }
-        runCatching {
-            val ep = EntryPointAccessors.fromApplication(
-                applicationContext,
-                KeepAliveEntryPoint::class.java
-            )
-            ep.airModePairingManager().ensureConnectedIfPaired()
-            ep.appUpdateManager().checkIfDue(appOpen = false)
-        }.onFailure {
-            Log.w(TAG, "Restore device connection failed: ${it.message}")
+        work = scope.launch {
+            try {
+                val ep = EntryPointAccessors.fromApplication(applicationContext, KeepAliveEntryPoint::class.java)
+                ep.airModePairingManager().keepAlive()
+                ep.appUpdateManager().checkIfDue(appOpen = false)
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                Log.w(TAG, "Restore device connection failed: ${error.message}")
+            } finally { jobFinished(params, false) }
         }
-        return false
+        return true
     }
 
-    override fun onStopJob(params: JobParameters?): Boolean = true
+    override fun onStopJob(params: JobParameters?): Boolean {
+        work?.cancel()
+        return true
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
+
 }
 
 @EntryPoint

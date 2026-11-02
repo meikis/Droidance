@@ -5,7 +5,7 @@ package com.droidance.ui.connection
 
 import com.droidance.core.device.air.AirModePairingManager.PairingState
 
-internal enum class DeviceConnectionAction { PAIR, WIRELESS_SETTINGS, WIFI_SETTINGS, RETRY, WAIT }
+internal enum class DeviceConnectionAction { PAIR, DEVELOPER_SETTINGS, WIRELESS_SETTINGS, WIFI_SETTINGS, RETRY, WAIT }
 
 internal enum class DeviceConnectionStatus(
     val action: DeviceConnectionAction = DeviceConnectionAction.WAIT,
@@ -18,7 +18,9 @@ internal enum class DeviceConnectionStatus(
     UNPAIRED(DeviceConnectionAction.PAIR, true),
     PAIRING_REQUIRED(DeviceConnectionAction.PAIR, true),
     WIFI_UNAVAILABLE(DeviceConnectionAction.WIFI_SETTINGS, true),
+    USB_DISABLED(DeviceConnectionAction.DEVELOPER_SETTINGS, true),
     WIRELESS_DISABLED(DeviceConnectionAction.WIRELESS_SETTINGS, true),
+    LOCAL_UNAVAILABLE(DeviceConnectionAction.RETRY, true),
     UNAVAILABLE(DeviceConnectionAction.RETRY, true)
 }
 
@@ -29,7 +31,10 @@ internal data class DeviceConnectionSnapshot(
     val pairingRequired: Boolean,
     val wifiAvailable: Boolean?,
     val wirelessDebuggingEnabled: Boolean?,
-    val connectionFailed: Boolean
+    val connectionFailed: Boolean,
+    val persistenceEnabled: Boolean = false,
+    val localPortAvailable: Boolean = false,
+    val usbDebuggingEnabled: Boolean? = null
 ) {
     fun status(): DeviceConnectionStatus = when {
         // A resident Binder can remain usable after Wi-Fi or the live ADB shell disappears.
@@ -38,6 +43,9 @@ internal data class DeviceConnectionSnapshot(
             DeviceConnectionStatus.PAIRING
         pairingRequired -> DeviceConnectionStatus.PAIRING_REQUIRED
         !previouslyPaired -> DeviceConnectionStatus.UNPAIRED
+        persistenceEnabled && usbDebuggingEnabled == false -> DeviceConnectionStatus.USB_DISABLED
+        localPortAvailable && pairingState == PairingState.CONNECTING && !connectionFailed -> DeviceConnectionStatus.RECONNECTING
+        localPortAvailable -> DeviceConnectionStatus.LOCAL_UNAVAILABLE
         wifiAvailable == null -> DeviceConnectionStatus.CHECKING
         wifiAvailable == false -> DeviceConnectionStatus.WIFI_UNAVAILABLE
         wirelessDebuggingEnabled == false -> DeviceConnectionStatus.WIRELESS_DISABLED

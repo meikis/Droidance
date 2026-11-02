@@ -153,7 +153,11 @@ class DiagnosticsCollector @Inject constructor(
         airShellLastCheckedAtMs: Long = 0L,
         airActiveEndpoint: String = "",
         airEndpointSource: String = "",
-        airShellLastProbeOutput: String = ""
+        airShellLastProbeOutput: String = "",
+        airAdbPersistenceEnabled: Boolean = false,
+        airLocalAdbPort: Int? = null,
+        airUsbDebuggingEnabled: Boolean? = null,
+        adbdEvidence: String = ""
     ) {
         envFile().writeText(buildString {
             append("{")
@@ -174,6 +178,10 @@ class DiagnosticsCollector @Inject constructor(
             append(",\"air_shell_last_checked_at_ms\":$airShellLastCheckedAtMs")
             append(",\"air_active_endpoint\":\"${escape(airActiveEndpoint)}\"")
             append(",\"air_endpoint_source\":\"${escape(airEndpointSource)}\"")
+            append(",\"air_adb_persistence_enabled\":$airAdbPersistenceEnabled")
+            append(",\"air_local_adb_port\":$airLocalAdbPort")
+            append(",\"air_usb_debugging_enabled\":$airUsbDebuggingEnabled")
+            append(",\"adbd_evidence\":\"${escape(adbdEvidence)}\"")
             append(",\"air_last_probe_output\":\"${escape(airShellLastProbeOutput.take(800))}\"")
             append(",\"cua_frame\":{")
             append("\"model_grid\":\"${escape(cuaFrameModelGrid)}\"")

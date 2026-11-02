@@ -18,7 +18,8 @@ import javax.net.ssl.SSLSocket
 class AirAdbClient(
     private val host: String,
     private val port: Int,
-    private val adbKey: AirAdbKey
+    private val adbKey: AirAdbKey,
+    private val allowUserAuthorization: Boolean = false
 ) : Closeable {
     private var socket: Socket? = null
     private var tlsSocket: SSLSocket? = null
@@ -84,11 +85,24 @@ class AirAdbClient(
         connected = true
     }
 
-    fun shell(command: String, service: String = "shell"): String = synchronized(shellLock) {
+    fun shell(command: String, service: String = "shell"): String {
+        val bytes = requestService("$service:$command")
+        return if (service.split(',').contains("v2")) decodeShellV2(bytes) else bytes.toString(Charsets.UTF_8)
+    }
+
+    fun restartTcpip(port: Int): String {
+        require(port in 49152..65535)
+        return requestService("tcpip:$port").toString(Charsets.UTF_8)
+    }
+
+    fun restartUsb(): String = requestService("usb:").toString(Charsets.UTF_8)
+
+    private fun requestService(destination: String): ByteArray = synchronized(shellLock) {
         connect()
         val localId = nextLocalId.getAndIncrement()
         val output = ByteArrayOutputStream()
-        writeMessage(A_OPEN, localId, 0, "$service:$command".adbPayload())
+        writeMessage(A_OPEN, localId, 0, destination.adbPayload())
+        var accepted = false
 
         while (true) {
             val message = readMessage()
@@ -98,19 +112,39 @@ class AirAdbClient(
             // 直接跳过，不要拌进 output；不需要 ACK，server 那边的流早已关闭。
             if (message.arg1 != localId) continue
             when (message.command) {
-                A_OKAY -> Unit
+                A_OKAY -> accepted = true
                 A_WRTE -> {
                     output.write(message.payload)
                     writeMessage(A_OKAY, localId, message.arg0, null)
                 }
                 A_CLSE -> {
+                    check(accepted) { "ADB service refused: $destination" }
                     writeMessage(A_CLSE, localId, message.arg0, null)
-                    return output.toString(Charsets.UTF_8.name())
+                    return output.toByteArray()
                 }
                 else -> throw IllegalStateException("Unexpected ADB shell packet: command=${message.command}")
             }
         }
-        @Suppress("UNREACHABLE_CODE") ""
+        @Suppress("UNREACHABLE_CODE") byteArrayOf()
+    }
+
+    /** shell,v2 wraps stdout/stderr in binary frames, even for a single PID line. */
+    private fun decodeShellV2(bytes: ByteArray): String {
+        val frames = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        val output = ByteArrayOutputStream()
+        while (frames.hasRemaining()) {
+            check(frames.remaining() >= 5) { "Truncated ADB shell v2 header" }
+            val stream = frames.get().toInt() and 255
+            val length = frames.int
+            check(length >= 0 && length <= frames.remaining()) { "Invalid ADB shell v2 payload length" }
+            val payload = ByteArray(length).also { frames.get(it) }
+            when (stream) {
+                1, 2 -> output.write(payload)
+                3 -> Unit // Exit status is a control frame, never command output.
+                else -> error("Unexpected ADB shell v2 stream: $stream")
+            }
+        }
+        return output.toString(Charsets.UTF_8.name())
     }
 
     private fun authenticate(firstAuth: AdbMessage): AdbMessage {
@@ -118,9 +152,14 @@ class AirAdbClient(
             throw IllegalStateException("Unsupported ADB auth type: ${firstAuth.arg0}")
         }
         writeMessage(A_AUTH, ADB_AUTH_SIGNATURE, 0, adbKey.signToken(firstAuth.payload))
-        val message = readMessage()
+        var message = readMessage()
+        if (message.command == A_AUTH && allowUserAuthorization) {
+            // A TLS-paired key may still need one explicit approval for the classic TCP transport.
+            writeMessage(A_AUTH, ADB_AUTH_RSAPUBLICKEY, 0, adbKey.publicKeyBytes)
+            message = readMessage()
+        }
         if (message.command == A_AUTH) {
-            throw AirAdbAuthorizationException("Wireless debugging rejected the paired ADB key")
+            throw AirAdbAuthorizationException("ADB rejected the key or is awaiting user authorization")
         }
         return message
     }
@@ -194,6 +233,7 @@ class AirAdbClient(
         const val ADB_HEADER_LENGTH = 24
         const val ADB_AUTH_TOKEN = 1
         const val ADB_AUTH_SIGNATURE = 2
+        const val ADB_AUTH_RSAPUBLICKEY = 3
         const val CONNECT_TIMEOUT_MS = 5_000
         // 单次 socket 读的硬上限。正常 screencap 首字节 ~1-2s、健康检查近乎瞬时，
         // 10s 足以覆盖任何合法读，又能把半死连接的卡死收敛到秒级而非数分钟。

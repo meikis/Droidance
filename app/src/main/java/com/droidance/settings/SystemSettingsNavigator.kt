@@ -76,6 +76,10 @@ class SystemSettingsNavigator @Inject constructor(
         context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    fun openDeveloperOptions() {
+        context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     fun openWirelessDebuggingSettings() {
         // 先尝试直达「无线调试」详情页（开关 + 使用配对码配对设备）；AOSP 原生不开放
         // SubSettings 给第三方，部分厂商 ROM 开放，失败时一律回退开发者选项页。

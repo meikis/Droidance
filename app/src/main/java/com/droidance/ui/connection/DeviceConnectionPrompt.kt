@@ -78,6 +78,13 @@ private fun presentation(status: DeviceConnectionStatus): ConnectionPresentation
     DeviceConnectionStatus.WIFI_UNAVAILABLE -> ConnectionPresentation(
         R.string.connection_wifi_title, R.string.connection_wifi_description,
         R.string.connection_open_wifi, DroidanceIcons.WifiOff)
+    DeviceConnectionStatus.LOCAL_UNAVAILABLE -> ConnectionPresentation(
+        R.string.connection_local_unavailable_title,
+        com.droidance.core.device.R.string.settings_air_local_adb_connection_failed,
+        R.string.connection_retry, DroidanceIcons.Refresh)
+    DeviceConnectionStatus.USB_DISABLED -> ConnectionPresentation(
+        R.string.air_adb_persistence_usb_title, R.string.air_adb_persistence_usb_required,
+        R.string.connection_open_settings, DroidanceIcons.Link)
     DeviceConnectionStatus.WIRELESS_DISABLED -> ConnectionPresentation(
         R.string.connection_wireless_disabled_title, R.string.connection_wireless_disabled_description,
         R.string.connection_open_settings, DroidanceIcons.WifiOff)

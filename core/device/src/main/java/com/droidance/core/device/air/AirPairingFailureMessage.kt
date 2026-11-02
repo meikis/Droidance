@@ -9,6 +9,8 @@ import com.droidance.core.device.R
 @StringRes
 fun AirPairingFailure.messageRes(): Int = when (this) {
     AirPairingFailure.PAIRING_REQUIRED -> R.string.settings_air_pairing_required_detail
+    AirPairingFailure.LOCAL_ADB_CONNECTION_FAILED -> R.string.settings_air_local_adb_connection_failed
+    AirPairingFailure.LOCAL_PORT_CLOSE_FAILED -> R.string.settings_air_local_port_close_failed
     AirPairingFailure.WIFI_UNAVAILABLE -> R.string.settings_air_wifi_unavailable_detail
     AirPairingFailure.NOTIFICATION_PERMISSION_REQUIRED ->
         R.string.settings_air_notification_permission_required

@@ -449,18 +449,18 @@ class AirModePairingSourceContractTest {
         assertTrue(app.contains("airModePairingManager.ensureConnectedIfPaired()"))
         assertTrue(service.contains("airModePairingManager.ensureConnectedIfPaired()"))
         assertTrue(boot.contains("ep.airModePairingManager().ensureConnectedIfPaired()"))
-        assertTrue(keepAlive.contains("ep.airModePairingManager().ensureConnectedIfPaired()"))
+        assertTrue(keepAlive.contains("ep.airModePairingManager().keepAlive()"))
     }
 
     @Test
-    fun wifiTransportChangesDropOnlyTheSocketAndKeepRetryingTheTrustedBridge() {
+    fun wifiChangesPreserveLocalTransportAndOnlyBootstrapNeedsWifi() {
         val app = projectFile("app/src/main/java/com/droidance/DroidanceApp.kt").readText()
         val manager = projectFile("core/device/src/main/java/com/droidance/core/device/air/AirModePairingManager.kt").readText()
         val transition = manager.substringAfter("fun onWifiNetworkChanged(")
             .substringBefore("fun hasSecureSettingsPermission()")
         val shellDown = manager.substringAfter("private fun markShellDown(")
             .substringBefore("private fun scheduleReconnectIfPaired(")
-        val connectTimeout = manager.substringAfter("// 等 mDNS 兜底（最多 20 秒）")
+        val connectTimeout = manager.substringAfter("private fun startConnectDiscovery()")
             .substringBefore("fun shell(command: String")
 
         assertTrue("AIR must listen to Wi-Fi itself instead of treating cellular availability as recovery", app.contains("NetworkCapabilities.TRANSPORT_WIFI"))
@@ -473,12 +473,14 @@ class AirModePairingSourceContractTest {
         assertFalse("A Wi-Fi transition must never clear the persisted ADB trust", transition.contains("KEY_AIR_PAIRED"))
         assertFalse("A Wi-Fi transition must never request pairing", transition.contains("PairingTrustState.PAIRING_REQUIRED"))
         assertFalse("A generic shell transport failure must never clear pairing", shellDown.contains("KEY_AIR_PAIRED"))
-        assertTrue("Reconnect attempts must be gated by a real Wi-Fi transport", manager.contains("isWifiTransportAvailable()"))
+        assertTrue("An active local connection must survive network callbacks", transition.contains("if (activeEndpoint?.source == LOCAL_PORT_SOURCE) return"))
+        assertTrue("A saved local port must be tried without Wi-Fi", manager.contains("hasLocalAdbPort || wifiAvailable"))
         val pairingStart = manager.substringAfter("fun startDiscovery(): Boolean")
             .substringBefore("private fun startPairingDiscovery()")
         assertFalse("First-time pairing must not attempt an unauthorized ADB connection", pairingStart.contains("startConnectDiscovery("))
         val connectStart = manager.substringAfter("private fun startConnectDiscovery()")
-        assertTrue("Pairing must be protected before connection discovery checks Wi-Fi", connectStart.indexOf("if (isConnectionBlockedByPairingRequirement()) return") in 0 until connectStart.indexOf("if (!isWifiTransportAvailable())"))
+        assertTrue("Local reconnect must precede the wireless bootstrap Wi-Fi gate",
+            connectStart.indexOf("doConnect(LOCAL_ADB_HOST, localPort, LOCAL_PORT_SOURCE, generation)") in 0 until connectStart.indexOf("if (!isWifiTransportAvailable())"))
         assertTrue("A timed-out discovery should schedule another bounded retry while Wi-Fi remains available", connectTimeout.contains("scheduleReconnectIfPaired("))
     }
 

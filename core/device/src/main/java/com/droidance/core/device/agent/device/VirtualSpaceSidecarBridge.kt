@@ -191,6 +191,13 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                 }
             }
 
+            awaitSupervisorRestart(selectedMode)?.let { ready ->
+                if (!ready) return@synchronized invalid(lastSidecarStartDiagnostic)
+                serviceOrNull(selectedMode)?.let { service ->
+                    return@synchronized startService(service, width, height, densityDpi, "supervisor_restart", selectedMode)
+                }
+                return@synchronized invalid("supervisor restarted without a usable resident Binder")
+            }
             return@synchronized when (selectedMode) {
                 RuntimeMode.STANDARD -> startAdbShellAppProcess(width, height, densityDpi)
                 else -> invalid("Unsupported execution mode")
@@ -238,6 +245,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                     return@synchronized false
                 }
             }
+            awaitSupervisorRestart(selectedMode)?.let { return@synchronized it }
             val cmd = buildAppProcessCommand(width, height, densityDpi)
             val ok = when (selectedMode) {
                 RuntimeMode.STANDARD -> {
@@ -298,6 +306,19 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             Thread.sleep(BIND_POLL_MS)
             if (isRegisteredServiceAlive(mode)) return true
         }
+        return false
+    }
+
+    /** A live supervisor owns crash recovery; launching another during its backoff duplicates it. */
+    private fun awaitSupervisorRestart(mode: RuntimeMode): Boolean? {
+        fun supervisorAlive(): Boolean = airModePairingManager.isShellReady &&
+            ResidentSidecarProcessCommands.parsePids(airModePairingManager.shell(
+                ResidentSidecarProcessCommands.listSupervisorPidsCommand(), PROCESS_PROBE_TIMEOUT_MS, "shell,v2"
+            )).isNotEmpty()
+        if (!supervisorAlive()) return null
+        if (awaitBinder(mode, RESIDENT_REBIND_RETRIES)) return true
+        if (!supervisorAlive()) return null
+        lastSidecarStartDiagnostic = "resident sidecar supervisor is still recovering; duplicate launch withheld"
         return false
     }
 

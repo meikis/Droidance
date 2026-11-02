@@ -106,6 +106,7 @@ class AgentRuntime @Inject constructor(
     private val appTakeoverPromptBuilder: com.droidance.automation.AppTakeoverPromptBuilder,
     private val processRecoveryCoordinator: AgentProcessRecoveryCoordinator,
     private val foregroundState: AppForegroundState,
+    private val adbLifecycleGate: com.droidance.core.device.air.AdbLifecycleGate,
     private val foregroundHost: ForegroundExecutionHost
 ) : ToolInteractionPort, ConversationTaskRuntime {
     private val finishScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -856,7 +857,7 @@ class AgentRuntime @Inject constructor(
         val originTurnId = java.util.concurrent.atomic.AtomicReference<String?>(null)
         var result: RuntimeTurnOutcome? = null
         suspend fun execute() {
-            result = processInputWithinTakeoverDeadline(
+            result = adbLifecycleGate.withTask { processInputWithinTakeoverDeadline(
                 request, onStreamContent, executionStrategyOverride, initialScreenFrame,
                 roundContext = {
                     (listOf(roundContext(), appTakeoverStore.deadlineForTurn(originTurnId.get())?.let { deadline ->
@@ -871,7 +872,7 @@ class AgentRuntime @Inject constructor(
                 },
                 prepareDevice = prepareDevice,
                 onTurnStarted = { scope -> originTurnId.set(scope.turnId); onTurnStarted?.invoke(scope) }
-            )
+            ) }
         }
         return try {
         val completedWithinDeadline = if (request.source == MessageSource.APP_TAKEOVER) {
