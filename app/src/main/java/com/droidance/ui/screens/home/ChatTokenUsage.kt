@@ -16,14 +16,15 @@ import androidx.compose.ui.unit.dp
 import com.droidance.config.TokenUsageTotals
 import com.droidance.ui.theme.LocalAppMotionEnabled
 
-internal fun tokenCountLabel(tokens: Long, reported: Boolean): String = when {
-    !reported -> "—"
+internal fun tokenCountLabel(tokens: Long): String = when {
     tokens >= 1_000_000 -> "%.2fM".format(tokens / 1_000_000.0)
     else -> "%.1fk".format(tokens.coerceAtLeast(0) / 1_000.0)
 }
 
 @Composable
 internal fun TokenUsageLabel(usage: TokenUsageTotals, modifier: Modifier = Modifier) {
+    if (!usage.hasReportedTokens) return
+
     val target = usage.totalTokens.toFloat()
     // Restored history starts at its recorded value; subsequent updates continue from the visible count.
     val count = remember { Animatable(target) }
@@ -33,7 +34,7 @@ internal fun TokenUsageLabel(usage: TokenUsageTotals, modifier: Modifier = Modif
         else count.snapTo(target)
     }
     Text(
-        tokenCountLabel(count.value.toLong(), usage.hasReportedTokens),
+        tokenCountLabel(count.value.toLong()),
         modifier = modifier.padding(start = 10.dp).testTag("chat-token-usage"),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
