@@ -34,6 +34,7 @@ class ReleaseTests(unittest.TestCase):
             (root / 'app').mkdir()
             (root / 'app/build.gradle.kts').write_text(SOURCE)
             (root / 'CHANGELOG.md').write_text('## [0.2.0-beta.1] - 2026-10-23\n\n### Fixed\n\n- Upgrade handling.\n')
+            (root / 'CHANGELOG.zh.md').write_text('## [0.2.0-beta.1] - 2026-10-23\n\n### 修复\n\n- 升级处理。\n', encoding='utf-8')
             def command(*args, **kwargs):
                 if args[:3] == ('git', 'rev-parse', 'HEAD'):
                     return 'commit'
@@ -49,7 +50,8 @@ class ReleaseTests(unittest.TestCase):
             with patch.object(release, 'run', side_effect=command):
                 identity, notes = release.tagged_identity('v0.2.0-beta.1', root)
                 self.assertTrue(identity['prerelease'])
-                self.assertIn('Upgrade handling', notes)
+                self.assertIn('## English\n\n### Fixed\n\n- Upgrade handling.', notes)
+                self.assertIn('## 简体中文\n\n### 修复\n\n- 升级处理。', notes)
                 with self.assertRaises(ValueError):
                     release.tagged_identity('v0.3.0', root)
             def wrong_commit(*args, **kwargs):
@@ -57,6 +59,9 @@ class ReleaseTests(unittest.TestCase):
                     return 'other-commit'
                 return command(*args, **kwargs)
             with patch.object(release, 'run', side_effect=wrong_commit), self.assertRaisesRegex(ValueError, 'commit'):
+                release.tagged_identity('v0.2.0-beta.1', root)
+            (root / 'CHANGELOG.zh.md').write_text('## [0.1.0] - 2026-10-01\n\n- 旧版本。\n', encoding='utf-8')
+            with patch.object(release, 'run', side_effect=command), self.assertRaisesRegex(ValueError, 'CHANGELOG.zh.md'):
                 release.tagged_identity('v0.2.0-beta.1', root)
             def dirty_source(*args, **kwargs):
                 return ' M app/build.gradle.kts' if args[:2] == ('git', 'status') else command(*args, **kwargs)

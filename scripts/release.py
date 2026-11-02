@@ -38,6 +38,10 @@ def build_identity(source):
                 min_sdk=int(field(r'^\s*minSdk = ([0-9]+)\s*$')))
 
 
+# The app selects a section by these headings; see ReleaseNotes.kt.
+RELEASE_NOTE_SOURCES = (('## English', 'CHANGELOG.md'), ('## 简体中文', 'CHANGELOG.zh.md'))
+
+
 def tagged_identity(tag, root=ROOT):
     expected = build_identity((root / 'app/build.gradle.kts').read_text())
     if tag != 'v' + expected['version_name']:
@@ -53,12 +57,17 @@ def tagged_identity(tag, root=ROOT):
         previous = build_identity(run('git', 'show', f'{other}:app/build.gradle.kts', cwd=root))
         if expected['version_code'] <= previous['version_code']:
             raise ValueError(f'versionCode must exceed reserved release {other}')
-    changelog = (root / 'CHANGELOG.md').read_text()
-    notes = re.search(r'^## \[' + re.escape(expected['version_name']) + r'\][^\n]*\n(.*?)(?=^## |\Z)',
-                      changelog, re.MULTILINE | re.DOTALL)
-    if not notes or not notes[1].strip():
-        raise ValueError('CHANGELOG.md needs a nonempty entry for this public version')
-    return dict(expected, tag=tag, commit=commit, prerelease='-' in expected['version_name']), notes[1].strip()
+    notes = '\n\n'.join(f"{heading}\n\n{changelog_entry(root / name, expected['version_name'])}"
+                        for heading, name in RELEASE_NOTE_SOURCES)
+    return dict(expected, tag=tag, commit=commit, prerelease='-' in expected['version_name']), notes
+
+
+def changelog_entry(path, version):
+    entry = re.search(r'^## \[' + re.escape(version) + r'\][^\n]*\n(.*?)(?=^## |\Z)',
+                      path.read_text(encoding='utf-8'), re.MULTILINE | re.DOTALL)
+    if not entry or not entry[1].strip():
+        raise ValueError(f'{path.name} needs a nonempty entry for this public version')
+    return entry[1].strip()
 
 
 def verify_apk(apk, expected, sdk, certificate):
@@ -101,7 +110,7 @@ def main():
         data, notes = tagged_identity(args.tag)
         args.output.mkdir(parents=True, exist_ok=True)
         (args.output / 'identity.json').write_text(json.dumps(data, indent=2) + '\n')
-        (args.output / 'notes.md').write_text(notes + '\n')
+        (args.output / 'notes.md').write_text(notes + '\n', encoding='utf-8')
         print('Tagged source identity and increasing versionCode verified')
     else:
         expected = json.loads(args.identity.read_text())

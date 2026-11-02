@@ -14,11 +14,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.droidance.R
+import com.droidance.config.LanguageManager
 import com.droidance.ui.components.DroidanceDialog
 import com.droidance.ui.components.FlatMarkdown
+import com.droidance.update.ReleaseNotes
 import com.droidance.update.model.AppReleaseInfo
 import com.droidance.update.model.DownloadError
 import com.droidance.update.model.DownloadProgressState
@@ -63,8 +66,9 @@ fun AppUpdateDialog(
         dismissLabel = if (downloading) stringResource(R.string.common_cancel) else later.takeUnless { verifying },
         onDismiss = if (downloading) onCancelDownload else onDismissRequest
     ) {
-        if (release.releaseNotes.isNotBlank()) {
-            FlatMarkdown(content = release.releaseNotes.trim())
+        val notes = ReleaseNotes.forLanguage(release.releaseNotes, LanguageManager.resolvedTag(LocalContext.current))
+        if (notes.isNotBlank()) {
+            FlatMarkdown(content = notes)
         }
         if (downloadState is DownloadProgressState.Downloading) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

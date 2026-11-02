@@ -68,7 +68,7 @@ Retain the existing official-source digest, package, and signing checks. Preserv
 
 ## Repository change logs
 
-Maintain one English `CHANGELOG.md` at the repository root as the source for public release changes. Start with `Unreleased`, followed by dated releases in descending order. The examples here are not release history.
+Maintain one English `CHANGELOG.md` at the repository root as the source for public release changes. Start with `Unreleased`, followed by dated releases in descending order. At release time, translate each version into `CHANGELOG.zh.md` for the Chinese update notes; the translation has no `Unreleased` section. The examples here are not release history.
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/2.0.0/). Use only the categories that contain changes:
 
@@ -127,6 +127,7 @@ Preview subscription, installation deferral while a task is active, and complete
 | --- | --- | --- |
 | 2026-10-07 | Separate public versions, Android installation order, and development identifiers; define release names, update channels, curated change logs, and validation evidence. | Guidance recorded; implementation status is described above. |
 | 2026-10-23 | Separate public update precedence from development identifiers; require an existing exact tag, increasing code, signed artifact verification and draft-only preparation. | Implemented with local regression checks. GitHub execution, production signing and device acceptance remain separate. |
+| 2026-11-02 | Add `CHANGELOG.zh.md` and publish update notes under English and Simplified Chinese headings so the app can follow its language. | Implemented from 0.1.2. Clients before 0.1.2 show both sections. |
 | 2026-10-09 | Bind publication to an existing validated tag and its exact commit, gate signing on the shared Release checks, and prepare the fixed native build tools in CI. | Workflow and local script verification implemented. Linux execution and signed publication remain unverified; public version/channel and updater changes remain pending. |
 
 Append a dated decision when these rules materially change, explaining the affected rule and its implementation status. Do not use this policy log as the application's release change log.
