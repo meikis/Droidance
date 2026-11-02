@@ -13,7 +13,7 @@ Enable GitHub private vulnerability reporting and verify that maintainers can re
 ## Prepare a public version
 
 1. Set `versionName` and `versionCode` in `app/build.gradle.kts`. Public names use `MAJOR.MINOR.PATCH`, optionally followed by `-beta.N` or `-rc.N`. Every public APK of the same package needs a greater version code, including transitions between preview and stable.
-2. Move the intended `CHANGELOG.md` entries from `Unreleased` into a nonempty `## [VERSION] - YYYY-MM-DD` section, and add the same section to `CHANGELOG.zh.md` in Simplified Chinese. Release notes combine these two sections under `## English` and `## 简体中文` headings. The app shows the section for its language. Clients before 0.1.2 show both.
+2. Move the intended `CHANGELOG.md` entries from `Unreleased` into a nonempty `## [VERSION] - YYYY-MM-DD` section, and add the same section to `CHANGELOG.zh.md` in Simplified Chinese. Release notes combine these two sections under `## English` and `## 简体中文` headings. The app shows the section for its language. Clients before 0.1.3 show both.
 3. Complete applicable local checks, commit the release inputs, and create and push `vVERSION` for that commit. Do not move an existing public tag.
 4. Run **Prepare release draft** with that tag. `scripts/release.py identity` rejects mismatched tags, dirty sources, and a version code that does not exceed every other reserved SemVer tag in the fetched repository. Keep public tags available; the code check depends on their history.
 5. Download the draft's final signed APK and complete clean-install, supported upgrade, affected device-behavior, and real-model task acceptance as applicable. Record the exact artifact digest and each unperformed check. Publish the draft manually only after acceptance.

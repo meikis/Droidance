@@ -8,6 +8,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-02
+
 ### Added
 
 - Every provider can now use Chat Completions or Responses, and the edit page shows the final request URL.
@@ -17,21 +19,13 @@ Record a notable change in `Unreleased` within the same pull request that implem
 - The provider list and chat model list show the default provider first, then custom providers, then presets.
 - A 403 from a model service now asks you to check API key permissions or plan, and shows the service's reason with sensitive values removed.
 - A task stopped by a rejected API key now says to check the key instead of showing a generic execution error.
-
-### Fixed
-
-- A complete `/responses` address no longer becomes `/responses/responses`.
-
-## [0.1.2] - 2026-11-02
-
-### Changed
-
 - After pairing, device control keeps working without Wi-Fi and on mobile data. Pairing and reconnecting after a phone restart still need Wi-Fi.
 - The background control service restarts itself if it is killed or crashes, without Wi-Fi. Resetting pairing stops it, and it does not restart once developer options are off.
 - Update notes in the app follow the app language.
 
 ### Fixed
 
+- A complete `/responses` address no longer becomes `/responses/responses`.
 - After Wi-Fi drops, pairing settings keep showing Connected while the background control service is running, and reading notifications no longer needs the live wireless debugging connection.
 - A restarted app can reconnect to the background control service without Wi-Fi while the screen is off.
 - The virtual display now recovers when you lock or unlock the phone during a task.
@@ -58,6 +52,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/YbbLab/Droidance/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/YbbLab/Droidance/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/YbbLab/Droidance/releases/tag/v0.1.0
