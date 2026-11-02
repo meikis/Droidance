@@ -98,9 +98,9 @@ cd Droidance
 ./gradlew :app:assembleDebug
 ```
 
-选择内置服务商，填写 API 密钥和模型 ID 后保存即可启用。API 地址和协议已预填，不预置模型 ID；也可以添加自定义地址。已有配置会保留。接口地址与地域说明见[服务商预设](docs/MODEL_PROVIDER_PRESETS.md)。构建过程不会将本机 Key 注入 APK。
+选择内置服务商，填写 API 密钥和模型 ID 后保存即可启用。API 地址和协议已预填，不预置模型 ID；也可以添加自定义地址。已有配置会保留。构建过程不会将本机 Key 注入 APK。
 
-完整的本地检查（架构、资源、单元测试、Lint 与 Debug APK）：
+公开源码检查（架构、资源、原生依赖、Lint 与 Debug APK；本地保留测试时也会运行测试）：
 
 ```bash
 scripts/verify.sh
@@ -133,7 +133,7 @@ scripts/verify.sh
 
 - **人在回路**：人机验证（CAPTCHA）始终由你完成；遇到支付、密码、登录授权等需要你本人决定的步骤，智能体会暂停并请你接手。你也可以随时接管，操作完再交还给它。
 - **定时任务**：支持一次性、每日/每周与固定间隔的计划，到点自动执行。
-- **技能沉淀**：把摸索出的有效流程沉淀为可复用的技能（Skill），之后按需加载，越用越顺手。详见[技能系统](docs/SKILLS.md)。
+- **技能沉淀**：把摸索出的有效流程沉淀为可复用的技能（Skill），之后按需加载，越用越顺手。
 - **系统能力**：在你授权后，可以直接读写日历、联系人、短信等系统数据，不必每一步都操作界面。
 - **模型自由**：可接入支持图像输入与工具调用的 OpenAI 兼容端点，服务地址、API Key 和模型都由你自己配置。
 
@@ -175,7 +175,7 @@ scripts/verify.sh
 | `core:knowledge` | 技能、记忆与文档存储 |
 | `core:persistence` | 事件与知识的本地持久化 |
 
-智能体的规则与策略放在 Markdown 配置中（`app/src/main/assets/rules/`、`skills/`），Kotlin 只负责通用编排、协议校验、设备执行与持久化。更多细节见 [架构蓝图](docs/ANDROID_USE_BLUEPRINT.md)、[规则配置](docs/RULES.md)、[权限与安全边界](docs/PERMISSIONS_AND_SECURITY.md) 与 [技能系统](docs/SKILLS.md)。
+智能体的规则与策略放在 Markdown 配置中（`app/src/main/assets/rules/`、`skills/`），Kotlin 只负责通用编排、协议校验、设备执行与持久化。
 
 ---
 
@@ -201,7 +201,7 @@ scripts/verify.sh
 | 精确闹钟、开机启动、电池优化豁免 | 定时任务按时执行与恢复 |
 | 安装未知应用 | 安装应用内下载的更新 |
 
-运行时权限都可以在系统设置中随时撤回。Sidecar 配对后不依赖 Wi‑Fi，被杀后会自动拉起；在配对页重置配对或重启手机可以停止它，关闭开发者选项后它不再自动拉起。完整清单见 [权限与安全边界](docs/PERMISSIONS_AND_SECURITY.md)，安全问题请按 [SECURITY](SECURITY.md) 私下报告。
+运行时权限都可以在系统设置中随时撤回。Sidecar 配对后不依赖 Wi‑Fi，被杀后会自动拉起；在配对页重置配对或重启手机可以停止它，关闭开发者选项后它不再自动拉起。安全问题请按 [SECURITY](SECURITY.md) 私下报告。
 
 **边界**
 
@@ -249,7 +249,7 @@ scripts/verify.sh
 - **保留声明**：分发源码或二进制时，请保留原有的版权声明、[LICENSE](LICENSE) 与 [NOTICE](NOTICE) 文件。
 - **标注修改**：如果修改了源文件，请在修改过的文件中注明。
 - **不得冒用名义**：协议不授予 Droidance 名称与 Logo 的商标使用权，基于本项目的衍生作品请勿以官方名义发布或宣传。
-- **第三方组件**：项目包含的第三方组件遵循各自的许可证，详见 [NOTICE](NOTICE) 与 [第三方组件说明](docs/THIRD_PARTY.md)。
+- **第三方组件**：项目包含的第三方组件遵循各自的许可证，详见 [NOTICE](NOTICE) 及 [随源码保留的许可证](app/src/main/assets/licenses/)。
 
 ### 免责声明
 

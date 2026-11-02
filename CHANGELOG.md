@@ -2,7 +2,7 @@
 
 All notable user-visible changes to Droidance are recorded in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/), and public releases use [Semantic Versioning](https://semver.org/). Version selection, entry rules, and the release process are defined in the [versioning and update policy](docs/release/VERSIONING_POLICY.md).
+The format follows [Keep a Changelog](https://keepachangelog.com/), and public releases use [Semantic Versioning](https://semver.org/).
 
 Record a notable change in `Unreleased` within the same pull request that implements it. Use only the categories that contain changes: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Mark incompatible entries with `**Breaking:**`, name the affected contract, and give migration steps. At release time, move the entries under the exact version and its release date. Add the same version to [CHANGELOG.zh.md](CHANGELOG.zh.md), which supplies the Chinese update notes.
 
@@ -10,7 +10,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Changed
 
-- **Breaking:** Custom rule overrides must replace `human_assistance.observation_unavailable_diagnostics` with `recovery_handoffs` and include the current localized runtime notice keys; see [Rules](docs/RULES.md#tunable-configuration).
+- Documentation, test sources, fixtures and debug acceptance tools are local-only. Public CI validates the published source and APK build without claiming local test coverage.
+- **Breaking:** Custom rule overrides must replace `human_assistance.observation_unavailable_diagnostics` with `recovery_handoffs` and include the current localized runtime notice keys from the bundled rule configuration.
 
 ### Fixed
 

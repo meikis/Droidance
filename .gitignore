@@ -30,3 +30,23 @@ __pycache__/
 # Debug exports and captures
 *.hprof
 captures/
+*.apk
+*.aab
+*.apks
+*.log
+/artifacts/
+/reports/
+/test-results/
+/screenshots/
+/recordings/
+/debug-exports/
+
+# Local documentation, tests and device acceptance tools
+/docs/
+**/src/test/
+**/src/androidTest/
+**/src/testFixtures/
+**/src/debug/
+/scripts/tests/
+/third_party/libadb/tests/
+/.project-internal/

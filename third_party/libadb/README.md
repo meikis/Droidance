@@ -36,10 +36,9 @@ Path aliases and relative compilation database paths are resolved before matchin
 ## Validation boundaries
 
 ```sh
-python3 -m unittest discover -s third_party/libadb/tests -v
 python3 scripts/verify_native.py
 ```
 
-`com.droidance.air.NativeAdbPairingInstrumentedTest` loads the packaged JNI library and exercises client/server SPAKE2 agreement, bidirectional binary payloads, authenticated-ciphertext rejection, password mismatch and oversized peer messages. Its server role uses the existing private JNI constructor from the test only; production Kotlin and pairing protocol are unchanged. It does not change device pairing settings or contact an ADB server.
+The public source tree includes provenance and packaged-native verification. Device acceptance tests and build-script tests are retained locally and are not included in this repository.
 
-Compilation, ELF checks and these native tests do not establish end-to-end Android wireless-debugging pairing, shell reconnect behavior, other-ABI runtime compatibility, or a 16 KB-page device run. Report those checks separately when performing a release validation.
+Compilation, ELF and provenance checks do not establish end-to-end Android wireless-debugging pairing, shell reconnect behavior, other-ABI runtime compatibility, or a 16 KB-page device run. Report those checks separately when performing a release validation.

@@ -98,9 +98,9 @@ cd Droidance
 ./gradlew :app:assembleDebug
 ```
 
-Choose a built-in provider, enter your API key and model ID, and save to enable it. The API address and protocol are prefilled; no model IDs are preset. You can also add a custom endpoint. Existing configurations are preserved. See [provider presets](docs/MODEL_PROVIDER_PRESETS.md) for endpoints and regional scope. Builds do not embed local provider keys.
+Choose a built-in provider, enter your API key and model ID, and save to enable it. The API address and protocol are prefilled; no model IDs are preset. You can also add a custom endpoint. Existing configurations are preserved. Builds do not embed local provider keys.
 
-Full local checks (architecture, resources, unit tests, lint and debug APK):
+Public source checks (architecture, resources, native inputs, lint and debug APK; locally retained tests also run when present):
 
 ```bash
 scripts/verify.sh
@@ -133,7 +133,7 @@ See [CONTRIBUTING](CONTRIBUTING.md) for development conventions and validation.
 
 - **Human in the loop**: CAPTCHAs are always left to you. For steps that need your own decision, such as payment, passwords or sign-in authorization, the agent pauses and asks you to take over. You can also take control at any time and hand the task back afterwards.
 - **Scheduled tasks**: one-time, daily, weekly and fixed-interval plans run automatically.
-- **Reusable skills**: save workflows that worked as reusable skills and load them when needed. See [Skills](docs/SKILLS.md).
+- **Reusable skills**: save workflows that worked as reusable skills and load them when needed.
 - **System capabilities**: with your permission, it can read and write calendar, contacts, SMS and other system data directly instead of operating the interface for every step.
 - **Model choice**: connect any OpenAI-compatible endpoint with image input and tool calling, using your own address, API key and models.
 
@@ -175,7 +175,7 @@ See [CONTRIBUTING](CONTRIBUTING.md) for development conventions and validation.
 | `core:knowledge` | Skills, memory and document storage |
 | `core:persistence` | Local persistence for events and knowledge |
 
-Agent rules and policies live in Markdown configuration (`app/src/main/assets/rules/`, `skills/`); Kotlin handles generic orchestration, protocol validation, device execution and persistence. See the [architecture blueprint](docs/ANDROID_USE_BLUEPRINT.md), [rules](docs/RULES.md), [permissions and security boundaries](docs/PERMISSIONS_AND_SECURITY.md) and [skills](docs/SKILLS.md) for details.
+Agent rules and policies live in Markdown configuration (`app/src/main/assets/rules/`, `skills/`); Kotlin handles generic orchestration, protocol validation, device execution and persistence.
 
 ---
 
@@ -201,7 +201,7 @@ Agent rules and policies live in Markdown configuration (`app/src/main/assets/ru
 | Exact alarms, start at boot, battery optimization exemption | Run and restore scheduled tasks on time |
 | Install unknown apps | Install updates downloaded in the app |
 
-Runtime permissions can be revoked in system settings at any time. After pairing, the sidecar does not depend on Wi‑Fi and restarts itself if killed. Reset pairing or restart the phone to stop it; it no longer restarts once developer options are off. See [permissions and security boundaries](docs/PERMISSIONS_AND_SECURITY.md) for the full list, and report security issues privately according to [SECURITY](SECURITY.md).
+Runtime permissions can be revoked in system settings at any time. After pairing, the sidecar does not depend on Wi‑Fi and restarts itself if killed. Reset pairing or restart the phone to stop it; it no longer restarts once developer options are off. Report security issues privately according to [SECURITY](SECURITY.md).
 
 **Limits**
 
@@ -249,7 +249,7 @@ Droidance is licensed under the [Apache License 2.0](LICENSE). You may use, modi
 - **Keep notices**: retain the copyright notices, [LICENSE](LICENSE) and [NOTICE](NOTICE) when distributing source or binaries.
 - **Mark changes**: state your changes in any source files you modify.
 - **Don't imply endorsement**: the license grants no trademark rights to the Droidance name or logo. Do not publish or promote derivative works as official.
-- **Respect third-party licenses**: bundled third-party components keep their own licenses. See [NOTICE](NOTICE) and [third-party components](docs/THIRD_PARTY.md).
+- **Respect third-party licenses**: bundled third-party components keep their own licenses. See [NOTICE](NOTICE) and [bundled license texts](app/src/main/assets/licenses/).
 
 ### Disclaimer
 

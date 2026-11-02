@@ -1,8 +1,0 @@
-<!--
-  SPDX-FileCopyrightText: 2026 YBBLab
-  SPDX-License-Identifier: Apache-2.0
--->
-
-<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
-    <string name="takeover_navigation_probe_status">Navigation probe\nPage depth: %1$d\nBack count: %2$d</string>
-</resources>

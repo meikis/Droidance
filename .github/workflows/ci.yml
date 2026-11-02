@@ -26,11 +26,9 @@ jobs:
           set +o pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" > /dev/null
       - name: Verify source and native inputs
-        run: python3 scripts/verify_source.py && python3 scripts/verify_native.py && python3 scripts/verify_secrets.py && python3 -m unittest discover -s scripts/tests
+        run: python3 scripts/verify_source.py && python3 scripts/verify_native.py && python3 scripts/verify_secrets.py
       - name: Verify module architecture
         run: ./gradlew verifyArchitecture
-      - name: Unit tests
-        run: ./gradlew testDebugUnitTest :core:model:test :core:agent:test :core:knowledge:test
       - name: Lint
         run: ./gradlew :app:lintDebug
       - name: Release APK (R8)
