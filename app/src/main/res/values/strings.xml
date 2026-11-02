@@ -10,6 +10,7 @@
     <string name="composer_model_title">Model</string>
     <string name="composer_model_description">Model: %1$s</string>
     <string name="composer_model_unavailable">The selected model is unavailable. Choose another model.</string>
+    <string name="model_not_configured">No model is configured. Add a model and its API key in AI model configuration.</string>
     <string name="composer_picker_close">Close picker</string>
     <string name="execution_interrupted_result">The task ended because the app was interrupted and did not complete all requirements. Existing results and execution records were retained; the last action may not have been verified.</string>
     <string name="app_name">Droidance</string>

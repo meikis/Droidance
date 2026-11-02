@@ -53,3 +53,6 @@ interface ModelClient {
 }
 
 data class ModelSwitchEvent(val fromModel: String, val toModel: String, val reason: String)
+
+/** No usable Provider or model is configured; the user must set one up before any task can run. */
+class ModelNotConfiguredException(message: String) : IllegalStateException(message)

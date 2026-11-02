@@ -970,6 +970,7 @@ class AgentRuntime @Inject constructor(
                     val cancelled = currentJob?.isCancelled == true || cancelRequested ||
                         failure is kotlinx.coroutines.CancellationException
                     val preparationFailure = failure as? com.droidance.daemon.DevicePreparationException
+                    val modelNotConfigured = failure is com.droidance.core.model.llm.ModelNotConfiguredException
                     val explainedFailure = (failure as? TaskExecutionFailure)?.publicReply
                     val notice = when {
                         deadlineReached -> appTakeoverStore.forTurn(session.durableTurn.scope.turnId)
@@ -979,22 +980,24 @@ class AgentRuntime @Inject constructor(
                         timedOut || cancelled -> PublicAssistantText.sanitize(buildCancelledTaskSummary(timedOut))
                         failure is com.droidance.core.knowledge.memory.DeferredMemoryEnqueueException -> appContext.getString(R.string.memory_background_save_failed)
                         explainedFailure != null -> explainedFailure
+                        modelNotConfigured -> appContext.getString(R.string.model_not_configured)
                         preparationFailure != null -> appContext.getString(preparationFailure.reason.messageResource)
                         deviceSnapshotInitializationFailure != null -> appContext.getString(
                             R.string.execution_device_snapshot_failed,
                             deviceSnapshotInitializationFailure?.message.orEmpty().take(240))
                         else -> appContext.getString(R.string.execution_completion_not_confirmed)
                     }
-                    if (cancelled || timedOut) _lastResponse.value = notice
+                    if (cancelled || timedOut || modelNotConfigured) _lastResponse.value = notice
                     else if (explainedFailure != null) _lastResponse.value = explainedFailure
                     TaskLifecycle.FailureNotice(
-                        status = if (cancelled) "cancelled" else if (timedOut || preparationFailure?.reason?.requiresUser == true) "need_more_info" else "error",
+                        status = if (cancelled) "cancelled" else if (timedOut || modelNotConfigured || preparationFailure?.reason?.requiresUser == true) "need_more_info" else "error",
                         text = notice.ifBlank { appContext.getString(R.string.execution_completion_not_confirmed) },
                         diagnosticCode = when {
                             deadlineReached -> "TASK_DEADLINE_REACHED"
                             timedOut -> "MANUAL_TAKEOVER_TIMEOUT"
                             cancelled -> "TASK_CANCELLED"
                             failure is com.droidance.core.knowledge.memory.DeferredMemoryEnqueueException -> "MEMORY_ENQUEUE_FAILED"
+                            modelNotConfigured -> "MODEL_NOT_CONFIGURED"
                             preparationFailure != null -> preparationFailure.reason.name
                             deviceSnapshotInitializationFailure != null -> DEVICE_SNAPSHOT_INIT_FAILED
                             else -> "TURN_NOT_COMPLETED"

@@ -10,6 +10,7 @@
     <string name="composer_model_title">模型</string>
     <string name="composer_model_description">模型：%1$s</string>
     <string name="composer_model_unavailable">所选模型暂不可用，请重新选择模型。</string>
+    <string name="model_not_configured">尚未配置模型。请先在“AI 模型配置”中添加模型和 API 密钥。</string>
     <string name="composer_picker_close">收起选择</string>
     <string name="execution_interrupted_result">任务因应用中断而结束，未完成全部要求。已有结果和执行记录已保留；最后一步的实际效果可能尚未确认。</string>
     <string name="app_name">Droidance</string>

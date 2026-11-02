@@ -135,15 +135,20 @@ class HomeViewModel @Inject constructor(
 
     private data class ComposerSubmissionOptions(val modelPlan: ModelStreamPlan?, val space: ExecutionSpace)
 
-    private fun captureComposerOptions(): ComposerSubmissionOptions? = try {
-        val preferences = _composerPreferences.value
-        ComposerSubmissionOptions(
-            composerModelPlan(preferences, providerConfigManager.getEnabledConfigs()),
-            ExecutionSpace.VIRTUAL_SPACE
-        )
-    } catch (_: IllegalArgumentException) {
-        _errorEvent.tryEmit(ContextCompat.getContextForLanguage(context).getString(R.string.composer_model_unavailable))
-        null
+    private fun captureComposerOptions(): ComposerSubmissionOptions? {
+        if (providerConfigManager.getEnabledConfigs().isEmpty()) {
+            _errorEvent.tryEmit(ContextCompat.getContextForLanguage(context).getString(R.string.model_not_configured))
+            return null
+        }
+        return try {
+            ComposerSubmissionOptions(
+                composerModelPlan(_composerPreferences.value, providerConfigManager.getEnabledConfigs()),
+                ExecutionSpace.VIRTUAL_SPACE
+            )
+        } catch (_: IllegalArgumentException) {
+            _errorEvent.tryEmit(ContextCompat.getContextForLanguage(context).getString(R.string.composer_model_unavailable))
+            null
+        }
     }
 
     @Volatile private var latestSubmittedTurnId: String? = null

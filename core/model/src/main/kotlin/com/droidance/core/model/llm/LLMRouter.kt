@@ -331,7 +331,7 @@ class LLMRouter(
     ): Flow<LLMStreamEvent> {
         val plan = requestPlan ?: planStreamChat(messages, hasImage)
         val config = plan.providerConfig ?: configManager.resolveProvider()
-            ?: throw Exception("No AI provider is available; configure one in settings")
+            ?: throw ModelNotConfiguredException("No AI provider is available; configure one in settings")
         val requestedEffort = config.reasoningPreference ?: reasoningEffort
 
         // remember the current provider for tool_choice construction
@@ -587,9 +587,9 @@ class LLMRouter(
             }
         }
         val config = configManager.resolveProvider()
-            ?: throw Exception("No AI provider is available; configure one in settings")
+            ?: throw ModelNotConfiguredException("No AI provider is available; configure one in settings")
         val initialModel = configManager.getCurrentModel(config)
-        if (initialModel.isBlank()) throw Exception("Provider \"${config.name}\" has no configured model")
+        if (initialModel.isBlank()) throw ModelNotConfiguredException("Provider \"${config.name}\" has no configured model")
         val plan = ModelStreamPlan.fromProvider(
             config = config,
             initialModel = initialModel,

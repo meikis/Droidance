@@ -51,6 +51,14 @@ class RouterTransportTest {
             assertEquals(7000L, error?.retryAfterMs)
         }
     }
+    @Test fun aProviderWithoutAModelFailsAsNotConfigured() {
+        val router = LLMRouter(OkHttpClient(),
+            StaticConfiguration(provider(ApiType.OPENAI_COMPATIBLE, ModelTransport.GENERIC_CHAT_COMPLETIONS).copy(defaultModel = "")),
+            RecordingUsage(), RecordingDiagnostics())
+        assertThrows(ModelNotConfiguredException::class.java) {
+            router.planStreamChat(listOf(ChatMessage(Role.USER, "hello")), hasImage = false)
+        }
+    }
     @Test fun toolRequirementReachesBothTransportsOnlyWithinTheActivatedRequestScope() = runBlocking {
         for ((api, transport, body) in listOf(
             Triple(ApiType.OPENAI_COMPATIBLE, ModelTransport.GENERIC_CHAT_COMPLETIONS, "data: [DONE]\n\n"),
