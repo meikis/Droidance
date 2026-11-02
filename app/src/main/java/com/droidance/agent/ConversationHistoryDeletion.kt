@@ -6,6 +6,7 @@ package com.droidance.agent
 import com.droidance.core.agent.blob.BlobStore
 import com.droidance.core.agent.event.AgentEventKind
 import com.droidance.core.agent.event.AgentEventStore
+import com.droidance.config.TokenUsageRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,7 +17,8 @@ class ConversationHistoryDeletion @Inject constructor(
     private val events: AgentEventStore,
     private val blobs: BlobStore,
     private val tasks: ConversationTaskController,
-    private val runtime: AgentRuntime
+    private val runtime: AgentRuntime,
+    private val tokenUsageRepository: TokenUsageRepository
 ) {
     suspend fun delete(threadIds: Set<String>? = null) = tasks.withHistoryMutation(threadIds) {
         // All production blob writers belong to this execution lane, including idle skill work.
@@ -25,6 +27,7 @@ class ConversationHistoryDeletion @Inject constructor(
             val selected = threadIds ?: events.eventsByKind(AgentEventKind.THREAD_CREATED)
                 .map { it.threadId }.filterNot { it == INTERNAL_SKILL_THREAD_ID }.toSet()
             purgeConversationData(events, blobs, selected)
+            tokenUsageRepository.deleteConversationUsage(threadIds)
             if (runtime.currentConversationId.value in selected) runtime.clearConversation()
         }
     }

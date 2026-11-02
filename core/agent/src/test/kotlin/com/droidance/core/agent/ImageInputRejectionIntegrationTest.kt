@@ -196,8 +196,7 @@ class ImageInputRejectionIntegrationTest {
     }
 
     private class Usage : TransportUsageRecorder {
-        override fun recordRequest(provider: String, model: String, promptTokens: Long, completionTokens: Long,
-            cachedInputTokens: Long, cacheFieldsReported: Boolean) = Unit
+        override fun recordRequest(usage: com.droidance.core.model.llm.ModelRequestUsage) = Unit
     }
 
     private class Diagnostics : TransportDiagnostics {

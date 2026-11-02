@@ -25,6 +25,10 @@ data class PromptCacheUsageObservation(
 
 /** Chat Completions 的 finish_reason 早于最终 usage chunk 时继续收尾读取。 */
 class ChatCompletionsUsageState {
+    var inputTokens: Int? = null
+        private set
+    var outputTokens: Int? = null
+        private set
     var observation: PromptCacheUsageObservation = PromptCacheUsageParser.parse(null)
         private set
     var terminalChoiceReceived: Boolean = false
@@ -37,7 +41,11 @@ class ChatCompletionsUsageState {
         get() = terminalChoiceReceived && !usageObserved
 
     fun observe(usage: JsonObject?, terminalChoice: Boolean) {
-        if (usage != null) observation = PromptCacheUsageParser.parse(usage)
+        if (usage != null) {
+            observation = PromptCacheUsageParser.parse(usage)
+            (usage["prompt_tokens"] as? JsonPrimitive)?.intOrNull?.let { inputTokens = it.coerceAtLeast(0) }
+            (usage["completion_tokens"] as? JsonPrimitive)?.intOrNull?.let { outputTokens = it.coerceAtLeast(0) }
+        }
         if (terminalChoice) terminalChoiceReceived = true
     }
 }

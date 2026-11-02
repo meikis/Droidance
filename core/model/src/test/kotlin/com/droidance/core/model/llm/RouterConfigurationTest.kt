@@ -33,8 +33,7 @@ class RouterConfigurationTest {
                 config: ProviderConfig, model: String, detail: ImageDetailOption
             ) = Unit
         }, object : TransportUsageRecorder {
-            override fun recordRequest(provider: String, model: String, promptTokens: Long,
-                completionTokens: Long, cachedInputTokens: Long, cacheFieldsReported: Boolean) = Unit
+            override fun recordRequest(usage: com.droidance.core.model.llm.ModelRequestUsage) = Unit
         }, object : TransportDiagnostics {
             override fun openExchange(scope: ModelDiagnosticScope?, provider: String, model: String,
             request: kotlinx.serialization.json.JsonObject) = TransportExchangeTrace.None

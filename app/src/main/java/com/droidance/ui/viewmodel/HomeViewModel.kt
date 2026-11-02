@@ -15,6 +15,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.droidance.R
+import com.droidance.config.TokenUsageRepository
 import com.droidance.core.device.permission.PermissionBroker
 import com.droidance.ui.execution.PendingPermissionUiState
 import com.droidance.agent.AgentRuntime
@@ -50,6 +51,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
@@ -82,6 +85,7 @@ class HomeViewModel @Inject constructor(
     private val providerConfigManager: ProviderConfigManager,
     private val composerSettingsRepository: ComposerSettingsRepository,
     private val reasoningCapabilities: com.droidance.settings.ReasoningCapabilityRepository,
+    tokenUsageRepository: TokenUsageRepository,
     @ApplicationContext private val context: Context,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -158,6 +162,10 @@ class HomeViewModel @Inject constructor(
     /** 消息列表 */
     private val _messages = MutableStateFlow<List<UIMessage>>(emptyList())
     val messages: StateFlow<List<UIMessage>> = _messages
+
+    val tokenUsage: StateFlow<ConversationTokenUsage> = combine(messages, tokenUsageRepository.turnRecords) { messages, records ->
+        conversationTokenUsage(conversationId, messages, records)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ConversationTokenUsage())
 
     private val _turnPresentations = MutableStateFlow<List<TurnPresentationUiState>>(emptyList())
     val turnPresentations: StateFlow<List<TurnPresentationUiState>> = _turnPresentations

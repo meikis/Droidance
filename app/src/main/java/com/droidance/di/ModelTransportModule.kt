@@ -31,7 +31,7 @@ object ModelTransportModule {
         configuration: ProviderConfigManager,
         reasoning: com.droidance.settings.ReasoningCapabilityRepository,
         requestFields: com.droidance.settings.ProviderRequestFieldsRepository,
-        usage: TokenUsageRepository,
+        usageRepository: TokenUsageRepository,
         latency: TaskLatencyTracker,
         diagnostics: DiagnosticsCollector
     ): LLMRouter = LLMRouter(
@@ -61,11 +61,8 @@ object ModelTransportModule {
             ) = configuration.recordImageDetailRejected(config, model, detail)
         },
         object : TransportUsageRecorder {
-            override fun recordRequest(
-                provider: String, model: String, promptTokens: Long, completionTokens: Long,
-                cachedInputTokens: Long, cacheFieldsReported: Boolean
-            ) = usage.recordRequest(provider, model, promptTokens, completionTokens,
-                cachedInputTokens, cacheFieldsReported)
+            override fun recordRequest(usage: ModelRequestUsage) =
+                usageRepository.recordRequest(usage)
         },
         object : TransportDiagnostics {
             override fun openExchange(scope: ModelDiagnosticScope?, provider: String, model: String,

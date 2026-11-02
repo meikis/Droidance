@@ -706,10 +706,11 @@ class LLMRouter(
             call.execute()
         } catch (e: Exception) {
             cancellationBinding.complete()
-            tokenUsageRepository.recordRequest(
+            tokenUsageRepository.recordRequest(ModelRequestUsage(
                 provider = providerName,
-                model = model
-            )
+                model = model,
+                scope = coroutineContext[ModelDiagnosticScope]
+            ))
             activeCalls.remove(call)
             exchange.finish(e)
             coroutineContext.ensureActive()
@@ -765,6 +766,7 @@ class LLMRouter(
                     val choice = (json["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
                     val reportedFinishReason = (choice?.get("finish_reason") as? JsonPrimitive)?.contentOrNull
                     if (reportedFinishReason != null) finishReason = reportedFinishReason
+                    usageState.observe(usage, reportedFinishReason != null)
                     if (usage != null || json["model"] is JsonPrimitive || reportedFinishReason != null) emit(LLMStreamEvent.ResponseMetadata(
                         (json["model"] as? JsonPrimitive)?.contentOrNull,
                         (usage?.get("prompt_tokens") as? JsonPrimitive)?.intOrNull,
@@ -776,7 +778,6 @@ class LLMRouter(
                         cacheWriteTokens = PromptCacheUsageParser.parse(usage).cacheWriteTokens
                     ))
 
-                    val terminalReceived = reportedFinishReason != null
                     choice?.let {
                         val delta = choice["delta"] as? JsonObject
 
@@ -802,7 +803,6 @@ class LLMRouter(
                         }
                     }
                     // finish_reason terminates content; include_usage may arrive in a later chunk.
-                    usageState.observe(usage, terminalReceived)
                     if (usageState.terminalChoiceReceived && usageState.usageObserved) {
                         break@streamLoop
                     }
@@ -839,15 +839,16 @@ class LLMRouter(
             cancellationBinding.complete()
             exchange.finish(exchangeFailure)
             val usage = usageState.observation
-            tokenUsageRepository.recordRequest(
+            tokenUsageRepository.recordRequest(ModelRequestUsage(
                 provider = providerName,
                 model = model,
-                promptTokens = usage.promptTokens.toLong(),
-                completionTokens = usage.completionTokens.toLong(),
-                cachedInputTokens = usage.hitTokens.toLong(),
-                cacheFieldsReported = usage.status == PromptCacheReportStatus.HIT ||
-                    usage.status == PromptCacheReportStatus.MISS
-            )
+                inputTokens = usageState.inputTokens?.toLong(),
+                outputTokens = usageState.outputTokens?.toLong(),
+                cachedInputTokens = usage.hitTokens.toLong().takeIf {
+                    usage.status == PromptCacheReportStatus.HIT || usage.status == PromptCacheReportStatus.MISS
+                },
+                scope = coroutineContext[ModelDiagnosticScope]
+            ))
             runCatching { response.close() }
             activeCalls.remove(call)
         }
@@ -925,10 +926,11 @@ class LLMRouter(
             call.execute()
         } catch (e: Exception) {
             cancellationBinding.complete()
-            tokenUsageRepository.recordRequest(
+            tokenUsageRepository.recordRequest(ModelRequestUsage(
                 provider = providerName,
-                model = model
-            )
+                model = model,
+                scope = coroutineContext[ModelDiagnosticScope]
+            ))
             activeCalls.remove(call)
             exchange.finish(e)
             coroutineContext.ensureActive()
@@ -995,14 +997,14 @@ class LLMRouter(
             exchange.finish(exchangeFailure)
             val usage = responseUsage
             usage?.let { diagnostics.recordTokenUsage(it.inputTokens, it.outputTokens) }
-            tokenUsageRepository.recordRequest(
+            tokenUsageRepository.recordRequest(ModelRequestUsage(
                 provider = providerName,
                 model = model,
-                promptTokens = usage?.inputTokens?.toLong() ?: 0,
-                completionTokens = usage?.outputTokens?.toLong() ?: 0,
-                cachedInputTokens = usage?.cachedInputTokens?.toLong() ?: 0,
-                cacheFieldsReported = usage?.cacheFieldsReported == true
-            )
+                inputTokens = usage?.takeIf { it.inputTokensReported }?.inputTokens?.toLong(),
+                outputTokens = usage?.takeIf { it.outputTokensReported }?.outputTokens?.toLong(),
+                cachedInputTokens = usage?.takeIf { it.cacheFieldsReported }?.cachedInputTokens?.toLong(),
+                scope = coroutineContext[ModelDiagnosticScope]
+            ))
             if (!responseCompleted) state.abortResponse(previousPendingComputerCallId)
             runCatching { response.close() }
             activeCalls.remove(call)

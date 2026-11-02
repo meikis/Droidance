@@ -152,7 +152,9 @@ object OpenAIResponsesProtocol {
         val cachedInputTokens: Int,
         val cacheFieldsReported: Boolean,
         val reasoningTokens: Int? = null,
-        val cacheWriteTokens: Int? = null
+        val cacheWriteTokens: Int? = null,
+        val inputTokensReported: Boolean = false,
+        val outputTokensReported: Boolean = false
     )
 
     fun buildRequest(
@@ -513,13 +515,15 @@ object OpenAIResponsesProtocol {
             setOf("response.completed", "response.incomplete", "response.failed")
         ) return null
         val usage = (json["response"] as? JsonObject)?.get("usage") as? JsonObject ?: return null
-        val input = usage["input_tokens"]?.jsonPrimitive?.intOrNull ?: 0
-        val output = usage["output_tokens"]?.jsonPrimitive?.intOrNull ?: 0
+        val input = (usage["input_tokens"] as? JsonPrimitive)?.intOrNull
+        val output = (usage["output_tokens"] as? JsonPrimitive)?.intOrNull
         val inputDetails = usage["input_tokens_details"] as? JsonObject
         val cached = inputDetails?.get("cached_tokens")?.jsonPrimitive?.intOrNull
         return Usage(
-            inputTokens = input.coerceAtLeast(0),
-            outputTokens = output.coerceAtLeast(0),
+            inputTokens = input?.coerceAtLeast(0) ?: 0,
+            outputTokens = output?.coerceAtLeast(0) ?: 0,
+            inputTokensReported = input != null,
+            outputTokensReported = output != null,
             cachedInputTokens = cached?.coerceAtLeast(0) ?: 0,
             cacheFieldsReported = cached != null,
             cacheWriteTokens = inputDetails?.get("cache_write_tokens")?.jsonPrimitive?.intOrNull?.coerceAtLeast(0),

@@ -28,15 +28,18 @@ interface TransportConfiguration {
     fun recordImageDetailRejected(config: ProviderConfig, model: String, detail: ImageDetailOption)
 }
 
+/** One actual transport attempt. Missing provider counts remain unknown, including on failure. */
+data class ModelRequestUsage(
+    val provider: String,
+    val model: String,
+    val inputTokens: Long? = null,
+    val outputTokens: Long? = null,
+    val cachedInputTokens: Long? = null,
+    val scope: ModelDiagnosticScope? = null
+)
+
 interface TransportUsageRecorder {
-    fun recordRequest(
-        provider: String,
-        model: String,
-        promptTokens: Long = 0,
-        completionTokens: Long = 0,
-        cachedInputTokens: Long = 0,
-        cacheFieldsReported: Boolean = false
-    )
+    fun recordRequest(usage: ModelRequestUsage)
 }
 
 interface TransportDiagnostics {

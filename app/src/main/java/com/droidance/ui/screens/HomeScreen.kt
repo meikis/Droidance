@@ -63,6 +63,7 @@ import java.util.Locale
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.droidance.R
+import com.droidance.config.TokenUsageTotals
 import com.droidance.core.agent.event.AgentEventProjectionFailureSnapshot
 import com.droidance.ui.mascot.MascotStage
 import com.droidance.ui.mascot.MascotMood
@@ -102,6 +103,8 @@ internal fun HomeScreen(
     }
     var hasDraft by remember { mutableStateOf(false) }
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val tokenUsage by viewModel.tokenUsage.collectAsStateWithLifecycle()
+    var usageSheetTarget by rememberSaveable(viewModel.conversationId) { mutableStateOf<String?>(null) }
     val conversationLoaded by viewModel.conversationLoaded.collectAsStateWithLifecycle()
     val turnPresentations by viewModel.turnPresentations.collectAsStateWithLifecycle()
     val threadProjectionFailure by viewModel.threadProjectionFailure.collectAsStateWithLifecycle()
@@ -170,6 +173,17 @@ internal fun HomeScreen(
         } else null
     }
 
+    usageSheetTarget?.let { target ->
+        val conversation = target.isEmpty()
+        TokenUsageSheet(
+            usage = if (conversation) tokenUsage.total else tokenUsage.turns[target] ?: TokenUsageTotals(),
+            conversation = conversation,
+            incomplete = conversation && tokenUsage.hasUnrecordedTurns,
+            running = if (conversation) isProcessing else target in activeTurnIds,
+            onDismiss = { usageSheetTarget = null }
+        )
+    }
+
     // Follow measured layout changes until the user chooses to read history.
     LaunchedEffect(
         visibleMessages.size,
@@ -217,6 +231,10 @@ internal fun HomeScreen(
                     )
                 },
                 actions = {
+                    if (tokenUsage.hasReplies || tokenUsage.turns.isNotEmpty()) {
+                        TokenUsageButton(tokenUsage.total, onClick = { usageSheetTarget = "" },
+                            incomplete = tokenUsage.hasUnrecordedTurns || isProcessing)
+                    }
                     Surface(
                         onClick = {
                             onNewConversation()
@@ -320,6 +338,9 @@ internal fun HomeScreen(
                             imageUris = message.imageUris,
                             imageBytes = message.imageBytes,
                             turnPresentation = turnPresentation,
+                            tokenUsage = if (!message.isUser && message.turnId != null && message.isCurrentSegment && !isQueued)
+                                tokenUsage.turns[message.turnId] ?: TokenUsageTotals() else null,
+                            onOpenTokenUsage = { usageSheetTarget = message.turnId },
                             loadTimelineAttachment = viewModel::loadTimelineAttachment,
                             canOpenVirtualSpace = ownsRetainedVirtualExecution,
                             onOpenVirtualSpace = { viewModel.openVirtualSpaceViewer(retainedVirtualExecution?.takeIf {

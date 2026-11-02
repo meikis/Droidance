@@ -961,6 +961,39 @@ class RouterTransportTest {
             RecordingUsage(), RecordingDiagnostics { tag -> if (tag == "ResponsesTerminal") onTerminal() }) to requests
     }
 
+    @Test
+    fun repeatedRequestsKeepTaskAttributionAndUnreportedFieldsForBothTransports() = runBlocking {
+        val cases = listOf(
+            Triple(ApiType.OPENAI_COMPATIBLE, ModelTransport.GENERIC_CHAT_COMPLETIONS,
+                """data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":100}}
+
+data: [DONE]
+
+"""),
+            Triple(ApiType.OPENAI_RESPONSES, ModelTransport.OPENAI_RESPONSES,
+                """data: {"type":"response.completed","response":{"id":"r","usage":{"input_tokens":100}}}
+
+""")
+        )
+        for ((api, transport, body) in cases) {
+            val usage = RecordingUsage()
+            val requests = mutableListOf<Request>()
+            val client = router(provider(api, transport), body, requests = requests,
+                usage = usage, diagnostics = RecordingDiagnostics())
+            val scope = ModelDiagnosticScope("thread", "turn", "round")
+            kotlinx.coroutines.withContext(scope) {
+                repeat(2) { client.streamChat(listOf(ChatMessage(Role.USER, "inspect"))).toList() }
+            }
+            assertEquals(2, usage.attempts.size)
+            usage.attempts.forEach {
+                assertEquals(scope, it.scope)
+                assertEquals(100L, it.inputTokens)
+                assertEquals(null, it.outputTokens)
+                assertEquals(null, it.cachedInputTokens)
+            }
+        }
+    }
+
     private fun router(
         provider: ProviderConfig,
         body: String,
@@ -1043,22 +1076,12 @@ class RouterTransportTest {
     private class RecordingUsage : TransportUsageRecorder {
         val records = mutableListOf<RequestUsage>()
 
-        override fun recordRequest(
-            provider: String,
-            model: String,
-            promptTokens: Long,
-            completionTokens: Long,
-            cachedInputTokens: Long,
-            cacheFieldsReported: Boolean
-        ) {
-            records += RequestUsage(
-                provider,
-                model,
-                promptTokens,
-                completionTokens,
-                cachedInputTokens,
-                cacheFieldsReported
-            )
+        val attempts = mutableListOf<ModelRequestUsage>()
+
+        override fun recordRequest(usage: ModelRequestUsage) {
+            attempts += usage
+            records += RequestUsage(usage.provider, usage.model, usage.inputTokens ?: 0,
+                usage.outputTokens ?: 0, usage.cachedInputTokens ?: 0, usage.cachedInputTokens != null)
         }
     }
 

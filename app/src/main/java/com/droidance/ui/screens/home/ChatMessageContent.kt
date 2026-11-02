@@ -94,6 +94,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.droidance.R
+import com.droidance.config.TokenUsageTotals
 import com.droidance.core.agent.event.DetailAttachmentReadModel
 import com.droidance.core.agent.harness.renderResultCardMarkdown
 import com.droidance.ui.components.FlatMarkdown
@@ -1074,6 +1075,8 @@ internal fun ChatBubble(
     imageUris: List<String> = emptyList(),
     imageBytes: List<ByteArray> = emptyList(),
     turnPresentation: TurnPresentationUiState? = null,
+    tokenUsage: TokenUsageTotals? = null,
+    onOpenTokenUsage: () -> Unit = {},
     liveIntervention: String = "",
     loadTimelineAttachment: suspend (DetailAttachmentReadModel) -> ByteArray? = { null },
     canOpenVirtualSpace: Boolean = false,
@@ -1132,33 +1135,35 @@ internal fun ChatBubble(
                 pendingPermission = pendingPermission,
                 onRequestPermission = onRequestPermission
             )
-            if (copyText.isNotBlank()) {
+            if (copyText.isNotBlank() || tokenUsage != null) {
                 Row(
-                    modifier = Modifier.padding(start = 4.dp, top = 0.dp, end = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 0.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(copyText))
-                            haptics.confirm()
-                            justCopied = true
-                        copyRequest++
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        AnimatedContent(
-                            targetState = justCopied,
-                            transitionSpec = {
-                                (scaleIn(initialScale = 0.88f, animationSpec = AppMotion.controlSpring()) + fadeIn(tween(AppMotion.FeedbackMillis)))
-                                    .togetherWith(scaleOut(targetScale = 0.88f, animationSpec = tween(AppMotion.FeedbackMillis)) + fadeOut(tween(AppMotion.PressMillis)))
+                    if (copyText.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(copyText))
+                                haptics.confirm()
+                                justCopied = true
+                                copyRequest++
                             },
-                            label = "taskCardCopyTransition"
-                        ) { copied ->
-                            ConversationActionGlyph(
-                                if (copied) R.drawable.ic_conversation_check else R.drawable.ic_conversation_copy,
-                                contentDescription = stringResource(if (copied) R.string.chat_copied else R.string.chat_copy),
-                                tint = if (copied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.58f)
-                            )
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            AnimatedContent(
+                                targetState = justCopied,
+                                transitionSpec = {
+                                    (scaleIn(initialScale = 0.88f, animationSpec = AppMotion.controlSpring()) + fadeIn(tween(AppMotion.FeedbackMillis)))
+                                        .togetherWith(scaleOut(targetScale = 0.88f, animationSpec = tween(AppMotion.FeedbackMillis)) + fadeOut(tween(AppMotion.PressMillis)))
+                                },
+                                label = "taskCardCopyTransition"
+                            ) { copied ->
+                                ConversationActionGlyph(
+                                    if (copied) R.drawable.ic_conversation_check else R.drawable.ic_conversation_copy,
+                                    contentDescription = stringResource(if (copied) R.string.chat_copied else R.string.chat_copy),
+                                    tint = if (copied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.58f)
+                                )
+                            }
                         }
                     }
                     if (!isStreaming && messageTimeText.isNotBlank()) {
@@ -1167,6 +1172,11 @@ internal fun ChatBubble(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    if (tokenUsage != null) {
+                        Spacer(Modifier.weight(1f))
+                        TokenUsageButton(tokenUsage, onOpenTokenUsage, incomplete = isStreaming,
+                            showChevron = true)
                     }
                 }
             }
@@ -1254,7 +1264,7 @@ internal fun ChatBubble(
             }
         }
         Row(
-            modifier = Modifier.padding(start = 4.dp, top = 0.dp, end = 4.dp),
+            modifier = (if (tokenUsage != null) Modifier.fillMaxWidth() else Modifier).padding(start = 4.dp, top = 0.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
@@ -1291,6 +1301,11 @@ internal fun ChatBubble(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            if (!isUser && tokenUsage != null) {
+                Spacer(Modifier.weight(1f))
+                TokenUsageButton(tokenUsage, onOpenTokenUsage, incomplete = isStreaming,
+                    showChevron = true)
             }
         }
     }

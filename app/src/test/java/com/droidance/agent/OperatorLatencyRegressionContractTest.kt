@@ -22,7 +22,7 @@ class OperatorLatencyRegressionContractTest {
             .substringBefore("private class RequestCancelledBeforeRegistrationException")
 
         assertTrue(stream.contains("choice?.get(\"finish_reason\")"))
-        assertTrue(stream.contains("val terminalReceived = reportedFinishReason != null"))
+        assertTrue(stream.contains("usageState.observe(usage, reportedFinishReason != null)"))
         assertTrue(stream.contains("usageState.needsFinalUsageChunk"))
         assertTrue(stream.contains("FINAL_USAGE_GRACE_MS"))
         assertTrue(stream.contains("SocketTimeoutException"))

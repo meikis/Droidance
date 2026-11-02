@@ -116,8 +116,7 @@ class TaskContextCompactorTransportTest {
                     .body(body.toResponseBody("text/event-stream".toMediaType())).build()
             }.build(), configuration,
             object : TransportUsageRecorder {
-                override fun recordRequest(provider: String, model: String, promptTokens: Long, completionTokens: Long,
-                    cachedInputTokens: Long, cacheFieldsReported: Boolean) = Unit
+                override fun recordRequest(usage: com.droidance.core.model.llm.ModelRequestUsage) = Unit
             },
             object : TransportDiagnostics {
                 override fun openExchange(scope: ModelDiagnosticScope?, provider: String, model: String, request: JsonObject) = TransportExchangeTrace.None

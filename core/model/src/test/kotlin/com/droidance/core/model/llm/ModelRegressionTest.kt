@@ -186,14 +186,7 @@ class ModelRegressionTest {
         httpClient = httpClient,
         configManager = configuration,
         tokenUsageRepository = object : TransportUsageRecorder {
-            override fun recordRequest(
-                provider: String,
-                model: String,
-                promptTokens: Long,
-                completionTokens: Long,
-                cachedInputTokens: Long,
-                cacheFieldsReported: Boolean
-            ) = Unit
+            override fun recordRequest(usage: com.droidance.core.model.llm.ModelRequestUsage) = Unit
         },
         diagnostics = object : TransportDiagnostics {
             override fun openExchange(scope: ModelDiagnosticScope?, provider: String, model: String,
