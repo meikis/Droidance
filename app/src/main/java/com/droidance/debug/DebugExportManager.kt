@@ -35,6 +35,7 @@ class DebugExportManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val diagnostics: DiagnosticsCollector,
     private val adbShell: AdbShellExecutor,
+    private val sidecarBridge: com.droidance.core.device.agent.device.VirtualSpaceSidecarBridge,
     private val airModePairingManager: AirModePairingManager,
     private val agentEventReplayExporter: AgentEventReplayExporter,
     private val blobStore: BlobStore,
@@ -69,6 +70,8 @@ class DebugExportManager @Inject constructor(
                 airEndpointSource = airShellHealth.activeEndpoint?.source.orEmpty(),
                 airShellLastProbeOutput = airShellHealth.probeOutput
             )
+
+            diagnostics.writeSidecarEvidence(sidecarBridge.readSidecarEvidence())
 
             val root = File(fileManager.getDataDirPath())
             val supplements = DebugExportSources.collect(root, snapshot)

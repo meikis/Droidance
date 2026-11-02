@@ -88,7 +88,9 @@ class ResidentSidecarProcessCommandsTest {
     fun supervisorRestartsOnlyAbnormalExitsWhileTheInstallIsCurrent() {
         val command = launchCommand()
 
-        assertTrue(command.contains("[ \$? -eq 0 ] && break"))
+        assertTrue(command.contains("[ \$rc -eq 0 ] && break"))
+        assertTrue(command.contains("supervisor: sidecar exited rc=\$rc"))
+        assertTrue(command.contains(">>/data/local/tmp/droidance_vspace.log"))
         assertTrue(command.contains("[ -f \"\$CLASSPATH\" ] || break"))
         assertTrue(command.contains("development_settings_enabled"))
         assertTrue(command.contains("sleep 5"))

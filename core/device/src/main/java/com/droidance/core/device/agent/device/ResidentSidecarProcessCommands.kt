@@ -49,7 +49,8 @@ internal object ResidentSidecarProcessCommands {
         val supervisor = "while :; do " +
             "app_process /system/bin \"\$DROIDANCE_SIDECAR_MAIN\" $width $height $densityDpi " +
             "\"\$DROIDANCE_SIDECAR_PACKAGE\" \"\$DROIDANCE_SIDECAR_PROTOCOL\" \"\$DROIDANCE_SIDECAR_SOURCE\"; " +
-            "[ \$? -eq 0 ] && break; " +
+            "rc=\$?; echo \"\$(date +%s) supervisor: sidecar exited rc=\$rc\"; " +
+            "[ \$rc -eq 0 ] && break; " +
             "sleep $RESTART_DELAY_SECONDS; " +
             "[ -f \"\$CLASSPATH\" ] || break; " +
             "[ \"\$(settings get global development_settings_enabled 2>/dev/null)\" != 0 ] || break; " +
@@ -65,8 +66,10 @@ internal object ResidentSidecarProcessCommands {
             // SIGHUP 杀掉后台 sidecar 进程（真机 binder timeout 的疑似主因；模拟器手动 adb shell 不复现）。
             // setsid 脱离一次性 shell 会话 + </dev/null 关闭 stdin 防 SIGPIPE，
             // 确保 AirAdbClient 连接关闭后 sidecar 仍存活到完成 binder 广播。
+            // Append so the exit that a restart follows stays readable; a launch rotates a large log.
+            append("[ \"\$(wc -c <$LOG_PATH 2>/dev/null || echo 0)\" -gt $LOG_ROTATE_BYTES ] && mv -f $LOG_PATH $LOG_PATH.1; ")
             append("(setsid sh -c ${escape(supervisor)} ")
-            append("</dev/null >/data/local/tmp/droidance_vspace.log 2>&1 &)")
+            append("</dev/null >>$LOG_PATH 2>&1 &)")
         }
     }
 
@@ -84,5 +87,15 @@ internal object ResidentSidecarProcessCommands {
             .ifBlank { null }
     }
 
+    /** Read through the live device shell so a debug export shows why the sidecar last stopped. */
+    fun evidenceCommand(): String =
+        "echo adb_enabled=\$(settings get global adb_enabled) " +
+            "adb_wifi_enabled=\$(settings get global adb_wifi_enabled) " +
+            "adbd=\$(getprop init.svc.adbd); " +
+            "ps -A -o UID,PID,PPID,PGID,ETIME,ARGS | grep -E '[V]irtualSpaceSidecarMain|[D]ROIDANCE_SIDECAR' | cut -c1-120; " +
+            "cat $LOG_PATH.1 2>/dev/null | tail -c 32768; tail -c 65536 $LOG_PATH 2>/dev/null"
+
+    private const val LOG_PATH = "/data/local/tmp/droidance_vspace.log"
+    private const val LOG_ROTATE_BYTES = 262144
     private const val RESTART_DELAY_SECONDS = 5
 }

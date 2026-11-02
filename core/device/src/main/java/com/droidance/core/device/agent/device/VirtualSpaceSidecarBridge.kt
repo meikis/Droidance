@@ -265,6 +265,17 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         }
     }
 
+    /** Debug-export evidence of why the sidecar last stopped; needs either live shell channel. */
+    fun readSidecarEvidence(): String = runCatching {
+        val command = ResidentSidecarProcessCommands.evidenceCommand()
+        val result = when {
+            isResidentBinderAlive() -> execShellCommand(command, RuntimeMode.STANDARD, timeoutMs = EVIDENCE_TIMEOUT_MS)
+            adbShell.isAvailable() -> adbShell.exec(command, EVIDENCE_TIMEOUT_MS)
+            else -> null
+        }
+        result?.output ?: "sidecar evidence unavailable: no live shell channel"
+    }.getOrElse { "sidecar evidence failed: ${it.javaClass.simpleName}" }
+
     /** Stops the sidecar and its supervisor; a graceful exit also works without the live ADB shell. */
     fun stopResidentChannel() {
         synchronized(serviceLock) {
@@ -1893,6 +1904,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         private const val ADB_BIND_RETRIES = 50
         private const val RESIDENT_REBIND_RETRIES = 30
         private const val BIND_POLL_MS = 200L
+        private const val EVIDENCE_TIMEOUT_MS = 6_000L
         private const val PROCESS_PROBE_TIMEOUT_MS = 2_000L
         private const val PROCESS_EXIT_RETRIES = 20
         private const val GRACEFUL_EXIT_RETRIES = 5

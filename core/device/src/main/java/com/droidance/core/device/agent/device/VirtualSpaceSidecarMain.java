@@ -32,6 +32,7 @@ public final class VirtualSpaceSidecarMain {
     private static final int STALE_PROCESS_EXIT_RETRIES = 20;
     private static final long SCREEN_OFF_APP_PROBE_MS = 2000L;
     private static final long SCREEN_STATE_POLL_MS = 1000L;
+    private static final int RESTARTABLE_FAILURE_EXIT_CODE = 1;
     private static final int SCREEN_OFF = 0;
     private static final int SCREEN_LOCKED = 1;
     private static final int SCREEN_UNLOCKED = 2;
@@ -84,7 +85,7 @@ public final class VirtualSpaceSidecarMain {
             writeLog("INFO broadcastBinder returned=" + broadcastOk + " err=" + service.getLastError(), null);
             if (!broadcastOk) {
                 reportFailure("broadcastBinder failed: " + service.getLastError(), null);
-                return;
+                System.exit(RESTARTABLE_FAILURE_EXIT_CODE);
             }
             reportInfo("sidecar binder broadcast sent");
             // 持续重发 binder 广播：防 app receiver 第一次未就绪而丢失 binder，
@@ -93,6 +94,8 @@ public final class VirtualSpaceSidecarMain {
             Looper.loop();
         } catch (Throwable t) {
             reportFailure(t.getClass().getSimpleName() + ": " + safeMessage(t), t);
+            // Exit code 0 tells the supervisor to stop; a crash on the main looper must restart.
+            System.exit(RESTARTABLE_FAILURE_EXIT_CODE);
         }
     }
 

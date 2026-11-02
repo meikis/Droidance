@@ -132,6 +132,10 @@ class DiagnosticsCollector @Inject constructor(
         completionTokens = completionTokenCount
     )
 
+    fun writeSidecarEvidence(evidence: String) {
+        File(envFile().parentFile, "sidecar.txt").writeText(evidence)
+    }
+
     fun writeEnvSnapshot(
         deviceModel: String,
         androidVersion: String,

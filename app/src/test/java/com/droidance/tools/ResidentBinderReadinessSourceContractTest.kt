@@ -118,6 +118,14 @@ class ResidentBinderReadinessSourceContractTest {
     }
 
     @Test
+    fun sidecarCrashesExitWithACodeTheSupervisorRestarts() {
+        val sidecar = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarMain.java").readText()
+        val crash = sidecar.substringAfter("} catch (Throwable t) {\n            reportFailure(t.getClass()")
+
+        assertTrue(crash.substringBefore("private static").contains("System.exit(RESTARTABLE_FAILURE_EXIT_CODE)"))
+    }
+
+    @Test
     fun sidecarFollowsScreenStateWithoutSystemReceivers() {
         val sidecar = projectFile("core/device/src/main/java/com/droidance/core/device/agent/device/VirtualSpaceSidecarMain.java").readText()
 
