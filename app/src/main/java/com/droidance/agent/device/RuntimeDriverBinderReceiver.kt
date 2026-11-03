@@ -120,6 +120,13 @@ private class NativePlatformDriver(private val context: Context) {
             "notificationClick" -> putBoolean("result", com.droidance.automation.NotificationWatcher.instance
                 ?.clickNotification(args.getString("key")!!, if (args.containsKey("display")) args.getInt("display") else null) == true)
             "notificationDismiss" -> com.droidance.automation.NotificationWatcher.instance?.dismissNotification(args.getString("key")!!)
+            // Framework JNI libraries the zygote preloaded into this application process.
+            "systemJniLibraries" -> putStringArrayList("paths", ArrayList(
+                java.io.File("/proc/self/maps").readLines().mapNotNull { it.substringAfter('/', "").takeIf(String::isNotEmpty) }
+                    .map { "/$it" }.distinct().filter { path ->
+                        !path.startsWith("/data/") && !path.startsWith("/apex/") && path.endsWith(".so") &&
+                            path.substringAfterLast('/').contains("jni", ignoreCase = true)
+                    }))
             "restore" -> putString("ime", AgentTextInputMethodService.restorationTarget(context))
             "begin" -> AgentTextInputMethodService.beginSession(context, args.getString("ime")!!)
             "end" -> AgentTextInputMethodService.endSession(context, args.getBoolean("restored"))

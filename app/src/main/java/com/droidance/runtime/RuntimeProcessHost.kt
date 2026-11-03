@@ -74,7 +74,9 @@ object RuntimeProcessHost {
             application.onCreate()
             // Acquire the platform-owned session while the submitting client is awake. Drawing
             // and input subsequently use the system session directly, without calling that client.
-            val session = RuntimePlatformDriver.connect().windowSession
+            val driver = RuntimePlatformDriver.connect()
+            loadSystemJniLibraries(driver)
+            val session = driver.windowSession
             val proxy = Class.forName("android.view.IWindowSession\$Stub")
                 .getMethod("asInterface", IBinder::class.java).invoke(null, session)
             Class.forName("android.view.WindowManagerGlobal").getDeclaredField("sWindowSession")
@@ -101,6 +103,23 @@ object RuntimeProcessHost {
             if (thread === android.os.Looper.getMainLooper().thread || owned) fallback?.uncaughtException(thread, error)
             else android.util.Log.w("DroidanceRuntime", "Platform helper thread ${thread.name} ended", error)
         }
+    }
+
+    /**
+     * app_process does not receive the zygote's framework JNI preloads. Vendor framework code on
+     * the view and input path may call those natives, so mirror the libraries the platform driver's
+     * zygote-started process holds before any window is created here.
+     */
+    private fun loadSystemJniLibraries(driver: INativeInputDriver) {
+        val loaded = File("/proc/self/maps").readText()
+        // Framework natives bind through the boot class loader and its system linker namespace.
+        val load = Runtime::class.java.getDeclaredMethod("load0", Class::class.java, String::class.java)
+            .apply { isAccessible = true }
+        RuntimeWire.read(driver.command("systemJniLibraries", Bundle())).getStringArrayList("paths").orEmpty()
+            .filterNot { loaded.contains(it) }.forEach { path ->
+                try { load.invoke(Runtime.getRuntime(), android.view.View::class.java, path) }
+                catch (error: Throwable) { android.util.Log.w("DroidanceRuntime", "System JNI library unavailable: $path", (error as? java.lang.reflect.InvocationTargetException)?.cause ?: error) }
+            }
     }
 
     private class Owner(private val application: Application, private val clientUid: Int) : IAgentRuntimeOwner.Stub() {
