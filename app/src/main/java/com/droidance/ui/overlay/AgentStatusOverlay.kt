@@ -43,6 +43,7 @@ class AgentStatusOverlay @Inject constructor(
     private val executionContextStore: ExecutionContextStore,
     private val inputActionLifecycle: InputActionLifecycle,
     private val runtimeSurfaceController: RuntimeSurfaceController,
+    private val shell: com.droidance.core.device.tools.AdbShellExecutor,
     @ApplicationScope private val appScope: CoroutineScope
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -217,7 +218,18 @@ class AgentStatusOverlay @Inject constructor(
     /** Open the current virtual-space viewer. */
     private fun runtimeIslandActionKind() = RuntimeSurfaceBitmapRenderer.IslandAction.OPEN
 
-    private fun handleRuntimeIslandAction() { openVirtualSpaceViewer() }
+    /** An empty execution display has nothing to show; the task's progress lives in Droidance. */
+    private fun handleRuntimeIslandAction() {
+        appScope.launch(Dispatchers.IO) {
+            if (virtualSpaceManager.inspectDisplayContent() == com.droidance.core.device.agent.device.VirtualDisplayContentState.CONTENT_PRESENT) openVirtualSpaceViewer()
+            else openApplication()
+        }
+    }
+
+    private fun openApplication() {
+        val component = shell.escapeForShell("${context.packageName}/com.droidance.MainActivity")
+        if (!shell.exec("am start --user 0 -n $component").success) mainHandler.post { showVirtualSpaceViewerOpenFailed() }
+    }
 
     private fun handleRuntimeIslandControl() {
         mainHandler.post {

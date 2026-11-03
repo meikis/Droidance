@@ -16,11 +16,13 @@ internal data class RuntimeTransportPolicy(
     val completedRetentionMs: Long,
     val maxBufferedChunks: Int,
     val maxBufferedChars: Int,
-    val resultBatchChunks: Int
+    val resultBatchChunks: Int,
+    val displayContentPollMs: Long
 ) {
     init {
         require(foregroundPollMs > 0 && backgroundPollMs >= foregroundPollMs && reconnectMs > 0)
         require(maxPendingTasks > 0 && maxRetainedTasks > 0 && completedRetentionMs > 0)
+        require(displayContentPollMs > 0)
         require(maxBufferedChunks > 0 && maxBufferedChars > 0 && resultBatchChunks in 1..maxBufferedChunks)
     }
     companion object {

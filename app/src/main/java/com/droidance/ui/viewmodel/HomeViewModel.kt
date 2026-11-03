@@ -200,6 +200,7 @@ class HomeViewModel @Inject constructor(
     val pendingPermissionRequest: StateFlow<PendingPermissionUiState?> = _pendingPermissionRequest
 
     val retainedVirtualExecution = virtualSpaceManager.retainedExecution
+    val retainedVirtualContent = virtualSpaceManager.retainedDisplayHasContent
     private val _appTakeoverStatusUiState = MutableStateFlow(AppTakeoverLogUiState())
     val appTakeoverStatusUiState: StateFlow<AppTakeoverLogUiState> = _appTakeoverStatusUiState
     private val _appTakeoverTurnPresentations =

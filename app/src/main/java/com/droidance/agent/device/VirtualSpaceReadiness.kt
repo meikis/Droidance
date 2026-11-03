@@ -38,7 +38,7 @@ class VirtualSpaceReadiness @Inject constructor(
             val result = client.get().command("prepareDisplay", android.os.Bundle().apply { putBoolean("probe", requireHealthProbe) })
             val id = result.getInt("display", -1).takeIf { it > 0 }
             if (id != null) virtualSpaceManager.adoptRuntimeDisplay(id, result.getInt("width"), result.getInt("height"),
-                result.getInt("density"), null, null)
+                result.getInt("density"), null, null, false)
             return VirtualSpaceReadinessResult(VirtualSpaceReadinessStatus.valueOf(result.getString("status")!!), id,
                 result.getString("message").orEmpty())
         }

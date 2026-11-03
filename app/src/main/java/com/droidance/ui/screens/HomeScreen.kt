@@ -118,6 +118,7 @@ internal fun HomeScreen(
     val manualTakeoverReason by viewModel.manualTakeoverReason.collectAsStateWithLifecycle()
     val pendingPermission by viewModel.pendingPermissionRequest.collectAsStateWithLifecycle()
     val retainedVirtualExecution by viewModel.retainedVirtualExecution.collectAsStateWithLifecycle()
+    val retainedVirtualContent by viewModel.retainedVirtualContent.collectAsStateWithLifecycle()
     val appTakeoverStatusUiState by viewModel.appTakeoverStatusUiState.collectAsStateWithLifecycle()
     val skills by skillsViewModel.skills.collectAsStateWithLifecycle()
     val draftWork by skillsViewModel.draftWorkState.collectAsStateWithLifecycle()
@@ -326,7 +327,7 @@ internal fun HomeScreen(
                             tokenUsage = if (!message.isUser && message.turnId != null && message.isCurrentSegment && !isQueued)
                                 tokenUsage.turns[message.turnId] ?: TokenUsageTotals() else null,
                             loadTimelineAttachment = viewModel::loadTimelineAttachment,
-                            canOpenVirtualSpace = ownsRetainedVirtualExecution,
+                            canOpenVirtualSpace = ownsRetainedVirtualExecution && retainedVirtualContent,
                             onOpenVirtualSpace = { viewModel.openVirtualSpaceViewer(retainedVirtualExecution?.takeIf {
                                 it.threadId == viewModel.conversationId
                             }) },

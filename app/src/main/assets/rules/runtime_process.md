@@ -13,7 +13,8 @@ The shell process owns the single Agent execution lane, its queue and authoritat
   "completedRetentionMs": 600000,
   "maxBufferedChunks": 256,
   "maxBufferedChars": 65536,
-  "resultBatchChunks": 64
+  "resultBatchChunks": 64,
+  "displayContentPollMs": 1000
 }
 ## Transport semantics
 

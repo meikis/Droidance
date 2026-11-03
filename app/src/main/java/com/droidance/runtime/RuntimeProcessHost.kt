@@ -155,6 +155,18 @@ object RuntimeProcessHost {
         private val tasks = ConcurrentHashMap<String, Task>()
         @Volatile private var presentation: IBinder? = null
 
+        init {
+            // Presentation needs to know whether the execution display holds an application at all.
+            scope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    try { entry.virtualSpace().refreshRetainedDisplayContent() }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (error: Exception) { android.util.Log.w("DroidanceRuntime", "Display content unavailable: ${error.javaClass.simpleName}") }
+                    delay(transport.displayContentPollMs)
+                }
+            }
+        }
+
         private inline fun <T> authenticated(action: () -> T): T {
             val caller = Binder.getCallingUid()
             check(caller == clientUid || caller == android.os.Process.myUid()) { "Runtime caller is not authorized" }
@@ -407,6 +419,7 @@ object RuntimeProcessHost {
                 entry.virtualSpace().retainedExecution.value?.let { execution ->
                     putString("thread", execution.threadId); putString("execution", execution.executionId)
                 }
+                putBoolean("content", entry.virtualSpace().retainedDisplayHasContent.value)
                 putInt("id", metrics.displayId); putInt("width", metrics.width)
                 putInt("height", metrics.height); putInt("density", metrics.densityDpi)
             }) }

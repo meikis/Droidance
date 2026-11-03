@@ -62,13 +62,17 @@ class VirtualSpaceManager @Inject constructor(
     @Volatile private var activeExecutionId: String? = null
     private val mutableRetainedExecution = MutableStateFlow<RetainedVirtualExecution?>(null)
     val retainedExecution: StateFlow<RetainedVirtualExecution?> = mutableRetainedExecution.asStateFlow()
+    private val mutableRetainedDisplayHasContent = MutableStateFlow(false)
+    /** Whether the retained execution display currently holds an application activity. */
+    val retainedDisplayHasContent: StateFlow<Boolean> = mutableRetainedDisplayHasContent.asStateFlow()
 
     fun isActive(): Boolean = active
 
     /** A GUI attaches to the resident owner's display; it never creates a replacement display. */
     fun adoptRuntimeDisplay(displayId: Int, width: Int, height: Int, densityDpi: Int,
-        threadId: String?, executionId: String?) {
+        threadId: String?, executionId: String?, hasContent: Boolean) {
         check(!com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner)
+        mutableRetainedDisplayHasContent.value = hasContent && threadId != null && executionId != null
         if (displayId <= 0) {
             active = false
             sidecarSession = null
@@ -132,6 +136,16 @@ class VirtualSpaceManager @Inject constructor(
         return sidecarBridge.isBoundSessionAlive(binding)
     }
 
+    /** Owner-side refresh of [retainedDisplayHasContent] from the platform activity inventory. */
+    fun refreshRetainedDisplayContent(): Boolean {
+        val retained = mutableRetainedExecution.value
+        val present = retained != null &&
+            inspectDisplayContent(retained.binding) == VirtualDisplayContentState.CONTENT_PRESENT &&
+            mutableRetainedExecution.value == retained
+        mutableRetainedDisplayHasContent.value = present
+        return present
+    }
+
     fun inspectDisplayContent(binding: SidecarSessionBinding? = activeBinding()): VirtualDisplayContentState {
         if (binding == null || activeBinding() != binding) return VirtualDisplayContentState.UNAVAILABLE
         val state = sidecarBridge.inspectDisplayContent(binding)
@@ -145,6 +159,7 @@ class VirtualSpaceManager @Inject constructor(
         capabilityRegistry.clearVirtualDisplayId()
         active = false
         mutableRetainedExecution.value = null
+        mutableRetainedDisplayHasContent.value = false
         activeExecutionId = null
         lastFailureReason = reason.take(240)
         debugLogManager.appendEvent("virtual_space: discarded stale sidecar session ${reason.take(160)}")
@@ -580,6 +595,7 @@ class VirtualSpaceManager @Inject constructor(
         capabilityRegistry.clearVirtualDisplayId()
         active = false
         mutableRetainedExecution.value = null
+        mutableRetainedDisplayHasContent.value = false
         activeExecutionId = null
         debugLogManager.appendEvent("virtual_space: background VirtualDisplay stopped")
     }

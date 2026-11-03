@@ -188,8 +188,9 @@ class RuntimeProcessClient @Inject constructor(
                     val snapshot = decode(owner().state())
                     snapshot.getBundle("display")?.let {
                         virtualSpace.get().adoptRuntimeDisplay(it.getInt("id"), it.getInt("width"),
-                            it.getInt("height"), it.getInt("density"), it.getString("thread"), it.getString("execution"))
-                    } ?: virtualSpace.get().adoptRuntimeDisplay(0, 0, 0, 0, null, null)
+                            it.getInt("height"), it.getInt("density"), it.getString("thread"), it.getString("execution"),
+                            it.getBoolean("content"))
+                    } ?: virtualSpace.get().adoptRuntimeDisplay(0, 0, 0, 0, null, null, false)
                     surfaces.get().adoptRuntimeHandCue(snapshot.getBundle("handCue")?.let {
                         val action = if (it.containsKey("endX")) com.droidance.core.device.tools.InputAction.Swipe(
                             it.getInt("x"), it.getInt("y"), it.getInt("endX"), it.getInt("endY"), it.getInt("duration"))
