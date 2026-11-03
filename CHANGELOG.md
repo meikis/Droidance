@@ -8,14 +8,16 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-03
+
 ### Added
 
 - Add a Back button to the virtual-space control island during manual control and teaching.
 
 ### Fixed
 
-- Keep automatic device reconnection quiet unless a connection problem was shown to the user.
-- Improve system Back focus handoff while preserving native keyboard input, and bind each manual Back to its original virtual session.
+- Improve system Back gestures and keyboard focus in virtual space.
+- Keep automatic device reconnection quiet unless a connection problem was shown.
 
 ## [0.1.5] - 2026-11-02
 
@@ -94,7 +96,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/YbbLab/Droidance/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/YbbLab/Droidance/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/YbbLab/Droidance/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/YbbLab/Droidance/compare/v0.1.1...v0.1.3
