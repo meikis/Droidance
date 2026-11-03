@@ -12,6 +12,7 @@ import java.security.MessageDigest
  * Stable, opaque plan for an upcoming streaming model interaction.
  * Keeps provider configuration and internal routing details encapsulated inside core:model.
  */
+@kotlinx.serialization.Serializable
 data class ModelStreamPlan(
     val initialModel: String,
     val imageIncluded: Boolean,

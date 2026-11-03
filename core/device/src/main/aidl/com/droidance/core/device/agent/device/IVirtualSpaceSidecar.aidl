@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.SurfaceControl;
 import com.droidance.core.device.agent.device.IRuntimeIndicatorCallback;
 import com.droidance.core.device.agent.device.NativeScreenFrame;
+import android.os.ParcelFileDescriptor;
 
 interface IVirtualSpaceSidecar {
     boolean start(int width, int height, int densityDpi);
@@ -68,4 +69,9 @@ interface IVirtualSpaceSidecar {
     int getViewerImeBottomInset(int displayId);
     boolean endViewerInput(int displayId);
     boolean setExecutionImeEnabled(int displayId, boolean enabled, String owner, IBinder lifetime);
+    IBinder startAgentRuntime(String packageName, String installationId, in ParcelFileDescriptor storage);
+    String getRuntimeIdentity();
+    IBinder getPlatformDriver();
+    void setPlatformDriver(IBinder driver);
+    boolean requestPlatformDriver();
 }

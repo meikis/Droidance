@@ -109,11 +109,22 @@ class AgentRuntime @Inject constructor(
     private val processRecoveryCoordinator: AgentProcessRecoveryCoordinator,
     private val foregroundState: AppForegroundState,
     private val adbLifecycleGate: com.droidance.core.device.air.AdbLifecycleGate,
-    private val foregroundHost: ForegroundExecutionHost
+    private val foregroundHost: ForegroundExecutionHost,
+    private val processClient: com.droidance.runtime.RuntimeProcessClient
 ) : ToolInteractionPort, ConversationTaskRuntime {
+    override val remoteQueue: Boolean get() = !processClient.isOwner
+    override val remoteTasks get() = processClient.queuedTasks.takeUnless { processClient.isOwner }
+    override fun removeRemoteQueued(conversationId: String, turnId: String): Boolean =
+        processClient.command("removeQueued", android.os.Bundle().apply {
+            putString("conversationId", conversationId); putString("turnId", turnId)
+        }).getBoolean("result")
+    override suspend fun steerRemoteQueued(conversationId: String, turnId: String): Boolean =
+        withContext(Dispatchers.IO) { processClient.command("steerQueued", android.os.Bundle().apply {
+            putString("conversationId", conversationId); putString("turnId", turnId)
+        }).getBoolean("result") }
     private val finishScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val _agentLoopState = MutableStateFlow(AgentLoopState.COMPLETED)
-    val agentLoopState: StateFlow<AgentLoopState> = _agentLoopState
+    val agentLoopState: StateFlow<AgentLoopState> = if (processClient.isOwner) _agentLoopState else processClient.agentLoopState
 
     /** Model switch callback for live UI status. */
     private var _onModelSwitchCallback: (suspend (String) -> Unit)? = null
@@ -135,6 +146,9 @@ class AgentRuntime @Inject constructor(
     }
 
     override suspend fun steerConversationInput(conversationId: String, turnId: String, request: TurnRequest): Boolean {
+        if (!processClient.isOwner) return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            processClient.command("steer", android.os.Bundle().apply { putString("conversationId", conversationId); putString("turnId", turnId); putString("request", kotlinx.serialization.json.Json.encodeToString(TurnRequest.serializer(), request)) }).getBoolean("result")
+        }
         val active = activeDurableTurn ?: return false
         if (active.scope.threadId != conversationId || active.scope.turnId != turnId) return false
         return recordUserSteer("message:${request.requestId}", request.rawText, request.images, active.scope,
@@ -194,7 +208,7 @@ class AgentRuntime @Inject constructor(
         }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val taskTiming: StateFlow<LiveTaskTiming?> = activeTurnClock.flatMapLatest { active ->
+    val taskTiming: StateFlow<LiveTaskTiming?> = if (!processClient.isOwner) processClient.taskTiming else activeTurnClock.flatMapLatest { active ->
         active?.executionClock?.state?.map { LiveTaskTiming(active.scope.turnId, it) } ?: flowOf(null)
     }.stateIn(finishScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
 
@@ -212,12 +226,13 @@ class AgentRuntime @Inject constructor(
      * 同一进程内一次只允许一个任务进入主循环，避免 UI 会话、定时任务互相污染上下文。
      */
     private val idleWorkScheduler = IdleWorkScheduler(finishScope)
-    val skillDraftWorkState = kotlinx.coroutines.flow.combine(idleWorkScheduler.state, knowledge.skillReflectionQueue.sources) { state, sources ->
+    val skillDraftWorkState = if (!processClient.isOwner) processClient.skillDraftWorkState else kotlinx.coroutines.flow.combine(idleWorkScheduler.state, knowledge.skillReflectionQueue.sources) { state, sources ->
         state.copy(pending = sources.count { it.failure == null },
             failures = maxOf(state.failures, sources.count { it.failure != null }))
     }.stateIn(finishScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, IdleWorkScheduler.State())
 
     fun cancelSkillDraftWork() {
+        if (!processClient.isOwner) { processClient.send("cancelSkillDraft", android.os.Bundle()); return }
         idleWorkScheduler.clearPending()
         finishScope.launch {
             runCatching { knowledge.skillReflectionQueue.clear() }.onFailure {
@@ -227,6 +242,7 @@ class AgentRuntime @Inject constructor(
     }
 
     fun resumeSkillDraftWork() {
+        if (!processClient.isOwner) { processClient.send("resumeSkillDraft", android.os.Bundle()); return }
         finishScope.launch {
             if (!appContext.getSharedPreferences("skill-authoring", android.content.Context.MODE_PRIVATE).getBoolean("auto_draft", false)) return@launch
             runCatching { knowledge.skillReflectionQueue.pending().forEach(::scheduleSkillDraft) }.onFailure {
@@ -250,36 +266,36 @@ class AgentRuntime @Inject constructor(
 
     /** Agent 运行状态 */
     private val _state = MutableStateFlow(AgentState.IDLE)
-    override val state: StateFlow<AgentState> = _state
+    override val state: StateFlow<AgentState> = if (processClient.isOwner) _state else processClient.state
 
     /** 当前活动会话 ID；任务入口在执行锁内绑定。 */
     private val _currentConversationId = MutableStateFlow<String?>(null)
-    override val currentConversationId: StateFlow<String?> = _currentConversationId
+    override val currentConversationId: StateFlow<String?> = if (processClient.isOwner) _currentConversationId else processClient.currentConversationId
     private val _currentTaskExecutionSpace = MutableStateFlow<ExecutionSpace?>(null)
-    val currentTaskExecutionSpace: StateFlow<ExecutionSpace?> = _currentTaskExecutionSpace
+    val currentTaskExecutionSpace: StateFlow<ExecutionSpace?> = if (processClient.isOwner) _currentTaskExecutionSpace else processClient.currentTaskExecutionSpace
 
     /** 最近一次响应 */
     private val _lastResponse = MutableStateFlow<String>("")
-    val lastResponse: StateFlow<String> = _lastResponse
+    val lastResponse: StateFlow<String> = if (processClient.isOwner) _lastResponse else processClient.lastResponse
 
     /** 当前正在执行的动作描述（工具名/推理状态），供任务详情显示 */
     private val _currentAction = MutableStateFlow("")
-    val currentAction: StateFlow<String> = _currentAction
+    val currentAction: StateFlow<String> = if (processClient.isOwner) _currentAction else processClient.currentAction
     /** 同一 Agent 生成一次的任务短标题，供运行岛显示 */
     private val _currentTaskTitle = MutableStateFlow("")
-    val currentTaskTitle: StateFlow<String> = _currentTaskTitle
+    val currentTaskTitle: StateFlow<String> = if (processClient.isOwner) _currentTaskTitle else processClient.currentTaskTitle
     private val _isMobileUseTaskActive = MutableStateFlow(false)
-    val isMobileUseTaskActive: StateFlow<Boolean> = _isMobileUseTaskActive
+    val isMobileUseTaskActive: StateFlow<Boolean> = if (processClient.isOwner) _isMobileUseTaskActive else processClient.isMobileUseTaskActive
 
     /** 持久 App 接管的岛内空闲态；每次唤醒仍创建一个普通 Agent Turn。 */
     private val _takeoverResidentStatus = MutableStateFlow<String?>(null)
-    val takeoverResidentStatus: StateFlow<String?> = _takeoverResidentStatus
+    val takeoverResidentStatus: StateFlow<String?> = if (processClient.isOwner) _takeoverResidentStatus else processClient.takeoverResidentStatus
     private val _appTakeoverTurnActive = MutableStateFlow(false)
-    val appTakeoverTurnActive: StateFlow<Boolean> = _appTakeoverTurnActive
+    val appTakeoverTurnActive: StateFlow<Boolean> = if (processClient.isOwner) _appTakeoverTurnActive else processClient.appTakeoverTurnActive
     private val _appTakeoverConversationId = MutableStateFlow<String?>(null)
-    val appTakeoverConversationId: StateFlow<String?> = _appTakeoverConversationId
+    val appTakeoverConversationId: StateFlow<String?> = if (processClient.isOwner) _appTakeoverConversationId else processClient.appTakeoverConversationId
     private val _appTakeoverLiveOutput = MutableStateFlow("")
-    val appTakeoverLiveOutput: StateFlow<String> = _appTakeoverLiveOutput
+    val appTakeoverLiveOutput: StateFlow<String> = if (processClient.isOwner) _appTakeoverLiveOutput else processClient.appTakeoverLiveOutput
 
     init {
         if (appTakeoverStore.hasEnabledWatches()) {
@@ -290,23 +306,23 @@ class AgentRuntime @Inject constructor(
 
     /** 当前流式输出的最新片段（最多 80 字符），供悬浮窗实时显示 */
     private val _streamingOutput = MutableStateFlow("")
-    val streamingOutput: StateFlow<String> = _streamingOutput
+    val streamingOutput: StateFlow<String> = if (processClient.isOwner) _streamingOutput else processClient.streamingOutput
 
     /** 当前工具调用参数摘要，供外部执行悬浮窗展示“正在做什么”和关键入参。 */
     private val _currentActionDetail = MutableStateFlow("")
-    val currentActionDetail: StateFlow<String> = _currentActionDetail
+    val currentActionDetail: StateFlow<String> = if (processClient.isOwner) _currentActionDetail else processClient.currentActionDetail
 
     /** 是否处于暂停状态（用户可接管） */
     private val _isPaused = MutableStateFlow(false)
-    val isPaused: StateFlow<Boolean> = _isPaused
+    val isPaused: StateFlow<Boolean> = if (processClient.isOwner) _isPaused else processClient.isPaused
     private val _manualTakeoverState = MutableStateFlow(ManualTakeoverState.RUNNING)
-    val manualTakeoverState: StateFlow<ManualTakeoverState> = _manualTakeoverState
+    val manualTakeoverState: StateFlow<ManualTakeoverState> = if (processClient.isOwner) _manualTakeoverState else processClient.manualTakeoverState
 
     /** 当前是否需要暴露人工接管入口。仅由明确的用户介入请求驱动，不写业务场景规则。 */
     private val _manualTakeoverAvailable = MutableStateFlow(false)
-    val manualTakeoverAvailable: StateFlow<Boolean> = _manualTakeoverAvailable
+    val manualTakeoverAvailable: StateFlow<Boolean> = if (processClient.isOwner) _manualTakeoverAvailable else processClient.manualTakeoverAvailable
     private val _userInteractionRequest = MutableStateFlow<UserInteractionRequest?>(null)
-    val userInteractionRequest: StateFlow<UserInteractionRequest?> = _userInteractionRequest
+    val userInteractionRequest: StateFlow<UserInteractionRequest?> = if (processClient.isOwner) _userInteractionRequest else processClient.userInteractionRequest
     @Volatile private var manualResumeRequiresObservation = false
     @Volatile private var manualTakeoverResumedAtElapsedMs = 0L
     /** 用户在接管期间或恢复时补充的上下文。 */
@@ -492,6 +508,7 @@ class AgentRuntime @Inject constructor(
 
     /** 取消当前正在运行的任务（包括 AI 决策循环） */
     override fun cancelCurrentTask(taskId: String?, origin: String) {
+        if (!processClient.isOwner) { processClient.send("cancel", android.os.Bundle().apply { putString("origin", origin); putString("taskId", taskId) }); return }
         finishScope.launch {
             debugLogManager.appendEvent(
                 "Task cancellation requested: origin=${origin.take(120)} task=${taskId ?: "all"}"
@@ -522,6 +539,7 @@ class AgentRuntime @Inject constructor(
     }
 
     fun stopCurrentMobileUse(origin: String) {
+        if (!processClient.isOwner) { processClient.send("stop", android.os.Bundle().apply { putString("origin", origin) }); return }
         val residencyStopped = stopAppTakeoverResidency(origin)
         val currentTaskStillActive = !residencyStopped || state.value != AgentState.IDLE
         if (currentTaskStillActive) {
@@ -533,6 +551,7 @@ class AgentRuntime @Inject constructor(
     }
 
     fun stopAppTakeoverResidency(origin: String): Boolean {
+        if (!processClient.isOwner) return processClient.command("stopResidency", android.os.Bundle().apply { putString("origin", origin) }).getBoolean("result")
         val takeoverTurnActive = _appTakeoverTurnActive.value
         val hasResidency = _takeoverResidentStatus.value != null ||
             appTakeoverStore.hasEnabledWatches() ||
@@ -558,6 +577,7 @@ class AgentRuntime @Inject constructor(
 
     /** Scheduler completion must not cancel an unrelated foreground task or erase other watches. */
     fun refreshAppTakeoverResidency() {
+        if (!processClient.isOwner) { processClient.send("refreshResidency", android.os.Bundle()); return }
         if (!appTakeoverStore.hasEnabledWatches()) {
             _takeoverResidentStatus.value = null
             if (state.value == AgentState.IDLE) {
@@ -577,6 +597,7 @@ class AgentRuntime @Inject constructor(
 
     /** 切换暂停/恢复状态 */
     fun togglePause() {
+        if (!processClient.isOwner) { processClient.send("pause", android.os.Bundle()); return }
         if (_isPaused.value) {
             resumeManualTakeover()
         } else {
@@ -587,6 +608,7 @@ class AgentRuntime @Inject constructor(
     /** Cancel only the currently bound Turn; a stale caller cannot stop a newer task. */
     @Synchronized
     fun cancelTurn(turnId: String): Boolean {
+        if (!processClient.isOwner) return processClient.command("cancelTurn", android.os.Bundle().apply { putString("turnId", turnId) }).getBoolean("result")
         val active = activeDurableTurn ?: return false
         if (active.scope.turnId != turnId) return false
         val job = runningTurnJob ?: return false
@@ -598,6 +620,7 @@ class AgentRuntime @Inject constructor(
 
     @Synchronized
     fun resumeManualTakeover(): Boolean {
+        if (!processClient.isOwner) return processClient.command("resume", android.os.Bundle().apply {  }).getBoolean("result")
         if (!_isPaused.value) return false
         val pendingRequest = _userInteractionRequest.value
             ?.takeIf { it.state == UserInteractionState.PENDING }
@@ -631,6 +654,7 @@ class AgentRuntime @Inject constructor(
     }
 
     fun beginManualTakeoverFromOverlay(): Boolean {
+        if (!processClient.isOwner) return processClient.command("takeControl", android.os.Bundle().apply {  }).getBoolean("result")
         // 同 display 接管（§5.4）：只暂停 Agent，把当前虚拟 display 的画面与输入权临时交给用户。
         // 绝不再把 App 迁移到主屏 0——那会让人与 Agent 操作在不同 display，恢复后 Agent 又回到旧虚拟
         // display。接管面板通过 VirtualSpaceManager 直接读写同一 display。
@@ -705,16 +729,20 @@ class AgentRuntime @Inject constructor(
      * 切换后自动清空对话历史（新 Agent 有不同的人格和记忆）
      */
     fun switchAgent(agentName: String) {
+        if (!processClient.isOwner) { processClient.send("switchAgent", android.os.Bundle().apply { putString("name", agentName) }); return }
         if (agentName == activeAgent) return
         activeAgent = agentName
         conversationHistory.clear()
     }
 
     /** 获取当前激活的 Agent 名称 */
-    fun getActiveAgent(): String = activeAgent
+    fun getActiveAgent(): String = if (processClient.isOwner) activeAgent else processClient.activeAgent
+
+    suspend fun clearLogData() = withContext(Dispatchers.IO) { processClient.command("clearLogs"); Unit }
 
     /** Storage maintenance shares the execution lane with every foreground and idle Turn. */
     suspend fun <T> withStorageMaintenance(block: suspend () -> T): T = idleWorkScheduler.runForeground {
+        check(processClient.isOwner) { "Storage maintenance belongs to the resident owner" }
         processRecoveryCoordinator.awaitReady()
         block()
     }
@@ -725,7 +753,9 @@ class AgentRuntime @Inject constructor(
         request: TurnRequest,
         onStreamContent: suspend (AssistantStreamChunk) -> Unit,
         onTurnStarted: () -> Unit
-    ): RuntimeTurnOutcome = idleWorkScheduler.runForeground {
+    ): RuntimeTurnOutcome = if (!processClient.isOwner) {
+        processClient.conversation(conversationId, request, onStreamContent, onTurnStarted)
+    } else idleWorkScheduler.runForeground {
         processRecoveryCoordinator.awaitReady()
         if (_currentConversationId.value != conversationId) conversationEpoch += 1L
         _currentConversationId.value = conversationId
@@ -735,12 +765,14 @@ class AgentRuntime @Inject constructor(
         processInputInternal(request, onStreamContent, onTurnStarted = { onTurnStarted() })
     }
 
+    @kotlinx.serialization.Serializable
     data class RuntimeTurnOutcome(
         val response: String,
         val status: String,
         val completion: com.droidance.tools.CompletionResult?
     )
 
+    @kotlinx.serialization.Serializable
     data class AutomationTurnResult(
         val response: String,
         val status: String
@@ -757,7 +789,9 @@ class AgentRuntime @Inject constructor(
         prepareDevice: () -> AutoCloseable,
         onTurnStarted: (com.droidance.core.agent.event.TurnEventScope) -> Unit,
         onStreamContent: suspend (AssistantStreamChunk) -> Unit = {}
-    ): AutomationTurnResult = idleWorkScheduler.runForeground {
+    ): AutomationTurnResult = if (!processClient.isOwner) {
+        processClient.automation(userInput, conversationId, onTurnStarted, onStreamContent)
+    } else idleWorkScheduler.runForeground {
         val historySnapshot = conversationHistory.toList()
         val conversationIdSnapshot = _currentConversationId.value
         conversationHistory.clear()
@@ -784,6 +818,7 @@ class AgentRuntime @Inject constructor(
         }
     }
 
+    @kotlinx.serialization.Serializable
     data class AppTakeoverTurnResult(
         val response: String,
         val status: String,
@@ -803,7 +838,9 @@ class AgentRuntime @Inject constructor(
         takeoverRunId: String,
         modelPlan: com.droidance.core.model.llm.ModelStreamPlan?,
         onStreamContent: suspend (AssistantStreamChunk) -> Unit = {}
-    ): AppTakeoverTurnResult = idleWorkScheduler.runForeground {
+    ): AppTakeoverTurnResult = if (!processClient.isOwner) {
+        processClient.takeover(userInput, conversationId, initialScreenFrame, roundContext(), takeoverRunId, modelPlan, onStreamContent)
+    } else idleWorkScheduler.runForeground {
         val historySnapshot = conversationHistory.toList()
         val conversationIdSnapshot = _currentConversationId.value
         conversationHistory.clear()
@@ -1717,6 +1754,7 @@ host = object : com.droidance.core.agent.TurnHost {
 
     /** 清空对话历史 */
     override fun clearConversation() {
+        if (!processClient.isOwner) { processClient.send("clearConversation", android.os.Bundle()); return }
         conversationEpoch += 1L
         conversationHistory.clear()
         _currentConversationId.value = null
@@ -1724,7 +1762,7 @@ host = object : com.droidance.core.agent.TurnHost {
     }
 
     // Restore only after every runtime field is initialized; IO work can start immediately.
-    init { resumeSkillDraftWork() }
+    init { if (processClient.isOwner) resumeSkillDraftWork() }
 }
 
 enum class ManualTakeoverState {

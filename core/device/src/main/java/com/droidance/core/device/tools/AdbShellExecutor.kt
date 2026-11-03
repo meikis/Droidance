@@ -28,10 +28,22 @@ class AdbShellExecutor @Inject constructor(
         val success: Boolean get() = executionStatus == com.droidance.core.agent.event.ToolExecutionStatus.SUCCEEDED
         val output: String get() = stdout.ifBlank { stderr }
     }
-    fun isAvailable(): Boolean = airManager.get().isShellReady
+    fun isAvailable(): Boolean = com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner || airManager.get().isShellReady
     fun escapeForShell(text: String): String = "'" + text.replace("'", "'\\''") + "'"
 
     fun exec(command: String, timeoutMs: Long = 15_000): Result {
+        if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+            val binder = requireNotNull(com.droidance.core.device.agent.device.SidecarBinderRegistry.get(2000))
+            val reply = com.droidance.core.device.agent.device.IVirtualSpaceSidecar.Stub.asInterface(binder)
+                .execShellCommand(command, timeoutMs, java.util.UUID.randomUUID().toString())
+            return Result(reply.getString("stdout").orEmpty(), reply.getString("stderr").orEmpty(),
+                reply.getInt("exit_code", -1),
+                executionStatus = com.droidance.core.agent.event.ToolExecutionStatus.valueOf(reply.getString("execution_status")!!),
+                diagnosticCode = reply.getString("diagnostic_code"),
+                stdoutTruncated = reply.getBoolean("stdout_truncated"), stderrTruncated = reply.getBoolean("stderr_truncated"),
+                stdoutBytes = reply.getLong("stdout_bytes"), stderrBytes = reply.getLong("stderr_bytes"),
+                executionUid = reply.getInt("uid"))
+        }
         latencyTracker.airShellCommands.incrementAndGet()
         val marker = "__DROIDANCE_EXIT_${System.nanoTime()}__"
         val script = "$command\nrc=\$?\necho $marker\$rc"

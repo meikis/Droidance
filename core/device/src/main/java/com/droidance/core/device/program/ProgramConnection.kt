@@ -29,6 +29,7 @@ class ProgramConnection(private val context: Context) : AutoCloseable {
     @Volatile private var closed = false
     @Volatile private var worker: IProgramWorker? = null
     private var bound = false
+    private var platformInstance: Pair<com.droidance.core.device.agent.device.INativeInputDriver, String>? = null
     private val activeRequest = java.util.concurrent.atomic.AtomicReference<Request?>()
     private val callback = object : IProgramHost.Stub() {
         override fun invoke(operation: String, arguments: String): String {
@@ -65,9 +66,19 @@ class ProgramConnection(private val context: Context) : AutoCloseable {
     suspend fun start(code: String, timeoutMs: Long) {
         try {
             check(android.os.Build.VERSION.SDK_INT >= 29) { "PROGRAM_REQUIRES_API_29" }
-            bound = context.bindIsolatedService(Intent(context, ProgramWorkerService::class.java), Context.BIND_AUTO_CREATE,
-                "run_" + java.util.UUID.randomUUID().toString().replace("-", ""), context.mainExecutor, service)
-            check(bound) { "WORKER_UNAVAILABLE" }
+            val intent = Intent(context, ProgramWorkerService::class.java)
+            val instance = "run_" + java.util.UUID.randomUUID().toString().replace("-", "")
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+                val driver = com.droidance.core.device.agent.device.RuntimePlatformDriver.connect()
+                platformInstance = driver to instance
+                val binder = withContext(kotlinx.coroutines.Dispatchers.IO) { driver.startProgram(instance) }
+                val remote = IProgramWorker.Stub.asInterface(binder)
+                worker = remote
+                connected.complete(remote)
+            } else {
+                bound = context.bindIsolatedService(intent, Context.BIND_AUTO_CREATE, instance, context.mainExecutor, service)
+                check(bound) { "WORKER_UNAVAILABLE" }
+            }
             val remote = withTimeout(5000) { connected.await() }
             check(!closed)
             identity = withContext(kotlinx.coroutines.Dispatchers.IO) { remote.identity() }
@@ -83,6 +94,8 @@ class ProgramConnection(private val context: Context) : AutoCloseable {
         activeRequest.getAndSet(null)?.answer?.completeExceptionally(IllegalStateException("PROGRAM_REVOKED"))
         requests.poll()?.answer?.completeExceptionally(IllegalStateException("PROGRAM_REVOKED"))
         runCatching { worker?.stop() }
+        platformInstance?.let { (driver, instance) -> runCatching { driver.closeProgram(instance) } }
+        platformInstance = null
         if (bound) { runCatching { context.unbindService(service) }; bound = false }
     }
 }

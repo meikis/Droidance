@@ -18,6 +18,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+@kotlinx.serialization.Serializable
 data class CompletionResult(
     val status: String,
     val summary: String,

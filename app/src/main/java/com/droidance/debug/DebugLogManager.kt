@@ -49,7 +49,7 @@ class DebugLogManager @Inject constructor(
         val now = readableTimeFormat.format(Date())
         try {
             fileManager.appendFile(path, "\n> **[$now]** $event\n")
-        } catch (_: IOException) {
+        } catch (_: Exception) {
             // Diagnostic storage is not an execution dependency. Do not echo private event data.
             Log.w("DebugLogManager", "DIAGNOSTIC_LOG_WRITE_FAILED")
         }

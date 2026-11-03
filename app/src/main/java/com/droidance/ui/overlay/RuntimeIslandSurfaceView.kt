@@ -20,6 +20,7 @@ internal open class RuntimeIslandSurfaceView(context: Context) : View(context) {
     private var label = ""
     private var action = RuntimeSurfaceBitmapRenderer.IslandAction.NONE
     private var paused = false
+    private var collapsed = false
     private var state = RuntimeIslandPresentation.State.READY
     private var animationStartedAtMs = SystemClock.uptimeMillis()
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -32,18 +33,21 @@ internal open class RuntimeIslandSurfaceView(context: Context) : View(context) {
         label: String,
         action: RuntimeSurfaceBitmapRenderer.IslandAction,
         paused: Boolean,
-        state: RuntimeIslandPresentation.State
+        state: RuntimeIslandPresentation.State,
+        collapsed: Boolean = false
     ) {
         val wasExecuting = isExecuting()
-        val staticChanged = this.label != label || this.action != action || this.paused != paused
+        val staticChanged = this.label != label || this.action != action || this.paused != paused ||
+            this.collapsed != collapsed
         this.label = label
         this.action = action
         this.paused = paused
         this.state = state
+        this.collapsed = collapsed
         if (isExecuting() && !wasExecuting) animationStartedAtMs = SystemClock.uptimeMillis()
         if (staticChanged || staticLayer == null) rebuildStaticLayer()
         updateFrameRatePreference()
-        contentDescription = label
+        contentDescription = if (collapsed) context.getString(com.droidance.R.string.runtime_island_expand) else label
         invalidate()
     }
 
@@ -68,7 +72,8 @@ internal open class RuntimeIslandSurfaceView(context: Context) : View(context) {
         try {
             val image = Bitmap.createBitmap(islandLayout.widthPx, islandLayout.heightPx, Bitmap.Config.ARGB_8888)
             image.density = Bitmap.DENSITY_NONE
-            painter.drawIslandStatic(Canvas(image), islandLayout, label, action, paused)
+            if (collapsed) painter.drawCollapsedStatic(Canvas(image), islandLayout)
+            else painter.drawIslandStatic(Canvas(image), islandLayout, label, action, paused)
             // RenderThread may still reference the previous bitmap; let it retain that buffer safely.
             staticLayer = image
         } finally {
@@ -78,7 +83,7 @@ internal open class RuntimeIslandSurfaceView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val measured = painter.islandLayout()
+        val measured = painter.islandLayout(collapsed)
         islandLayout = measured.copy(widthPx = w, heightPx = h,
             stopButtonLeftPx = measured.stopButtonLeftPx + w - measured.widthPx)
         rebuildStaticLayer()
@@ -97,7 +102,8 @@ internal open class RuntimeIslandSurfaceView(context: Context) : View(context) {
         Trace.beginSection("DroidanceIsland.draw")
         try {
             staticLayer?.let { canvas.drawBitmap(it, 0f, 0f, bitmapPaint) }
-            painter.drawIslandActivity(canvas, islandLayout, action, isExecuting(), motionEnabled, elapsedMs)
+            if (collapsed) painter.drawCollapsedActivity(canvas, islandLayout, isExecuting(), motionEnabled, elapsedMs)
+            else painter.drawIslandActivity(canvas, islandLayout, action, isExecuting(), motionEnabled, elapsedMs)
         } finally {
             Trace.endSection()
         }

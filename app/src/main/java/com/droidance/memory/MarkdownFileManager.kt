@@ -30,8 +30,10 @@ import javax.inject.Singleton
  */
 @Singleton
 class MarkdownFileManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val runtimeClient: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>?
 ) : MemoryDocumentStorage, com.droidance.core.knowledge.skill.SkillDocumentStorage {
+    private val remote get() = runtimeClient?.get()?.takeIf { !it.isOwner && it.managedStorageEnabled }
     private val ioLock = ReentrantReadWriteLock()
 
     // 数据根目录：权威位置收敛至内部私有目录（noBackupFilesDir）
@@ -70,6 +72,7 @@ class MarkdownFileManager @Inject constructor(
 
     /** 读取指定路径的 Markdown 文件 */
     override fun readFile(relativePath: String): String? {
+        remote?.let { return it.file("read", relativePath).getString("text") }
         return ioLock.read {
             val file = resolve(relativePath)
             if (file.exists()) file.readText(Charsets.UTF_8) else null
@@ -77,7 +80,9 @@ class MarkdownFileManager @Inject constructor(
     }
 
     /** Reads only the leading YAML front matter and stops before the Markdown body. */
-    override fun readFrontMatter(relativePath: String): String? = ioLock.read {
+    override fun readFrontMatter(relativePath: String): String? {
+        remote?.let { return it.file("frontMatter", relativePath).getString("text") }
+        return ioLock.read {
         val file = resolve(relativePath)
         if (!file.exists() || !file.isFile) return@read null
         file.bufferedReader(Charsets.UTF_8).use { reader ->
@@ -92,10 +97,14 @@ class MarkdownFileManager @Inject constructor(
         }
     }
 
+    }
+
     /** 写入/覆盖指定路径的 Markdown 文件 */
     // Readers and atomic replacements share the lock. In-place and directory mutations
     // take the exclusive lock, so they cannot race staged replacements.
-    override fun writeFile(relativePath: String, content: String) = ioLock.read {
+    override fun writeFile(relativePath: String, content: String) {
+        remote?.let { it.file("write", relativePath, android.os.Bundle().apply { putString("text", content) }); return }
+        ioLock.read {
         val file = resolve(relativePath)
         file.parentFile?.mkdirs()
         val tmp = File.createTempFile(".${file.name}.", ".tmp", file.parentFile)
@@ -108,8 +117,11 @@ class MarkdownFileManager @Inject constructor(
         }
     }
 
+    }
+
     /** Writes binary evidence such as action-bound learning keyframes atomically. */
     fun writeBytes(relativePath: String, content: ByteArray) {
+        remote?.let { it.file("writeBytes", relativePath, android.os.Bundle().apply { putByteArray("bytes", content) }); return }
         ioLock.read {
             val file = resolve(relativePath)
             file.parentFile?.mkdirs()
@@ -124,6 +136,7 @@ class MarkdownFileManager @Inject constructor(
     }
 
     fun readBytes(relativePath: String): ByteArray? {
+        remote?.let { return it.file("readBytes", relativePath).getByteArray("bytes") }
         return ioLock.read {
             val file = resolve(relativePath)
             if (file.exists() && file.isFile) file.readBytes() else null
@@ -132,6 +145,7 @@ class MarkdownFileManager @Inject constructor(
 
     /** 追加内容到指定文件 */
     fun appendFile(relativePath: String, content: String) {
+        remote?.let { it.file("append", relativePath, android.os.Bundle().apply { putString("text", content) }); return }
         ioLock.write {
             val file = resolve(relativePath)
             file.parentFile?.mkdirs()
@@ -141,11 +155,13 @@ class MarkdownFileManager @Inject constructor(
 
     /** 检查文件是否存在 */
     override fun exists(relativePath: String): Boolean {
+        remote?.let { return it.file("exists", relativePath).getBoolean("result") }
         return ioLock.read { resolve(relativePath).exists() }
     }
 
     /** 返回文件 mtime；不存在时返回 -1。 */
     fun lastModified(relativePath: String): Long {
+        remote?.let { return it.file("modified", relativePath).getLong("time") }
         return ioLock.read {
             val file = resolve(relativePath)
             if (file.exists()) file.lastModified() else -1L
@@ -154,6 +170,7 @@ class MarkdownFileManager @Inject constructor(
 
     /** 列出目录下的所有文件 */
     override fun listFiles(directoryPath: String): List<String> {
+        remote?.let { return it.file("list", directoryPath).getStringArrayList("names").orEmpty() }
         return ioLock.read {
             val dir = resolve(directoryPath)
             if (dir.exists() && dir.isDirectory) {
@@ -166,11 +183,13 @@ class MarkdownFileManager @Inject constructor(
 
     /** 删除文件 */
     fun deleteFile(relativePath: String): Boolean {
+        remote?.let { return it.file("delete", relativePath).getBoolean("result") }
         return ioLock.write { Files.deleteIfExists(resolve(relativePath).toPath()) }
     }
 
     /** Atomically replace one managed directory with a validated set of direct child files. */
     override fun replaceDirectory(relativePath: String, files: Map<String, String>) {
+        remote?.let { it.file("replaceDirectory", relativePath, android.os.Bundle().apply { putBundle("files", android.os.Bundle().apply { files.forEach { (name, content) -> putString(name, content) } }) }); return }
         require(files.isNotEmpty()) { "Directory replacement requires at least one file" }
         require(files.keys.all { name ->
             name.isNotBlank() && '\\' !in name && name.split('/').all { it.isNotBlank() && it != "." && it != ".." }
@@ -202,6 +221,7 @@ class MarkdownFileManager @Inject constructor(
     }
 
     override fun deleteDirectory(relativePath: String): Boolean {
+        remote?.let { return it.file("deleteDirectory", relativePath).getBoolean("result") }
         return ioLock.write {
             val directory = resolve(relativePath)
             directory.exists() && directory.isDirectory && directory.deleteRecursively()
@@ -209,5 +229,28 @@ class MarkdownFileManager @Inject constructor(
     }
 
     /** 获取数据根目录的绝对路径 */
-    fun getDataDirPath(): String = dataDir.absolutePath
+    fun getDataDirPath(): String {
+        val client = remote ?: return dataDir.absolutePath
+        val export = File(context.cacheDir, "runtime-export-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+        java.util.zip.ZipInputStream(android.os.ParcelFileDescriptor.AutoCloseInputStream(client.owner().files())).use { zip ->
+            var total = 0L
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val destination = File(export, entry.name).canonicalFile
+                require(destination.path.startsWith(export.canonicalPath + File.separator))
+                destination.parentFile!!.mkdirs()
+                destination.outputStream().use { output ->
+                    val buffer = ByteArray(32768)
+                    while (true) {
+                        val count = zip.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 512L * 1024 * 1024)
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+        }
+        return export.absolutePath
+    }
 }

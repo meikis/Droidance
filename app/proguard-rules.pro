@@ -25,7 +25,14 @@
 }
 
 
+# Resident Agent entrypoint invoked by the shell service.
+-keep class com.droidance.runtime.RuntimeProcessHost { public static android.os.IBinder start(...); }
+-keep class com.droidance.core.device.agent.device.IAgentRuntimeOwner$Stub { *; }
+-keep class com.droidance.core.device.agent.device.IAgentRuntimeOwner$Stub$Proxy { *; }
+-keep class com.droidance.agent.device.RuntimeDriverBinderReceiver { *; }
+
 # OkHttp
+
 -dontwarn okhttp3.**
 -dontwarn okio.**
 

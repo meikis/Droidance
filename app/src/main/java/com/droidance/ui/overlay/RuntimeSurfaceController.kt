@@ -76,6 +76,7 @@ class RuntimeSurfaceController @Inject constructor(
     private val bitmapRenderer: RuntimeSurfaceBitmapRenderer,
     private val debugLogManager: DebugLogManager,
     private val inputActionLifecycle: com.droidance.core.device.tools.InputActionLifecycle,
+    private val processClient: com.droidance.runtime.RuntimeProcessClient,
     @ApplicationScope private val appScope: CoroutineScope
 ) {
     private var screenWidthPx = appContext.resources.displayMetrics.widthPixels
@@ -132,7 +133,8 @@ class RuntimeSurfaceController @Inject constructor(
         val currentActionText: String,
         val action: RuntimeSurfaceBitmapRenderer.IslandAction,
         val paused: Boolean,
-        val state: RuntimeIslandPresentation.State
+        val state: RuntimeIslandPresentation.State,
+        val collapsed: Boolean
     )
 
     // This windowless hierarchy owns its own Looper, independent of Activity
@@ -148,6 +150,10 @@ class RuntimeSurfaceController @Inject constructor(
 
     /** 虚拟屏动作反馈流；查看页与接管镜像面板订阅它，在预览之上画小手。 */
     val virtualSpaceHandCue: StateFlow<VirtualSpaceHandCue?> = _virtualSpaceHandCue.asStateFlow()
+    internal fun adoptRuntimeHandCue(cue: VirtualSpaceHandCue?) {
+        check(!processClient.isOwner)
+        _virtualSpaceHandCue.value = cue
+    }
     @Volatile private var lastBinding: SidecarSessionBinding? = null
     @Volatile private var activeCursorActionId: String? = null
     @Volatile private var activeCursorDisplayId = 0
@@ -184,6 +190,9 @@ class RuntimeSurfaceController @Inject constructor(
     @Volatile private var lastIslandBaseTopPx = 0
     @Volatile private var lastIslandHeightPx = 0
     @Volatile private var currentSpec: IslandSpec? = null
+    @Volatile private var collapsed = RuntimeIslandPosition.isCollapsed(appContext)
+    private data class PendingPlacement(val edge: RuntimeIslandDocking.Edge?, val centerX: Float, val centerY: Float)
+    private var pendingPlacement: PendingPlacement? = null
     private var renderJob: Job? = null
     private val callback = object : IRuntimeIndicatorCallback.Stub() {
         override fun onRuntimeIndicatorTapped() {
@@ -196,17 +205,19 @@ class RuntimeSurfaceController @Inject constructor(
     }
 
     init {
-        appScope.launch(Dispatchers.IO) {
-            delay(500L)
-            hideAll()
-        }
-        appScope.launch(Dispatchers.IO) {
-            while (isActive) {
-                val command = select<Command> {
-                    commands.onReceive { it }
-                    cursors.onReceive { it }
+        if (processClient.isOwner) {
+            appScope.launch(Dispatchers.IO) {
+                delay(500L)
+                hideAll()
+            }
+            appScope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    val command = select<Command> {
+                        commands.onReceive { it }
+                        cursors.onReceive { it }
+                    }
+                    execute(command)
                 }
-                execute(command)
             }
         }
     }
@@ -228,6 +239,11 @@ class RuntimeSurfaceController @Inject constructor(
     }
 
     fun setViewerExpanded(expanded: Boolean) {
+        if (!processClient.isOwner) {
+            viewerExpanded = expanded
+            processClient.send("viewer", android.os.Bundle().apply { putBoolean("expanded", expanded) })
+            return
+        }
         if (viewerExpanded == expanded) return
         viewerExpanded = expanded
         if (expanded) hide(preserveCursor = true)
@@ -248,7 +264,7 @@ class RuntimeSurfaceController @Inject constructor(
             islandDragOffsetY = RuntimeIslandPosition.read(appContext)
         }
         runtimeVisible = true
-        val spec = IslandSpec(currentActionText, action, paused, state)
+        val spec = IslandSpec(currentActionText, action, paused, state, collapsed)
         if (spec == currentSpec && inputSurface != null) return
         currentSpec = spec
         // Status changes stay on the windowless UI thread even if a sidecar command is busy.
@@ -280,7 +296,7 @@ class RuntimeSurfaceController @Inject constructor(
         renderJob?.cancel()
         renderJob = appScope.launch(Dispatchers.Default) {
             val first = bitmapRenderer.renderIsland(spec.currentActionText, spec.action, spec.paused,
-                spec.state, phase = 0f)
+                spec.state, phase = 0f, collapsed = spec.collapsed)
             if (!isActive || currentSpec != spec || !runtimeVisible || lastBinding != binding) return@launch
             commands.trySend(Command.Frame(binding, true, first.png, first.topOffsetPx,
                 first.widthPx, first.heightPx, first.stopButtonLeftPx, spec))
@@ -288,7 +304,7 @@ class RuntimeSurfaceController @Inject constructor(
     }
 
     private fun presentIsland(spec: IslandSpec) {
-        inputIslandView?.present(spec.currentActionText, spec.action, spec.paused, spec.state)
+        inputIslandView?.present(spec.currentActionText, spec.action, spec.paused, spec.state, spec.collapsed)
     }
 
     fun ensureVirtualSpaceCursor(displayId: Int) {
@@ -540,7 +556,7 @@ class RuntimeSurfaceController @Inject constructor(
         return when (command) {
             is Command.Edge -> command.spec == edgeSpec &&
                 (!command.spec.visible || (!viewerExpanded && !foregroundState.isInForeground))
-            is Command.Frame -> !command.visible || (runtimeVisible && !foregroundState.isInForeground &&
+            is Command.Frame -> if (!command.visible) !runtimeVisible else (runtimeVisible && !foregroundState.isInForeground &&
                 command.spec == currentSpec)
             is Command.Cursor -> !command.visible || latestHandCue?.let {
                 command.cueId == it.actionId && command.finishedAtMs == it.finishedAtMs
@@ -557,6 +573,16 @@ class RuntimeSurfaceController @Inject constructor(
         try {
             val display = appContext.getSystemService(android.hardware.display.DisplayManager::class.java)
                 .getDisplay(Display.DEFAULT_DISPLAY)
+            // Android 16 requires a registered application PID to create a WMS Session.
+            // The platform driver supplies the system session; input, drawing and frame timing stay here.
+            val sessionField = Class.forName("android.view.WindowManagerGlobal").getDeclaredField("sWindowSession")
+                .apply { isAccessible = true }
+            if (sessionField.get(null) == null) {
+                val session = com.droidance.core.device.agent.device.RuntimePlatformDriver.connect().windowSession
+                val api = Class.forName("android.view.IWindowSession\$Stub")
+                    .getMethod("asInterface", android.os.IBinder::class.java).invoke(null, session)
+                sessionField.set(null, api)
+            }
             host = SurfaceControlViewHost(appContext, display, createInputTransferToken())
             val view = object : RuntimeIslandSurfaceView(appContext) {
                 override fun onAttachedToWindow() {
@@ -588,6 +614,16 @@ class RuntimeSurfaceController @Inject constructor(
             screenHeightPx = bounds.height()
             inputWidthPx = widthPx
             inputHeightPx = heightPx
+            pendingPlacement?.let { pending ->
+                val placed = RuntimeIslandDocking.place(pending.edge, pending.centerX, pending.centerY,
+                    widthPx, heightPx, screenWidthPx, screenHeightPx)
+                islandDragOffsetX = placed.left - baseLeftPx()
+                islandDragOffsetY = placed.top - lastIslandBaseTopPx
+                pendingPlacement = null
+                val offsetX = islandDragOffsetX
+                val offsetY = islandDragOffsetY
+                appScope.launch(Dispatchers.IO) { RuntimeIslandPosition.write(appContext, offsetX, offsetY) }
+            }
             islandDragOffsetX = clampIslandOffsetX(islandDragOffsetX)
             islandDragOffsetY = clampIslandOffsetY(islandDragOffsetY)
             try {
@@ -682,10 +718,16 @@ class RuntimeSurfaceController @Inject constructor(
                     // Commit UP's position before persisting the shared offset.
                     if (event.actionMasked == MotionEvent.ACTION_UP) moveIslandTo(event.rawX, event.rawY)
                     inputPositionScheduler?.flush()
-                    val offsetX = islandDragOffsetX
-                    val offsetY = islandDragOffsetY
-                    appScope.launch(Dispatchers.IO) {
-                        RuntimeIslandPosition.write(appContext, offsetX, offsetY)
+                    val edge = RuntimeIslandDocking.nearbyEdge(
+                        baseLeftPx() + islandDragOffsetX, lastIslandBaseTopPx + islandDragOffsetY,
+                        inputWidthPx, inputHeightPx, screenWidthPx, screenHeightPx,
+                        (24f * appContext.resources.displayMetrics.density).toInt())
+                    if (event.actionMasked == MotionEvent.ACTION_UP && collapsed != (edge != null)) {
+                        changeCollapsed(edge != null, edge)
+                    } else {
+                        val offsetX = islandDragOffsetX
+                        val offsetY = islandDragOffsetY
+                        appScope.launch(Dispatchers.IO) { RuntimeIslandPosition.write(appContext, offsetX, offsetY) }
                     }
                 } else if (event.actionMasked == MotionEvent.ACTION_UP && inputDownAtMs != 0L &&
                     dx * dx + dy * dy <= tapSlopPx * tapSlopPx &&
@@ -695,6 +737,10 @@ class RuntimeSurfaceController @Inject constructor(
                         (RuntimeIslandStyle.CHIP_SIZE_DP * density).toInt() -
                         (RuntimeIslandStyle.CHIP_GAP_DP * density).toInt()
                     when {
+                        collapsed -> changeCollapsed(false, RuntimeIslandDocking.nearbyEdge(
+                            baseLeftPx() + islandDragOffsetX, lastIslandBaseTopPx + islandDragOffsetY,
+                            inputWidthPx, inputHeightPx, screenWidthPx, screenHeightPx,
+                            (24f * density).toInt()))
                         event.x >= inputStopButtonLeftPx -> stopClickListener?.invoke()
                         event.x >= controlLeft && currentSpec?.let { it.action != RuntimeSurfaceBitmapRenderer.IslandAction.NONE } == true ->
                             controlClickListener?.invoke()
@@ -707,6 +753,20 @@ class RuntimeSurfaceController @Inject constructor(
             }
         }
         return true
+    }
+
+    /** Resize only after UP: the touch coordinate space remains stable throughout a drag. */
+    private fun changeCollapsed(value: Boolean, edge: RuntimeIslandDocking.Edge?) {
+        val spec = currentSpec ?: return
+        val binding = lastBinding ?: return
+        pendingPlacement = PendingPlacement(edge,
+            baseLeftPx() + islandDragOffsetX + inputWidthPx / 2f,
+            lastIslandBaseTopPx + islandDragOffsetY + inputHeightPx / 2f)
+        collapsed = value
+        val updated = spec.copy(collapsed = value)
+        currentSpec = updated
+        appScope.launch(Dispatchers.IO) { RuntimeIslandPosition.writeCollapsed(appContext, value) }
+        startRender(binding, updated)
     }
 
     @SuppressLint("NewApi")

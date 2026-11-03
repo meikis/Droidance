@@ -78,7 +78,8 @@ class DebugExportManager @Inject constructor(
             diagnostics.writeSidecarEvidence(sidecarBridge.readSidecarEvidence())
 
             val root = File(fileManager.getDataDirPath())
-            val supplements = DebugExportSources.collect(root, snapshot)
+            val supplements = try { DebugExportSources.collect(root, snapshot) }
+                finally { if (root.parentFile == context.cacheDir && root.name.startsWith("runtime-export-")) root.deleteRecursively() }
             ZipOutputStream(stagingFile.outputStream().buffered()).use { zip ->
                 DebugArchiveWriter(blobStore).write(zip, snapshot, buildJsonObject {
                     put("exported_at", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date()))

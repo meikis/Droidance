@@ -49,96 +49,99 @@ class AgentStatusOverlay @Inject constructor(
 
     private var overlayMonitorJob: Job? = null
     init {
-        appScope.launch {
-            foregroundState.foreground.collect {
-                mainHandler.post { updateRuntimeOverlayVisibility() }
+        if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+            appScope.launch {
+                foregroundState.foreground.collect {
+                    mainHandler.post { updateRuntimeOverlayVisibility() }
+                }
             }
-        }
-        appScope.launch {
-            agentRuntime.isMobileUseTaskActive.collect {
-                mainHandler.post { updateRuntimeOverlayVisibility() }
+            appScope.launch {
+                agentRuntime.isMobileUseTaskActive.collect {
+                    mainHandler.post { updateRuntimeOverlayVisibility() }
+                }
             }
-        }
-        appScope.launch {
-            agentRuntime.currentTaskExecutionSpace.collect {
-                mainHandler.post { updateRuntimeOverlayVisibility() }
+            appScope.launch {
+                agentRuntime.currentTaskExecutionSpace.collect {
+                    mainHandler.post { updateRuntimeOverlayVisibility() }
+                }
             }
-        }
-        appScope.launch {
-            delay(1000L)
-            if (!isRuntimeActive()) {
-                runtimeSurfaceController.hideAll()
+            appScope.launch {
+                delay(1000L)
+                if (!isRuntimeActive()) {
+                    runtimeSurfaceController.hideAll()
+                }
             }
-        }
-        runtimeSurfaceController.setOnIndicatorClick { handleRuntimeIslandAction() }
-        runtimeSurfaceController.setOnControlClick { handleRuntimeIslandControl() }
-        runtimeSurfaceController.setOnStopClick { handleRuntimeIslandStop() }
-        runtimeSurfaceController.setOnVisibilityChanged { mainHandler.post { updateRuntimeOverlayVisibility() } }
-        appScope.launch {
-            agentRuntime.state.collect { state ->
-                when (state) {
-                    AgentState.THINKING,
-                    AgentState.EXECUTING_TOOL -> {
-                        startOverlayMonitor()
-                        updateRuntimeOverlayVisibility()
-                    }
-                    AgentState.WAITING_PERMISSION -> {
-                        startOverlayMonitor()
-                        updateRuntimeOverlayVisibility()
-                    }
-                    AgentState.ERROR -> {
-                        stopOverlayMonitor()
-                        runtimeSurfaceController.hideAll()
-                    }
-                    AgentState.IDLE -> {
-                        stopOverlayMonitor()
-                        runtimeSurfaceController.hideAll()
+            runtimeSurfaceController.setOnIndicatorClick { handleRuntimeIslandAction() }
+            runtimeSurfaceController.setOnControlClick { handleRuntimeIslandControl() }
+            runtimeSurfaceController.setOnStopClick { handleRuntimeIslandStop() }
+            runtimeSurfaceController.setOnVisibilityChanged { mainHandler.post { updateRuntimeOverlayVisibility() } }
+            appScope.launch {
+                agentRuntime.state.collect { state ->
+                    when (state) {
+                        AgentState.THINKING,
+                        AgentState.EXECUTING_TOOL -> {
+                            startOverlayMonitor()
+                            updateRuntimeOverlayVisibility()
+                        }
+                        AgentState.WAITING_PERMISSION -> {
+                            startOverlayMonitor()
+                            updateRuntimeOverlayVisibility()
+                        }
+                        AgentState.ERROR -> {
+                            stopOverlayMonitor()
+                            runtimeSurfaceController.hideAll()
+                        }
+                        AgentState.IDLE -> {
+                            stopOverlayMonitor()
+                            runtimeSurfaceController.hideAll()
+                        }
                     }
                 }
             }
-        }
-        // 运行岛随 mobile_use 执行空间与主屏生命周期更新。
-        appScope.launch {
-            agentRuntime.currentTaskTitle.collect {
-                mainHandler.post {
-                    if (shouldShowExternalTaskOverlay()) showRuntimeSurfaceIndicator()
-                }
-            }
-        }
-        appScope.launch {
-            agentRuntime.isPaused.collect { paused ->
-                mainHandler.post {
-                    // 接管 = 暂停 agent，让用户手动操作；再点「继续」交还给 agent
-                    if (shouldShowExternalTaskOverlay()) showRuntimeSurfaceIndicator()
-                }
-            }
-        }
-        appScope.launch {
-            agentRuntime.manualTakeoverAvailable.collect {
-                mainHandler.post {
-                    if (shouldShowExternalTaskOverlay()) showRuntimeSurfaceIndicator()
-                }
-            }
-        }
-        appScope.launch {
-            inputActionLifecycle.events.collect { event ->
-                if (!isRuntimeActive()) return@collect
-                mainHandler.post {
-                    if (!agentRuntime.isMobileUseTaskActive.value) {
-                        runtimeSurfaceController.hideAll()
-                        return@post
+            // 运行岛随 mobile_use 执行空间与主屏生命周期更新。
+            appScope.launch {
+                agentRuntime.currentTaskTitle.collect {
+                    mainHandler.post {
+                        if (shouldShowExternalTaskOverlay()) showRuntimeSurfaceIndicator()
                     }
-                    // 小手只跟随真实输入生命周期，并挂到事件所属 display；它只做视觉反馈，不注入输入。
-                    when (event) {
-                        is InputActionLifecycleEvent.Started ->
-                            runtimeSurfaceController.showAction(event)
-                        is InputActionLifecycleEvent.Finished ->
-                            runtimeSurfaceController.finishAction(event)
+                }
+            }
+            appScope.launch {
+                agentRuntime.isPaused.collect { paused ->
+                    mainHandler.post {
+                        // 接管 = 暂停 agent，让用户手动操作；再点「继续」交还给 agent
+                        if (shouldShowExternalTaskOverlay()) showRuntimeSurfaceIndicator()
+                    }
+                }
+            }
+            appScope.launch {
+                agentRuntime.manualTakeoverAvailable.collect {
+                    mainHandler.post {
+                        if (shouldShowExternalTaskOverlay()) showRuntimeSurfaceIndicator()
+                    }
+                }
+            }
+            appScope.launch {
+                inputActionLifecycle.events.collect { event ->
+                    if (!isRuntimeActive()) return@collect
+                    mainHandler.post {
+                        if (!agentRuntime.isMobileUseTaskActive.value) {
+                            runtimeSurfaceController.hideAll()
+                            return@post
+                        }
+                        // 小手只跟随真实输入生命周期，并挂到事件所属 display；它只做视觉反馈，不注入输入。
+                        when (event) {
+                            is InputActionLifecycleEvent.Started ->
+                                runtimeSurfaceController.showAction(event)
+                            is InputActionLifecycleEvent.Finished ->
+                                runtimeSurfaceController.finishAction(event)
+                        }
                     }
                 }
             }
         }
     }
+
 
 
     private fun startOverlayMonitor() {

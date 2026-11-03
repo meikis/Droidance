@@ -20,7 +20,8 @@ import kotlinx.serialization.json.Json
  */
 @Singleton
 class AutomationStore @Inject constructor(
-    private val fileManager: MarkdownFileManager
+    private val fileManager: MarkdownFileManager,
+    private val runtimeClient: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>?
 ) {
     private val lock = Any()
     private val json = Json { ignoreUnknownKeys = false; prettyPrint = true }
@@ -30,8 +31,10 @@ class AutomationStore @Inject constructor(
     private var definitionsState = emptyList<AutomationDefinition>()
     private var occurrencesState = emptyList<AutomationOccurrence>()
 
-    val definitions: StateFlow<List<AutomationDefinition>> = _definitions.asStateFlow()
-    val occurrences: StateFlow<List<AutomationOccurrence>> = _occurrences.asStateFlow()
+    val definitions: StateFlow<List<AutomationDefinition>> get() =
+        runtimeClient?.get()?.takeUnless { it.isOwner }?.automationDefinitions ?: _definitions.asStateFlow()
+    val occurrences: StateFlow<List<AutomationOccurrence>> get() =
+        runtimeClient?.get()?.takeUnless { it.isOwner }?.automationOccurrences ?: _occurrences.asStateFlow()
     val changeVersion: StateFlow<Long> = _changeVersion.asStateFlow()
 
     init {

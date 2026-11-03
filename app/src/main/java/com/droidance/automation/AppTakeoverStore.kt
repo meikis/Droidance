@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 @Singleton
 class AppTakeoverStore @Inject constructor(
-    @ApplicationContext context: Context
+    @ApplicationContext context: Context,
+    private val runtimeClient: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>?
 ) {
     @Serializable
     private data class PersistedState(
@@ -28,7 +29,8 @@ class AppTakeoverStore @Inject constructor(
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
     private val _changeVersion = MutableStateFlow(0L)
-    val changeVersion = _changeVersion.asStateFlow()
+    val changeVersion: kotlinx.coroutines.flow.StateFlow<Long> get() =
+        runtimeClient?.get()?.takeUnless { it.isOwner }?.takeoverRevision ?: _changeVersion.asStateFlow()
 
     @Synchronized
     fun bindTurnDeadline(turnId: String, deadlineAtMs: Long) {
@@ -65,7 +67,7 @@ class AppTakeoverStore @Inject constructor(
     }
 
     @Synchronized
-    fun list(): List<AppTakeoverWatch> = load()
+    fun list(): List<AppTakeoverWatch> = runtimeClient?.get()?.takeUnless { it.isOwner }?.takeovers?.value ?: load()
 
     @Synchronized
     fun find(packageName: String): AppTakeoverWatch? = load().firstOrNull {

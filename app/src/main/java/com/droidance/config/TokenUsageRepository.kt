@@ -25,7 +25,8 @@ import javax.inject.Singleton
 
 @Singleton
 class TokenUsageRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val runtimeClient: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>?
 ) {
     private val prefs = context.getSharedPreferences("droidance_token_usage", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
@@ -65,13 +66,13 @@ class TokenUsageRepository @Inject constructor(
     }
 
     private val _records = MutableStateFlow(loadAll())
-    val records: StateFlow<List<DailyUsage>> = _records.asStateFlow()
+    val records: StateFlow<List<DailyUsage>> get() = runtimeClient?.get()?.takeUnless { it.isOwner }?.usage ?: _records.asStateFlow()
 
     @Serializable
     data class TurnUsage(val threadId: String, val turnId: String, val totals: TokenUsageTotals)
 
     private val _turnRecords = MutableStateFlow(loadTurnUsage())
-    val turnRecords: StateFlow<List<TurnUsage>> = _turnRecords.asStateFlow()
+    val turnRecords: StateFlow<List<TurnUsage>> get() = runtimeClient?.get()?.takeUnless { it.isOwner }?.turnUsage ?: _turnRecords.asStateFlow()
 
     /** 每次实际发出的模型 HTTP 请求只记一次；Token 与缓存只采用 Provider 返回值。 */
     @Synchronized

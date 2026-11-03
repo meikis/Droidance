@@ -40,7 +40,8 @@ class NotificationToolRegistrar(
     private val executionContextStore: ExecutionContextStore,
     private val requestTime: suspend () -> Long,
     private val requestTurnId: () -> String,
-    private val requestModelSelection: () -> com.droidance.automation.AppTakeoverModelSelection
+    private val requestModelSelection: () -> com.droidance.automation.AppTakeoverModelSelection,
+    private val notifications: com.droidance.automation.ResidentNotificationAccess
 ) {
     fun registerAll() {
         registerReadNotifications()
@@ -60,7 +61,7 @@ class NotificationToolRegistrar(
 
             override suspend fun execute(arguments: String): ToolExecutionResult {
                 val filterApp = arguments.jsonString("app")
-                val watcher = com.droidance.automation.NotificationWatcher.instance
+                val watcher = notifications.takeIf { it.available() }
                 if (watcher != null) return ToolProtocolResult.success(formatWatcherNotifications(watcher, filterApp))
                 if (!deviceShell.isAvailable()) {
                     return ToolProtocolResult.notExecuted(
@@ -76,7 +77,7 @@ class NotificationToolRegistrar(
     }
 
     private fun formatWatcherNotifications(
-        watcher: com.droidance.automation.NotificationWatcher,
+        watcher: com.droidance.automation.ResidentNotificationAccess,
         filterApp: String?
     ): String {
         val all = watcher.getAllNotifications()
@@ -104,7 +105,7 @@ class NotificationToolRegistrar(
 
             override suspend fun execute(arguments: String): ToolExecutionResult {
                 val key = arguments.jsonString("key") ?: return ToolProtocolResult.missingArgument("key")
-                val watcher = com.droidance.automation.NotificationWatcher.instance
+                val watcher = notifications.takeIf { it.available() }
                     ?: return ToolProtocolResult.notExecuted(
                         code = "NOTIFICATION_LISTENER_UNAVAILABLE",
                         retryable = false
@@ -133,7 +134,7 @@ class NotificationToolRegistrar(
 
             override suspend fun execute(arguments: String): ToolExecutionResult {
                 val key = arguments.jsonString("key") ?: return ToolProtocolResult.missingArgument("key")
-                val watcher = com.droidance.automation.NotificationWatcher.instance
+                val watcher = notifications.takeIf { it.available() }
                     ?: return ToolProtocolResult.notExecuted(
                         code = "NOTIFICATION_LISTENER_UNAVAILABLE",
                         retryable = false

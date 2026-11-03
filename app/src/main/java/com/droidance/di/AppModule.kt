@@ -87,9 +87,19 @@ object AppModule {
     @Provides
     @Singleton
     fun providePermissionBroker(
-        @ApplicationContext context: Context
-    ): com.droidance.core.device.permission.PermissionBroker = com.droidance.core.device.permission.PermissionBroker(context) { requestId ->
-        context.startActivity(
+        @ApplicationContext context: Context,
+        runtime: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>,
+        shell: dagger.Lazy<com.droidance.core.device.tools.AdbShellExecutor>
+    ): com.droidance.core.device.permission.PermissionBroker = com.droidance.core.device.permission.PermissionBroker(context,
+        if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) null else
+            com.droidance.core.device.permission.PermissionPresentationRelay { operation, id, settings ->
+                runtime.get().send("permission", android.os.Bundle().apply {
+                    putString("operation", operation); putString("id", id); putBoolean("settings", settings)
+                })
+            }) { requestId ->
+        if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+            check(shell.get().exec("am start --user 0 -n ${shell.get().escapeForShell(context.packageName + "/com.droidance.MainActivity")} --es runtimePermissionRequestId ${shell.get().escapeForShell(requestId)}").success)
+        } else context.startActivity(
             android.content.Intent(context, com.droidance.MainActivity::class.java)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                 .putExtra(com.droidance.core.device.permission.PermissionBroker.EXTRA_PERMISSION_REQUEST_ID, requestId)
@@ -104,7 +114,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideAgentEventDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        runtime: com.droidance.runtime.RuntimeProcessClient
     ): AgentEventDatabase = Room.databaseBuilder(
         context,
         AgentEventDatabase::class.java,
@@ -113,13 +124,15 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAgentEventStore(database: AgentEventDatabase): AgentEventStore =
-        RoomAgentEventStore(database)
+    fun provideAgentEventStore(database: AgentEventDatabase,
+        runtime: com.droidance.runtime.RuntimeProcessClient): AgentEventStore =
+        if (runtime.isOwner) RoomAgentEventStore(database) else com.droidance.runtime.RuntimeEventStore(runtime)
 
     @Provides
     @Singleton
     fun provideMemoryCandidateDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        runtime: com.droidance.runtime.RuntimeProcessClient
     ): MemoryCandidateDatabase = Room.databaseBuilder(
         context,
         MemoryCandidateDatabase::class.java,
@@ -130,8 +143,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideBlobStore(
-        @ApplicationContext context: Context
-    ): BlobStore = FileBlobStore(context.filesDir.resolve("agent-blobs"))
+        @ApplicationContext context: Context,
+        runtime: com.droidance.runtime.RuntimeProcessClient
+    ): BlobStore = if (runtime.isOwner) FileBlobStore(context.filesDir.resolve("agent-blobs"))
+        else com.droidance.runtime.RuntimeBlobStore(runtime)
 
     @Provides
     @Singleton

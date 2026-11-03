@@ -60,10 +60,10 @@ class RuntimeSurfaceBitmapRenderer @Inject constructor(
     private val labelBounds = RectF()
     private val mascotBounds = RectF()
 
-    internal fun islandLayout(): IslandLayout {
+    internal fun islandLayout(collapsed: Boolean = false): IslandLayout {
         val padding = dp(ISLAND_SHADOW_PADDING_DP)
         val height = max(dp(RuntimeIslandStyle.HEIGHT_DP), textPainter.heightPx())
-        val width = islandWidthPx()
+        val width = if (collapsed) height else islandWidthPx()
         val stopLeft = width - dp(RuntimeIslandStyle.EDGE_PADDING_DP) - dp(RuntimeIslandStyle.CHIP_SIZE_DP)
         return IslandLayout(width + padding * 2, height + padding * 2, padding,
             stopButtonLeftPx = stopLeft + padding)
@@ -79,11 +79,18 @@ class RuntimeSurfaceBitmapRenderer @Inject constructor(
         action: IslandAction,
         paused: Boolean,
         state: RuntimeIslandPresentation.State,
-        phase: Float
+        phase: Float,
+        collapsed: Boolean = false
     ): IslandBitmap {
-        val layout = islandLayout()
+        val layout = islandLayout(collapsed)
         val bitmap = Bitmap.createBitmap(layout.widthPx, layout.heightPx, Bitmap.Config.ARGB_8888)
-        drawIsland(Canvas(bitmap), layout, currentActionText, action, paused, state, phase)
+        if (collapsed) {
+            val canvas = Canvas(bitmap)
+            drawCollapsedStatic(canvas, layout)
+            drawCollapsedActivity(canvas, layout,
+                state == RuntimeIslandPresentation.State.EXECUTING && !paused,
+                RuntimeIslandAnimations.areEnabled(context), (phase * MascotMotion.CYCLE_MS).toLong())
+        } else drawIsland(Canvas(bitmap), layout, currentActionText, action, paused, state, phase)
         return IslandBitmap(
             png = bitmap.toPng().also { bitmap.recycle() },
             topOffsetPx = RuntimeIslandPosition.defaultTopPx(screenHeightPx(), layout.heightPx),
@@ -91,6 +98,27 @@ class RuntimeSurfaceBitmapRenderer @Inject constructor(
             heightPx = layout.heightPx,
             stopButtonLeftPx = layout.stopButtonLeftPx
         )
+    }
+
+    internal fun drawCollapsedStatic(canvas: Canvas, layout: IslandLayout) {
+        val padding = layout.paddingPx.toFloat()
+        pillBounds.set(padding, padding, layout.widthPx - padding, layout.heightPx - padding)
+        val radius = pillBounds.height() / 2f
+        canvas.drawRoundRect(pillBounds, radius, radius, pillPaint)
+        hairlineBounds.set(pillBounds)
+        hairlineBounds.inset(hairlinePaint.strokeWidth / 2f, hairlinePaint.strokeWidth / 2f)
+        canvas.drawRoundRect(hairlineBounds, radius, radius, hairlinePaint)
+    }
+
+    internal fun drawCollapsedActivity(canvas: Canvas, layout: IslandLayout, executing: Boolean,
+        motionEnabled: Boolean, elapsedMs: Long) {
+        val size = dpFloat(RuntimeIslandStyle.MASCOT_SIZE_DP)
+        val centerX = layout.widthPx / 2f
+        val centerY = layout.heightPx / 2f
+        mascotBounds.set(centerX - size / 2f, centerY - size / 2f,
+            centerX + size / 2f, centerY + size / 2f)
+        mascotPainter.draw(canvas, mascotBounds, MascotFraming.FULL,
+            if (executing) MascotMotion.loopingDancePose(elapsedMs, !motionEnabled) else MascotPose())
     }
 
     /** Bitmap exports and the live host share exactly the same static and animated layers. */

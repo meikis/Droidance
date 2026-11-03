@@ -48,8 +48,13 @@ data class PendingPermissionRequest(
  * system dialog. Process recovery can redisplay the pending request; the durable Turn recovery
  * path remains responsible for restarting interrupted model execution.
  */
+fun interface PermissionPresentationRelay {
+    fun send(operation: String, requestId: String, settingsRequired: Boolean)
+}
+
 class PermissionBroker(
     private val context: Context,
+    private val relay: PermissionPresentationRelay? = null,
     private val launchPermissionHost: (requestId: String) -> Unit
 ) {
     private val lock = Any()
@@ -67,7 +72,7 @@ class PermissionBroker(
         .filter(String::isNotBlank)
         .distinct()
         .filter { permission ->
-            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+            context.packageManager.checkPermission(permission, context.packageName) != PackageManager.PERMISSION_GRANTED
         }
         .toList()
 
@@ -165,7 +170,14 @@ class PermissionBroker(
         return outcome
     }
 
+    fun mirror(request: PendingPermissionRequest?, prompt: String?) {
+        check(relay != null) { "Only the presentation client mirrors permission state" }
+        _pendingRequest.value = request
+        _systemDialogPromptRequested.value = prompt
+    }
+
     fun requestSystemPermissionDialog(requestId: String) {
+        if (relay != null) { relay.send("prompt", requestId, false); return }
         synchronized(lock) {
             val current = _pendingRequest.value?.takeIf { it.requestId == requestId } ?: return
             if (current.launched || current.settingsRequired) return
@@ -174,6 +186,7 @@ class PermissionBroker(
     }
 
     fun consumeSystemDialogRequest(requestId: String) {
+        if (relay != null) { _systemDialogPromptRequested.value = null; relay.send("consume", requestId, false); return }
         synchronized(lock) {
             if (_systemDialogPromptRequested.value == requestId) {
                 _systemDialogPromptRequested.value = null
@@ -182,6 +195,7 @@ class PermissionBroker(
     }
 
     fun markLaunched(requestId: String) {
+        if (relay != null) { relay.send("launched", requestId, false); return }
         synchronized(lock) {
             val current = _pendingRequest.value?.takeIf { it.requestId == requestId } ?: return
             if (current.launched) return
@@ -192,6 +206,7 @@ class PermissionBroker(
     }
 
     fun resolve(requestId: String, settingsRequired: Boolean) {
+        if (relay != null) { relay.send("resolve", requestId, settingsRequired); return }
         synchronized(lock) {
             val current = _pendingRequest.value?.takeIf { it.requestId == requestId } ?: return
             _systemDialogPromptRequested.value = null

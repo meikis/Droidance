@@ -26,6 +26,7 @@ class NotificationWatcher : NotificationListenerService() {
         /** 通知事件流 */
         private val _notificationFlow = MutableSharedFlow<NotificationInfo>(extraBufferCapacity = 50)
         val notificationFlow: SharedFlow<NotificationInfo> = _notificationFlow
+        internal fun publish(info: NotificationInfo) { _notificationFlow.tryEmit(info) }
     }
 
     override fun onListenerConnected() {
@@ -132,6 +133,7 @@ class NotificationWatcher : NotificationListenerService() {
 /**
  * 通知信息数据类
  */
+@kotlinx.serialization.Serializable
 data class NotificationInfo(
     val packageName: String,   // 来源 App 包名
     val appName: String,       // 来源 App 名称

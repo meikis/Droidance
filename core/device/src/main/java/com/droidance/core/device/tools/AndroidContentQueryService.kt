@@ -42,7 +42,8 @@ class AndroidContentQueryService(
     private val permissionReason: (String) -> String,
     private val permissionTimeoutMillis: () -> Long,
     private val onPermissionWaiting: suspend (PendingPermissionRequest) -> Unit,
-    private val onPermissionResolved: suspend (PendingPermissionRequest, PermissionRequestOutcome) -> Unit
+    private val onPermissionResolved: suspend (PendingPermissionRequest, PermissionRequestOutcome) -> Unit,
+    private val platformDispatch: (suspend (String, String) -> ToolExecutionResult)?
 ) {
     suspend fun query(arguments: String): ToolExecutionResult {
         val input = runCatching { Json.parseToJsonElement(arguments).jsonObject }
@@ -94,6 +95,8 @@ class AndroidContentQueryService(
         val offset = (input["offset"]?.jsonPrimitive?.intOrNull ?: 0).coerceAtLeast(0)
 
         return try {
+            platformDispatch?.let { return it("query", arguments) }
+            com.droidance.core.device.agent.device.RuntimeContentProviders.acquire(requireNotNull(uri.authority))
             val cursor = context.contentResolver.query(
                 uri,
                 projection?.toTypedArray(),
@@ -160,6 +163,8 @@ class AndroidContentQueryService(
 
         val contentValues = jsonObjectToContentValues(valuesElement)
         return try {
+            platformDispatch?.let { return it("insert", arguments) }
+            com.droidance.core.device.agent.device.RuntimeContentProviders.acquire(requireNotNull(uri.authority))
             val insertedUri = context.contentResolver.insert(uri, contentValues)
                 ?: return ToolProtocolResult.failed(
                     code = "CONTENT_INSERT_FAILED",
@@ -234,6 +239,8 @@ class AndroidContentQueryService(
         }
 
         return try {
+            platformDispatch?.let { return it("update", arguments) }
+            com.droidance.core.device.agent.device.RuntimeContentProviders.acquire(requireNotNull(uri.authority))
             val rows = context.contentResolver.update(
                 uri, contentValues, selection, selectionArgs?.toTypedArray()
             )
@@ -299,6 +306,8 @@ class AndroidContentQueryService(
         }
 
         return try {
+            platformDispatch?.let { return it("delete", arguments) }
+            com.droidance.core.device.agent.device.RuntimeContentProviders.acquire(requireNotNull(uri.authority))
             val rows = context.contentResolver.delete(uri, selection, selectionArgs?.toTypedArray())
             val payload = buildJsonObject {
                 put("uri", JsonPrimitive(rawUri))
@@ -391,6 +400,8 @@ class AndroidContentQueryService(
         }
 
         return try {
+            platformDispatch?.let { return it("batch", arguments) }
+            com.droidance.core.device.agent.device.RuntimeContentProviders.acquire(authority)
             val results = context.contentResolver.applyBatch(authority, ops)
             val payload = buildJsonObject {
                 put("authority", JsonPrimitive(authority))

@@ -64,6 +64,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     private val displayModes = ConcurrentHashMap<Int, RuntimeMode>()
     private val displaySizes = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val protocolCompatibility = ConcurrentHashMap<IBinder, Boolean>()
+    private val runtimeIdentities = ConcurrentHashMap<IBinder, String>()
 
     // sidecar 是独立 app_process 子进程；AIDL 是同步阻塞的双向 Binder transact，进程卡住时
     // 调用方线程会被无限期挂起——既不抛异常也不返回。这曾是"后台任务卡住上百分钟只能手动取消"的
@@ -131,6 +132,16 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     fun isResidentBinderAlive(): Boolean =
         isRegisteredServiceAlive(RuntimeMode.STANDARD)
 
+    fun startAgentRuntime(packageName: String, installationId: String, storage: android.os.ParcelFileDescriptor): IAgentRuntimeOwner {
+        val metrics = context.resources.displayMetrics
+        if (!ensureResidentChannel(metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+            RuntimeMode.STANDARD)) throw RuntimeUnavailableException()
+        val service = serviceOrNull(RuntimeMode.STANDARD) ?: throw RuntimeUnavailableException()
+        val binder = service.startAgentRuntime(packageName, installationId, storage)
+            ?: throw RuntimeUnavailableException()
+        return IAgentRuntimeOwner.Stub.asInterface(binder)
+    }
+
     fun isResidentBinderAlive(mode: RuntimeMode): Boolean =
         isRegisteredServiceAlive(mode)
 
@@ -144,6 +155,10 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     fun ensureStarted(width: Int, height: Int, densityDpi: Int, mode: RuntimeMode?): CommandResult =
         synchronized(serviceLock) {
             val selectedMode = mode?.takeIf { it == RuntimeMode.STANDARD } ?: return@synchronized invalid("Standard mode required")
+            if (RuntimeProcessRole.isOwner) {
+                val service = serviceOrNull(selectedMode) ?: return@synchronized invalid("Resident device service is unavailable")
+                return@synchronized startService(service, width, height, densityDpi, "resident_runtime", selectedMode)
+            }
             // Allocate a virtual display only when execution starts on the resident shell Binder.
             if (!reconcileDuplicateResidentSidecars(selectedMode)) {
                 return@synchronized invalid(
@@ -226,6 +241,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         }
 
     fun ensureResidentChannel(width: Int, height: Int, densityDpi: Int, mode: RuntimeMode?): Boolean {
+        if (RuntimeProcessRole.isOwner) return isRegisteredServiceAlive(RuntimeMode.STANDARD)
         val selectedMode = mode?.takeIf { it == RuntimeMode.STANDARD } ?: return false
         return synchronized(serviceLock) {
             if (!reconcileDuplicateResidentSidecars(selectedMode)) return@synchronized false
@@ -1593,7 +1609,9 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         mode: RuntimeMode,
         service: IVirtualSpaceSidecar?
     ): String {
-        val binderIdentity = service?.asBinder()?.hashCode()?.toString(16) ?: "direct"
+        val binderIdentity = service?.let {
+            runtimeIdentities.getOrPut(it.asBinder()) { it.runtimeIdentity }
+        } ?: error("A resident Binder is required for an execution binding")
         return "${mode.name.lowercase()}:$displayId:$binderIdentity"
     }
 

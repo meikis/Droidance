@@ -27,6 +27,7 @@ class PrivilegedShellRunner @Inject constructor(
         }
 
     fun currentAdbShellUid(): Int? {
+        if (RuntimeProcessRole.isOwner) return ADB_SHELL_UID
         if (!airModePairingManager.isConnected) return null
         return airModePairingManager
             .shell("id -u", ADB_UID_PROBE_TIMEOUT_MS)
@@ -39,7 +40,7 @@ class PrivilegedShellRunner @Inject constructor(
         currentAdbShellUid() == ADB_SHELL_UID
 
     fun isAdbShellReady(): Boolean =
-        airModePairingManager.isConnected && isAdbShellUid()
+        RuntimeProcessRole.isOwner || (airModePairingManager.isConnected && isAdbShellUid())
 
     fun describeShellUnavailable(): String {
         val uid = currentAdbShellUid()

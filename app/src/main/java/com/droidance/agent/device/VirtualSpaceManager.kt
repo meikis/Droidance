@@ -64,6 +64,28 @@ class VirtualSpaceManager @Inject constructor(
     val retainedExecution: StateFlow<RetainedVirtualExecution?> = mutableRetainedExecution.asStateFlow()
 
     fun isActive(): Boolean = active
+
+    /** A GUI attaches to the resident owner's display; it never creates a replacement display. */
+    fun adoptRuntimeDisplay(displayId: Int, width: Int, height: Int, densityDpi: Int,
+        threadId: String?, executionId: String?) {
+        check(!com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner)
+        if (displayId <= 0) {
+            active = false
+            sidecarSession = null
+            capabilityRegistry.clearVirtualDisplayId()
+            mutableRetainedExecution.value = null
+            activeExecutionId = null
+            return
+        }
+        val binding = sidecarBridge.runtimeSurfaceBinding(displayId, RuntimeMode.STANDARD) ?: return
+        sidecarSession = SidecarSession(displayId, 2000, "binder", RuntimeMode.STANDARD,
+            binding.backendSessionId, width, height, densityDpi)
+        capabilityRegistry.setVirtualDisplayId(displayId)
+        mutableRetainedExecution.value = if (threadId != null && executionId != null)
+            RetainedVirtualExecution(threadId, executionId, binding) else null
+        activeExecutionId = executionId
+        active = true
+    }
     fun isActiveForMode(mode: RuntimeMode): Boolean =
         active && sidecarSession?.mode == mode
     fun isVisible(): Boolean = false
@@ -609,7 +631,12 @@ class VirtualSpaceManager @Inject constructor(
     /** 主屏分辨率/密度，作为后台显示规格。 */
     private fun resolveScreenSpec(): ScreenSpec {
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val size = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val size = if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+            val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+                .getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            @Suppress("DEPRECATION") val point = android.graphics.Point().also { display.getRealSize(it) }
+            point.x to point.y
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val bounds = wm.maximumWindowMetrics.bounds
             bounds.width() to bounds.height()
         } else {

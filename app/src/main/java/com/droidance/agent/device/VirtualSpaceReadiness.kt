@@ -24,7 +24,9 @@ class VirtualSpaceReadiness @Inject constructor(
     private val virtualSpaceManager: VirtualSpaceManager,
     private val sidecarBridge: VirtualSpaceSidecarBridge,
     private val virtualSpaceRuntimePolicy: VirtualSpaceRuntimePolicy,
-    private val debugLogManager: DebugLogManager
+    private val debugLogManager: DebugLogManager,
+    private val driver: NativeInputDriverClient,
+    private val client: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>
 ) {
     private companion object {
         const val INPUT_PROBE_ATTEMPTS = 3
@@ -32,6 +34,14 @@ class VirtualSpaceReadiness @Inject constructor(
     }
 
     fun ensureReadyResult(requireHealthProbe: Boolean = false): VirtualSpaceReadinessResult {
+        if (!client.get().isOwner) {
+            val result = client.get().command("prepareDisplay", android.os.Bundle().apply { putBoolean("probe", requireHealthProbe) })
+            val id = result.getInt("display", -1).takeIf { it > 0 }
+            if (id != null) virtualSpaceManager.adoptRuntimeDisplay(id, result.getInt("width"), result.getInt("height"),
+                result.getInt("density"), null, null)
+            return VirtualSpaceReadinessResult(VirtualSpaceReadinessStatus.valueOf(result.getString("status")!!), id,
+                result.getString("message").orEmpty())
+        }
         val mode = capabilityRegistry.currentStrategy().selection.effectiveMode
             ?: return failed(
                 status = VirtualSpaceReadinessStatus.DISPLAY_MISSING,
@@ -85,7 +95,7 @@ class VirtualSpaceReadiness @Inject constructor(
     fun probeReadyResult(): VirtualSpaceReadinessResult = ensureReadyResult(requireHealthProbe = true)
 
     private fun runHealthProbe(displayId: Int, mode: RuntimeMode): VirtualSpaceReadinessResult {
-        VirtualSpaceProbeLanding.displayId = null
+        driver.command("probeReset")
         val launch = sidecarBridge.launchActivity(displayId, probeComponentName(), mode)
         if (!launch.ok) {
             return failed(
@@ -100,13 +110,13 @@ class VirtualSpaceReadiness @Inject constructor(
             val (status, reason) = frameFailure
             if (
                 status == VirtualSpaceReadinessStatus.FRAME_FAILED &&
-                VirtualSpaceProbeLanding.displayId == displayId
+                driver.command("probeState").getInt("display", -1) == displayId
             ) {
                 capabilityRegistry.markVirtualSpaceHealthReady(displayId)
                 debugLogManager.appendEvent(
                     "virtual_space: probe reached the target display; first frame is pending displayId=$displayId"
                 )
-                VirtualSpaceProbeLanding.finishActive()
+                driver.command("probeFinish")
                 return VirtualSpaceReadinessResult(
                     status = VirtualSpaceReadinessStatus.FRAME_PENDING,
                     displayId = displayId,
@@ -117,7 +127,7 @@ class VirtualSpaceReadiness @Inject constructor(
             return failed(
                 status = status,
                 displayId = displayId,
-                message = "$reason; ${VirtualSpaceProbeLanding.describe(displayId)}"
+                message = "$reason; ${describeProbe(displayId)}"
             )
         }
         // 帧可用（非黑帧）才是"能看屏幕"的真正门槛，据此标记就绪。
@@ -129,7 +139,7 @@ class VirtualSpaceReadiness @Inject constructor(
         capabilityRegistry.markVirtualSpaceHealthReady(displayId)
         warmUpInputChannel(displayId, mode)
         // 自检做完立刻销毁探针 Activity，避免白屏残留并覆盖目标 App 的首帧。
-        VirtualSpaceProbeLanding.finishActive()
+        driver.command("probeFinish")
         return VirtualSpaceReadinessResult(
             status = VirtualSpaceReadinessStatus.READY,
             displayId = displayId,
@@ -181,8 +191,13 @@ class VirtualSpaceReadiness @Inject constructor(
         // 真因落盘：之前探活失败只在设置页一闪而过，debug 包里看不到卡在哪一步
         debugLogManager.appendEvent("virtual_space: readiness probe failed [$status] $message")
         // 失败路径也要销毁探针（落点诊断已在上游读过静态字段），避免它作为白屏残留到下次任务
-        VirtualSpaceProbeLanding.finishActive()
+        driver.command("probeFinish")
         return VirtualSpaceReadinessResult(status = status, displayId = displayId, message = message)
+    }
+
+    private fun describeProbe(expected: Int): String {
+        val landed = driver.command("probeState").getInt("display", -1)
+        return "Probe display=$landed, expected=$expected"
     }
 
     private fun probeComponentName(): String =

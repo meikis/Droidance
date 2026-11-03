@@ -83,7 +83,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     private static final int INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH = 2;
     private static final int PREVIEW_MAX_WIDTH = 720;
     private static final int PREVIEW_JPEG_QUALITY = 72;
-    public static final int SIDECAR_PROTOCOL_VERSION = 73;
+    public static final int SIDECAR_PROTOCOL_VERSION = 74;
     private static final long MAIN_DIRECT_CAPTURE_TIMEOUT_MS = 1_500L;
     private static final long SHELL_EXEC_TIMEOUT_MS = 8_000L;
     private static final long LIFECYCLE_FRAME_TIMEOUT_MS = 1_500L;
@@ -105,6 +105,12 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     private volatile String lastError = "";
     private volatile boolean systemServiceRegistered = false;
     private volatile IRuntimeIndicatorCallback runtimeIndicatorCallback;
+    private volatile String runtimePackage;
+    private volatile IBinder agentRuntimeOwner;
+    private final String runtimeIdentity = java.util.UUID.randomUUID().toString();
+
+    @Override
+    public String getRuntimeIdentity() { return runtimeIdentity; }
     private volatile SidecarRuntimeSurface runtimeSurface;
     private final SidecarViewerMirror viewerMirror = new SidecarViewerMirror(this::holdViewerDisplayAwake);
     private SidecarViewerIme viewerIme;
@@ -1604,6 +1610,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
      * Replaces ServiceManager.addService, which SELinux rejects for custom service names.
      */
     public boolean broadcastBinder(Context broadcastContext, String targetPackage) {
+        runtimePackage = targetPackage;
         try {
             if (targetPackage == null || targetPackage.isEmpty()) {
                 lastError = "broadcastBinder target package missing";
@@ -1622,6 +1629,62 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
         } catch (Throwable t) {
             lastError = "broadcastBinder failed: " + safeMessage(t);
             return false;
+        }
+    }
+
+    private volatile IBinder platformDriver;
+
+    @Override public IBinder getPlatformDriver() {
+        if (android.os.Binder.getCallingUid() != android.os.Process.myUid()) throw new SecurityException("Only the owner may use the platform driver");
+        IBinder current = platformDriver;
+        return current != null && current.isBinderAlive() ? current : null;
+    }
+    @Override public void setPlatformDriver(IBinder driver) {
+        try {
+            int expected = resolveContext().getPackageManager().getApplicationInfo(runtimePackage, 0).uid;
+            if (android.os.Binder.getCallingUid() != expected) throw new SecurityException("Platform driver identity mismatch");
+            platformDriver = driver;
+        } catch (Exception error) { throw new IllegalStateException(error); }
+    }
+    @Override public boolean requestPlatformDriver() {
+        if (android.os.Binder.getCallingUid() != android.os.Process.myUid()) throw new SecurityException("Only the owner may start a platform driver");
+        Intent intent = new Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_READY);
+        intent.setClassName(runtimePackage, "com.droidance.agent.device.RuntimeDriverBinderReceiver");
+        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        intent.putExtra(SidecarBinderReceiver.EXTRA_BINDER_CONTAINER, new SidecarBinderContainer(this));
+        intent.putExtra(SidecarBinderReceiver.EXTRA_SIDECAR_PROTOCOL_VERSION, SIDECAR_PROTOCOL_VERSION);
+        try { resolveContext().sendBroadcast(intent); return true; }
+        catch (Exception error) { throw new IllegalStateException(error); }
+    }
+
+    @Override
+    public IBinder startAgentRuntime(String packageName, String installationId, android.os.ParcelFileDescriptor storage) {
+        try {
+            if (runtimePackage == null || !runtimePackage.equals(packageName)) {
+                throw new SecurityException("Runtime package does not match the paired application");
+            }
+            int ownerUid = resolveContext().getPackageManager().getApplicationInfo(packageName, 0).uid;
+            int callerUid = android.os.Binder.getCallingUid();
+            if (callerUid != ownerUid && callerUid != android.os.Process.myUid()) {
+                throw new SecurityException("Runtime caller is not the paired application");
+            }
+            if (agentRuntimeOwner != null) {
+                if (storage != null) storage.close();
+                return agentRuntimeOwner;
+            }
+            long identity = android.os.Binder.clearCallingIdentity();
+            try {
+                Class<?> entry = Class.forName("com.droidance.runtime.RuntimeProcessHost");
+                agentRuntimeOwner = (IBinder) entry.getMethod("start", Context.class,
+                    IBinder.class, String.class, int.class, String.class, android.os.ParcelFileDescriptor.class)
+                    .invoke(null, resolveContext(), asBinder(), packageName, ownerUid, installationId, storage);
+                return agentRuntimeOwner;
+            } finally { android.os.Binder.restoreCallingIdentity(identity); }
+        } catch (Throwable error) {
+            try { if (storage != null) storage.close(); } catch (Exception ignored) {}
+            android.util.Log.e("DroidanceVSpace", "Runtime bootstrap failed", error);
+            fail("runtime start failed: " + deepestCauseMessage(error));
+            return null;
         }
     }
 

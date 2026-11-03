@@ -153,6 +153,7 @@ data class ToolExecutionResult(
     }
 }
 
+@Serializable
 data class AgentEventDraft(
     val eventKind: AgentEventKind,
     val threadId: String,

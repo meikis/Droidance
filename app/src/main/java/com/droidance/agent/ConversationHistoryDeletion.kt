@@ -18,17 +18,28 @@ class ConversationHistoryDeletion @Inject constructor(
     private val blobs: BlobStore,
     private val tasks: ConversationTaskController,
     private val runtime: AgentRuntime,
-    private val tokenUsageRepository: TokenUsageRepository
+    private val tokenUsageRepository: TokenUsageRepository,
+    private val processClient: com.droidance.runtime.RuntimeProcessClient
 ) {
-    suspend fun delete(threadIds: Set<String>? = null) = tasks.withHistoryMutation(threadIds) {
-        // All production blob writers belong to this execution lane, including idle skill work.
-        // UI attachment preparation retains encoded input; blobs are written when a Turn starts.
-        runtime.withStorageMaintenance {
-            val selected = threadIds ?: events.eventsByKind(AgentEventKind.THREAD_CREATED)
-                .map { it.threadId }.filterNot { it == INTERNAL_SKILL_THREAD_ID }.toSet()
-            purgeConversationData(events, blobs, selected)
-            tokenUsageRepository.deleteConversationUsage(threadIds)
-            if (runtime.currentConversationId.value in selected) runtime.clearConversation()
+    suspend fun delete(threadIds: Set<String>? = null) {
+        if (!processClient.isOwner) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                processClient.command("deleteHistory", android.os.Bundle().apply {
+                    threadIds?.let { putStringArrayList("threads", ArrayList(it)) }
+                })
+            }
+            return
+        }
+        tasks.withHistoryMutation(threadIds) {
+            // All production blob writers belong to this execution lane, including idle skill work.
+            // UI attachment preparation retains encoded input; blobs are written when a Turn starts.
+            runtime.withStorageMaintenance {
+                val selected = threadIds ?: events.eventsByKind(AgentEventKind.THREAD_CREATED)
+                    .map { it.threadId }.filterNot { it == INTERNAL_SKILL_THREAD_ID }.toSet()
+                purgeConversationData(events, blobs, selected)
+                tokenUsageRepository.deleteConversationUsage(threadIds)
+                if (runtime.currentConversationId.value in selected) runtime.clearConversation()
+            }
         }
     }
 }

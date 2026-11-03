@@ -24,6 +24,10 @@ import javax.inject.Singleton
 
 /** Host operations needed by application-owned conversation submission. */
 interface ConversationTaskRuntime {
+    val remoteQueue: Boolean get() = false
+    val remoteTasks: StateFlow<Map<String, List<ActiveConversationTask>>>? get() = null
+    fun removeRemoteQueued(conversationId: String, turnId: String): Boolean = false
+    suspend fun steerRemoteQueued(conversationId: String, turnId: String): Boolean = false
     val currentConversationId: kotlinx.coroutines.flow.StateFlow<String?>
     val state: kotlinx.coroutines.flow.StateFlow<AgentState>
     fun registerActiveJob(taskId: String, job: Job)
@@ -39,6 +43,7 @@ interface ConversationTaskRuntime {
     ): AgentRuntime.RuntimeTurnOutcome
 }
 
+@kotlinx.serialization.Serializable
 data class ActiveConversationTask(
     val conversationId: String,
     val turnId: String,
@@ -57,7 +62,7 @@ class ConversationTaskController @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope
 ) {
     private val _activeTasks = MutableStateFlow<Map<String, List<ActiveConversationTask>>>(emptyMap())
-    val activeTasks: StateFlow<Map<String, List<ActiveConversationTask>>> = _activeTasks
+    val activeTasks: StateFlow<Map<String, List<ActiveConversationTask>>> = runtime.remoteTasks ?: _activeTasks
 
     private class Submission(val conversationId: String, val turnId: String,
         val ready: kotlinx.coroutines.CompletableDeferred<Unit>, val request: TurnRequest) {
@@ -176,7 +181,7 @@ class ConversationTaskController @Inject constructor(
                     }
                     onStream(chunk)
                 }
-                onCompleted(executionMutex.withLock {
+                suspend fun executeSlot(): AgentRuntime.RuntimeTurnOutcome {
                     // Reserve each queue slot while an explicit steering action is being
                     // persisted. A failed steer leaves this same slot and its order intact.
                     while (true) {
@@ -196,13 +201,19 @@ class ConversationTaskController @Inject constructor(
                         } ?: break
                         gate.await()
                     }
-                    runtime.processConversationInput(conversationId, request, wrappedStream) {
+                    return runtime.processConversationInput(conversationId, request, wrappedStream) {
                         synchronized(submissionLock) {
                             if (submission.removed) throw CancellationException("Queued message removed")
                             started.complete(Unit)
                         }
                     }
-                })
+                }
+                onCompleted(if (runtime.remoteQueue) {
+                    runtime.processConversationInput(conversationId, request, wrappedStream) {
+                        submission.enteringRuntime = true
+                        started.complete(Unit)
+                    }
+                } else executionMutex.withLock { executeSlot() })
             } catch (error: Exception) {
                 // The UI shows only a generic notice; keep the cause for diagnosis.
                 if (error !is CancellationException) android.util.Log.e("ConversationTask", "Turn $turnId failed", error)
@@ -242,6 +253,11 @@ class ConversationTaskController @Inject constructor(
 
     /** Withdraw only a queue slot that has not entered the runtime. */
     fun deleteQueued(conversationId: String, turnId: String): Boolean = synchronized(submissionLock) {
+        if (runtime.remoteQueue) {
+            if (!runtime.removeRemoteQueued(conversationId, turnId)) return false
+            submissions[turnId]?.let { it.removed = true; it.job.cancel() }
+            return true
+        }
         val queued = submissions[turnId]
         if (queued == null) {
             val admission = admissions.values.firstOrNull {
@@ -261,6 +277,7 @@ class ConversationTaskController @Inject constructor(
     /** Explicitly use one queued message as guidance; keep its slot on rejection. */
     suspend fun steerQueued(conversationId: String, turnId: String, onResult: (Boolean) -> Unit = {}): Boolean =
         kotlinx.coroutines.withContext(scope.coroutineContext) {
+            if (runtime.remoteQueue) return@withContext runtime.steerRemoteQueued(conversationId, turnId).also(onResult)
             steerQueuedInput(conversationId, turnId).also(onResult)
         }
 
@@ -301,7 +318,7 @@ class ConversationTaskController @Inject constructor(
         // Cancel suspended input admission first so stopping a Turn cannot resubmit that input.
         admissions.entries.filter { it.value.conversationId == conversationId }.forEach { it.key.cancel() }
         // A conversation stop covers its running Turn and admitted queued Turns, never another thread.
-        _activeTasks.value[conversationId].orEmpty().asReversed().sortedBy { it.started }
+        activeTasks.value[conversationId].orEmpty().asReversed().sortedBy { it.started }
             .forEach { runtime.cancelCurrentTask("ui:${it.turnId}", origin) }
     }
 

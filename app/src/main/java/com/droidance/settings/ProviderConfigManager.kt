@@ -61,6 +61,8 @@ class ProviderConfigManager @Inject constructor(
         loadImageDetailCapabilities()
     }
 
+    @Synchronized fun reloadFromStorage() { loadConfigs() }
+
     /** 获取所有 Provider 配置 */
     @Synchronized fun getAllConfigs(): List<ProviderConfig> = _configs.toList()
 

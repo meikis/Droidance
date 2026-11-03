@@ -21,11 +21,25 @@ enum class AutomationAlarmPrecision {
 
 @Singleton
 class AutomationAlarmScheduler @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val manager: dagger.Lazy<AutomationManager>?
 ) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
+    private val residentAlarms = java.util.concurrent.ConcurrentHashMap<String, AlarmManager.OnAlarmListener>()
+
     fun schedule(definition: AutomationDefinition): AutomationAlarmPrecision {
+        if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+            residentAlarms.remove(definition.id)?.let(alarmManager::cancel)
+            if (!definition.enabled || definition.nextRunAtMs <= 0L) return AutomationAlarmPrecision.EXACT
+            val listener = AlarmManager.OnAlarmListener {
+                requireNotNull(manager).get().onAlarm(definition.id, definition.version, definition.nextRunAtMs)
+            }
+            residentAlarms[definition.id] = listener
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, definition.nextRunAtMs, "Droidance automation", listener,
+                android.os.Handler(android.os.Looper.getMainLooper()))
+            return AutomationAlarmPrecision.EXACT
+        }
         if (!definition.enabled || definition.nextRunAtMs <= 0L) {
             cancel(definition.id)
             return precision()
@@ -62,6 +76,10 @@ class AutomationAlarmScheduler @Inject constructor(
     }
 
     fun cancel(automationId: String) {
+        if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+            residentAlarms.remove(automationId)?.let(alarmManager::cancel)
+            return
+        }
         pendingIntent(
             automationId = automationId,
             definitionVersion = 0,

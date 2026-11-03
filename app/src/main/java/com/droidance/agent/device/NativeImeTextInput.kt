@@ -39,7 +39,8 @@ class NativeImeTextInput @Inject constructor(
     private val bridge: VirtualSpaceSidecarBridge,
     private val rules: RuleConfigManager,
     private val input: SidecarInputController,
-    private val executionContexts: ExecutionContextStore
+    private val executionContexts: ExecutionContextStore,
+    private val driver: NativeInputDriverClient
 ) {
     private val mutex = Mutex()
 
@@ -55,7 +56,7 @@ class NativeImeTextInput @Inject constructor(
         val inputMethods = context.getSystemService(InputMethodManager::class.java)
         val component = ComponentName(context, AgentTextInputMethodService::class.java).flattenToShortString()
         val selectedBefore = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-        val original = if (selectedBefore == component) AgentTextInputMethodService.restorationTarget(context)
+        val original = if (selectedBefore == component) withContext(Dispatchers.IO) { driver.command("restore").getString("ime") }
             ?.takeUnless { it == component } else selectedBefore
         val wasEnabled = inputMethods.enabledInputMethodList.any { it.id == component }
         if (original.isNullOrBlank()) return@withLock failed("Initial input method unavailable")
@@ -74,7 +75,7 @@ class NativeImeTextInput @Inject constructor(
         var restored = false
         var focusEvent: com.droidance.core.agent.tools.ExecutedActionEvent? = null
         try {
-            withContext(Dispatchers.Main.immediate) { AgentTextInputMethodService.beginSession(context, original) }
+            withContext(Dispatchers.IO) { driver.command("begin", android.os.Bundle().apply { putString("ime", original) }) }
             val keyboardWasShown = withContext(Dispatchers.IO) { (manager.viewerImeBottomInset(binding) ?: 0) > 0 }
             // A visible keyboard already owns display focus. Focus its observed
             // editor before hiding that keyboard; otherwise bind first, then tap once.
@@ -101,10 +102,16 @@ class NativeImeTextInput @Inject constructor(
                 if (manager.retainedExecution.value?.executionId != execution.executionId)
                     return@withLock failed("Execution generation changed before commit")
                 if (focus() != expectedFocus) return@withLock failed("Execution input window changed before commit")
-                result = withContext(Dispatchers.Main.immediate) {
-                    AgentTextInputMethodService.commit(binding.displayId, foreground, text, clear).also {
-                        connectionState = AgentTextInputMethodService.connectionState(binding.displayId, foreground)
-                    }
+                result = withContext(Dispatchers.IO) {
+                    val reply = driver.command("commit", android.os.Bundle().apply {
+                        putInt("display", binding.displayId); putString("package", foreground)
+                        putString("text", text); putBoolean("clear", clear)
+                    })
+                    connectionState = reply.getString("state").orEmpty()
+                    if (!reply.getBoolean("dispatched")) null else DeviceInputResult(reply.getBoolean("success"),
+                        reply.getString("message").orEmpty(), textInputEvidence = TextInputEvidence(reply.getBoolean("focus"),
+                            reply.getBoolean("payload"), reply.getBoolean("injected"), reply.getBoolean("changed"), reply.getBoolean("verified")),
+                        diagnosticCode = reply.getString("diagnostic"))
                 }
                 if (result != null) break // A dispatched commit is never retried.
                 delay(poll)
@@ -115,9 +122,7 @@ class NativeImeTextInput @Inject constructor(
                 // until editor readback acknowledges it or the shared budget ends.
                 do {
                     delay(poll)
-                    acknowledged = withContext(Dispatchers.Main.immediate) {
-                        AgentTextInputMethodService.pendingCommitDelivered()
-                    }
+                    acknowledged = withContext(Dispatchers.IO) { driver.command("delivered").getBoolean("delivered") }
                 } while (!acknowledged && android.os.SystemClock.elapsedRealtime() < deadline)
                 result = result?.copy(message = result?.message + "; native_editor_ack=$acknowledged")
             }
@@ -128,9 +133,7 @@ class NativeImeTextInput @Inject constructor(
                 // Preserve a newer manual selection rather than restoring over its owner.
                 if (!wasEnabled && (restored || selected != component)) command("ime disable ${quote(component)}")
                 withContext(Dispatchers.IO) { manager.endExecutionKeyboard(execution.executionId) }
-                withContext(Dispatchers.Main.immediate) {
-                    AgentTextInputMethodService.endSession(context, restored || selected != component)
-                }
+                withContext(Dispatchers.IO) { driver.command("end", android.os.Bundle().apply { putBoolean("restored", restored || selected != component) }) }
             }
         }
         val delivered = result ?: failed("No native editor connection on execution display; $connectionState", focusConfirmed = true)

@@ -17,6 +17,7 @@ object RuntimeIslandPosition {
     const val KEY_BOTTOM_OFFSET = "island_bottom_offset_px"
     const val KEY_OFFSET_X = "island_offset_x_px"
     const val KEY_OFFSET_Y = "island_offset_y_px"
+    private const val KEY_COLLAPSED = "island_collapsed"
 
     private const val PREFS = "droidance_runtime_island_pos"
 
@@ -27,6 +28,12 @@ object RuntimeIslandPosition {
     fun read(context: Context): Int = prefs(context).getInt(KEY_OFFSET_Y, prefs(context).getInt(KEY_BOTTOM_OFFSET, 0))
 
     fun readX(context: Context): Int = prefs(context).getInt(KEY_OFFSET_X, 0)
+
+    fun isCollapsed(context: Context): Boolean = prefs(context).getBoolean(KEY_COLLAPSED, false)
+
+    fun writeCollapsed(context: Context, collapsed: Boolean) {
+        prefs(context).edit().putBoolean(KEY_COLLAPSED, collapsed).apply()
+    }
 
     fun write(context: Context, offsetPx: Int) {
         prefs(context).edit()

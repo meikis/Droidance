@@ -460,10 +460,7 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(dataClearing = DataClearTarget.LOGS, dataActionMessage = "") }
         appScope.launch(Dispatchers.IO) {
             val result = try {
-                agentRuntime.withStorageMaintenance {
-                    diagnosticsCollector.clearAll()
-                    markdownFileManager.deleteFile("debug/conversation-latest.md")
-                }
+                agentRuntime.clearLogData()
                 Result.success(Unit)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 _uiState.update { it.copy(dataClearing = null) }

@@ -55,6 +55,7 @@ class TaskExecutionService : Service() {
 
         /** 便捷方法：启动常驻服务（待命模式） */
         fun startStandby(context: Context) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) return
             val appContext = context.applicationContext
             KeepAliveJobService.schedule(appContext)
             val intent = Intent(appContext, TaskExecutionService::class.java).apply {
@@ -69,6 +70,10 @@ class TaskExecutionService : Service() {
 
         /** 便捷方法：开始前台任务执行（按需前台服务） */
         fun startExecution(context: Context, taskTitle: String? = null) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+                com.droidance.runtime.RuntimeNotifications.post(context, NOTIFICATION_ID, R.string.app_name, taskTitle.orEmpty(), true)
+                return
+            }
             val appContext = context.applicationContext
             val intent = Intent(appContext, TaskExecutionService::class.java).apply {
                 action = ACTION_START_EXECUTION
@@ -85,6 +90,10 @@ class TaskExecutionService : Service() {
 
         /** 便捷方法：停止前台任务执行并清除常驻通知 */
         fun stopExecution(context: Context) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+                com.droidance.runtime.RuntimeNotifications.cancel(context, NOTIFICATION_ID)
+                return
+            }
             val appContext = context.applicationContext
             val intent = Intent(appContext, TaskExecutionService::class.java).apply {
                 action = ACTION_STOP_EXECUTION
@@ -106,6 +115,7 @@ class TaskExecutionService : Service() {
         const val TASK_STARTED_NOTIFICATION_ID = 1004
 
         fun refreshLanguage(context: Context) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) return
             val localized = localizedContext(context)
             val manager = NotificationManagerCompat.from(context)
             listOf(
@@ -145,6 +155,8 @@ class TaskExecutionService : Service() {
 
         /** 发送定时任务启动通知（场景 b） */
         fun notifyAutomationStarted(context: Context, taskTitle: String): Boolean {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner)
+                return com.droidance.runtime.RuntimeNotifications.post(context, TASK_STARTED_NOTIFICATION_ID, R.string.automation_started_notification_title, taskTitle)
             if (suppressForegroundNotification(context, "task_started")) return true
             val l10n = localizedContext(context)
             val channel = NotificationChannelCompat.Builder(
@@ -189,6 +201,8 @@ class TaskExecutionService : Service() {
 
         /** 发送任务完成通知（场景 e） */
         fun notifyTaskCompleted(context: Context, taskTitle: String? = null, summary: String): Boolean {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner)
+                return com.droidance.runtime.RuntimeNotifications.post(context, TASK_DONE_NOTIFICATION_ID, R.string.task_completed_notification_title, summary)
             if (suppressForegroundNotification(context, "task_complete")) return true
             val l10n = localizedContext(context)
             val channel = NotificationChannelCompat.Builder(
@@ -231,6 +245,8 @@ class TaskExecutionService : Service() {
 
         /** 发送任务中断/失败通知（场景 c） */
         fun notifyTaskInterrupted(context: Context, taskTitle: String? = null, reason: String): Boolean {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner)
+                return com.droidance.runtime.RuntimeNotifications.post(context, TASK_DONE_NOTIFICATION_ID, R.string.task_interrupted_notification_title, reason)
             if (suppressForegroundNotification(context, "task_interrupted")) return true
             val l10n = localizedContext(context)
             val channel = NotificationChannelCompat.Builder(
@@ -297,6 +313,8 @@ class TaskExecutionService : Service() {
          * 正文就是模型最终给用户的那段话本身：不带成败标题、不加前缀，展开即全文。
          */
         fun notifyTaskDone(context: Context, text: String): Boolean {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner)
+                return com.droidance.runtime.RuntimeNotifications.post(context, TASK_DONE_NOTIFICATION_ID, R.string.task_completed_notification_title, text)
             if (suppressForegroundNotification(context, "task_complete")) return true
             val l10n = localizedContext(context)
             // 创建通知渠道（高优先级，有声音）
@@ -337,6 +355,11 @@ class TaskExecutionService : Service() {
             return result.isSuccess && nm.areNotificationsEnabled()
         }
         fun notifyManualTakeoverRequired(context: Context, detail: String? = null) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+                com.droidance.runtime.RuntimeNotifications.post(context, MANUAL_TAKEOVER_NOTIFICATION_ID,
+                    R.string.manual_takeover_channel_name, detail.orEmpty())
+                return
+            }
             if (suppressForegroundNotification(context, "manual_takeover")) return
             val l10n = localizedContext(context)
             val channel = NotificationChannelCompat.Builder(
@@ -385,6 +408,7 @@ class TaskExecutionService : Service() {
 
         /** Background tasks cannot force a runtime-permission dialog; this opens the normal host. */
         fun notifyRuntimePermissionRequired(context: Context, detail: String) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) return
             if (suppressForegroundNotification(context, "runtime_permission")) return
             val l10n = localizedContext(context)
             val channel = NotificationChannelCompat.Builder(
@@ -428,6 +452,10 @@ class TaskExecutionService : Service() {
         }
 
         fun cancelManualTakeover(context: Context) {
+            if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
+                com.droidance.runtime.RuntimeNotifications.cancel(context, MANUAL_TAKEOVER_NOTIFICATION_ID)
+                return
+            }
             try {
                 NotificationManagerCompat.from(context).cancel(MANUAL_TAKEOVER_NOTIFICATION_ID)
             } catch (_: SecurityException) {

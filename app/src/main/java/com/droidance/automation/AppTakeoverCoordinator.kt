@@ -55,7 +55,8 @@ class AppTakeoverCoordinator @Inject constructor(
     private val virtualSpaceManager: VirtualSpaceManager,
     private val virtualSpaceSidecarBridge: VirtualSpaceSidecarBridge,
     private val ruleConfigManager: RuleConfigManager,
-    private val providerConfigManager: com.droidance.settings.ProviderConfigManager
+    private val providerConfigManager: com.droidance.settings.ProviderConfigManager,
+    private val residentNotifications: ResidentNotificationAccess
 ) {
     @Volatile private var started = false
 
@@ -76,6 +77,21 @@ class AppTakeoverCoordinator @Inject constructor(
                         "app_takeover signal=notification package=${info.packageName}"
                     )
                 }
+            }
+        }
+        appScope.launch(Dispatchers.IO) {
+            var seen = emptySet<String>()
+            while (currentCoroutineContext().isActive) {
+                if (store.hasEnabledWatches()) {
+                    try {
+                        val notifications = residentNotifications.getAllNotifications()
+                        val current = notifications.map { "${it.key}:${it.timestamp}" }.toSet()
+                        notifications.filter { "${it.key}:${it.timestamp}" !in seen }.forEach(NotificationWatcher::publish)
+                        seen = current
+                    } catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { /* The system listener may not be connected yet. */ }
+                }
+                delay(thresholds().appTakeoverSchedulerMaxSleepMs)
             }
         }
         appScope.launch(Dispatchers.Default) { schedulerLoop() }

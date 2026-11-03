@@ -39,6 +39,7 @@ import javax.inject.Inject
 @HiltAndroidApp
 class DroidanceApp : Application(), Configuration.Provider {
 
+    @Inject lateinit var runtimeProcessClient: com.droidance.runtime.RuntimeProcessClient
     @Inject lateinit var foregroundState: com.droidance.agent.AppForegroundState
     @Inject lateinit var builtinSkillInstaller: com.droidance.skill.BuiltinSkillInstaller
 
@@ -81,11 +82,22 @@ class DroidanceApp : Application(), Configuration.Provider {
     override fun onCreate() {
         // Do not initialize Hilt, credentials, or app state in the isolated worker.
         // Application.onCreate itself is empty; the Hilt superclass performs injection.
-        if (getProcessName().substringAfter(':', "").startsWith("program_worker")) return
+        val role = getProcessName().substringAfter(':', "")
+        if (role.startsWith("program_worker") || role == "input_driver") return
         super.onCreate()
         builtinSkillInstaller.install()
-        deferredMemoryWriter.resume()
-        experiences.resume()
+        initializeRuntimeStorage()
+        if (runtimeProcessClient.isOwner) {
+            deferredMemoryWriter.resume()
+            experiences.resume()
+            agentProcessRecoveryCoordinator.start()
+            appTakeoverCoordinator.start()
+            automationManager.restoreSchedules()
+            automationCoordinator.start()
+            applicationScope.launch(Dispatchers.IO) { installedAppsManager.init() }
+            return
+        }
+        runtimeProcessClient.managedStorageEnabled = true
         // 追踪自身 Activity 前台状态，用于悬浮窗可见性判断
         val foregroundActivities = RuntimeForegroundActivities<Activity>()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
@@ -100,20 +112,36 @@ class DroidanceApp : Application(), Configuration.Provider {
                 val onMainDisplay = activity !is com.droidance.agent.device.VirtualSpaceProbeActivity &&
                     (displayId == Display.DEFAULT_DISPLAY || displayId == null)
                 foregroundState.update(foregroundActivities.resume(activity, onMainDisplay))
+                runtimeProcessClient.send("foreground", android.os.Bundle().apply { putBoolean("visible", foregroundState.isInForeground) })
             }
             override fun onActivityPaused(activity: Activity) {
                 foregroundState.update(foregroundActivities.remove(activity))
+                runtimeProcessClient.send("foreground", android.os.Bundle().apply { putBoolean("visible", foregroundState.isInForeground) })
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) = Unit
             override fun onActivityStarted(activity: Activity) = Unit
             override fun onActivityStopped(activity: Activity) {
                 foregroundState.update(foregroundActivities.remove(activity))
+                runtimeProcessClient.send("foreground", android.os.Bundle().apply { putBoolean("visible", foregroundState.isInForeground) })
             }
             override fun onActivitySaveInstanceState(activity: Activity, outState: android.os.Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) {
                 foregroundState.update(foregroundActivities.remove(activity))
+                runtimeProcessClient.send("foreground", android.os.Bundle().apply { putBoolean("visible", foregroundState.isInForeground) })
             }
         })
+        KeepAliveJobService.schedule(this)
+        heartbeatManager.startHeartbeat()
+        registerNetworkCallback()
+        airModePairingManager.ensureConnectedIfPaired()
+        applicationScope.launch(Dispatchers.IO) {
+            installedAppsManager.init()
+            com.droidance.daemon.startAppInventoryMaintenance(this@DroidanceApp, installedAppsManager, applicationScope)
+            capabilityRegistry.monitorChannelAvailability { installedAppsManager.refreshIfIncomplete() }
+        }
+    }
+
+    private fun initializeRuntimeStorage() {
         initDataDirectories()
         agentWorkspaceStore.initializeDefault()
         ruleConfigManager.initialize()
@@ -122,19 +150,6 @@ class DroidanceApp : Application(), Configuration.Provider {
         deepLinkKnowledgeStore.configureFailurePolicy(kotlinx.serialization.json.Json.decodeFromString(
             ruleConfigManager.readMarkdownSection("device_tools.md", "route_failure_policy")))
         deepLinkKnowledgeStore.initializeBuiltinKnowledge()
-        agentProcessRecoveryCoordinator.start()
-        heartbeatManager.startHeartbeat()
-        KeepAliveJobService.schedule(this)
-        registerNetworkCallback()
-        appTakeoverCoordinator.start()
-        automationCoordinator.start()
-        automationManager.restoreSchedules()
-        airModePairingManager.ensureConnectedIfPaired()
-        applicationScope.launch(Dispatchers.IO) {
-            installedAppsManager.init()
-            com.droidance.daemon.startAppInventoryMaintenance(this@DroidanceApp, installedAppsManager, applicationScope)
-            capabilityRegistry.monitorChannelAvailability { installedAppsManager.refreshIfIncomplete() }
-        }
     }
 
     private fun registerNetworkCallback() {
@@ -182,7 +197,8 @@ class DroidanceApp : Application(), Configuration.Provider {
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (!getProcessName().substringAfter(':', "").startsWith("program_worker")) refreshLanguage()
+        val role = getProcessName().substringAfter(':', "")
+        if (!role.startsWith("program_worker") && role != "input_driver") refreshLanguage()
     }
 
     private fun refreshLanguage() {

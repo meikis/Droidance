@@ -79,6 +79,8 @@ class ToolExecutor @Inject constructor(
     private val diagnostics: DiagnosticsCollector,
     private val ruleConfigManager: com.droidance.config.RuleConfigManager,
     private val executionSettingsRepository: ExecutionSettingsRepository,
+    private val platformDriver: com.droidance.agent.device.NativeInputDriverClient,
+    private val residentNotifications: com.droidance.automation.ResidentNotificationAccess,
     private val capabilityRegistry: RuntimeCapabilityRegistry,
     private val executionContextStore: ExecutionContextStore,
     private val virtualSpaceManager: VirtualSpaceManager,
@@ -997,7 +999,8 @@ class ToolExecutor @Inject constructor(
             },
             requestTurnId = { toolTurnServices.requireCurrent().sessionContext.turnId },
             requestModelSelection = { checkNotNull(toolTurnServices.requireCurrent().sessionContext
-                .getTyped<com.droidance.automation.AppTakeoverModelSelection>()) }
+                .getTyped<com.droidance.automation.AppTakeoverModelSelection>()) },
+            notifications = residentNotifications
         ).registerAll()
         val keyInput = KeyInputService(deviceBackend)
         val contentQueryService = AndroidContentQueryService(
@@ -1014,6 +1017,12 @@ class ToolExecutor @Inject constructor(
             },
             onPermissionResolved = { request, outcome ->
                 toolTurnServices.requireCurrent().interaction.resolveRuntimePermissionRequest(request, outcome)
+            },
+            platformDispatch = { operation, arguments ->
+                val reply = platformDriver.command("content", android.os.Bundle().apply {
+                    putString("operation", operation); putString("arguments", arguments)
+                })
+                Json.decodeFromString<ToolExecutionResult>(reply.getString("result")!!)
             }
         )
 
