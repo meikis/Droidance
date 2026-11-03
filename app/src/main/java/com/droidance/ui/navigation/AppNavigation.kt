@@ -129,7 +129,9 @@ fun AppNavigation(
     agentRuntime: AgentRuntime,
     lastConversationId: String? = null,
     initialPrompt: String? = null,
-    initialAutoSend: Boolean = false
+    initialAutoSend: Boolean = false,
+    resultConversationId: String? = null,
+    onResultOpened: () -> Unit = {}
 ) = Box(Modifier.fillMaxSize()) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -180,6 +182,17 @@ fun AppNavigation(
     val currentConversationId = remember(navBackStackEntry) {
         navBackStackEntry?.arguments?.getString("conversationId")
             ?: navBackStackEntry?.arguments?.getString("threadId")?.takeIf { it.isNotBlank() }
+    }
+
+    LaunchedEffect(resultConversationId) {
+        val conversationId = resultConversationId ?: return@LaunchedEffect
+        drawerState.close()
+        navController.navigate(SubRoutes.buildChatRoute(conversationId)) {
+            // A fresh chat entry follows the saved result even if this conversation was scrolled up.
+            popUpTo(navController.graph.id)
+            launchSingleTop = true
+        }
+        onResultOpened()
     }
 
     // 在对话页拦截系统返回手势 → 先弹出抽屉；抽屉已开时由 ModalNavigationDrawer 自动关闭

@@ -40,9 +40,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.droidance.R
+import com.droidance.MainActivity
 import com.droidance.agent.AgentRuntime
 import com.droidance.core.agent.AgentState
 import com.droidance.core.agent.di.ApplicationScope
+import com.droidance.core.agent.event.AgentEventStore
+import com.droidance.core.agent.event.AgentThreadProjectionResult
 import com.droidance.agent.OperationRecorder
 import com.droidance.core.agent.UserDemonstrationActionType
 import com.droidance.core.agent.UserDemonstrationGestureClassifier
@@ -65,6 +68,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,6 +82,7 @@ import kotlinx.coroutines.withContext
 class VirtualSpaceViewerActivity : AppCompatActivity() {
     @Inject lateinit var virtualSpaceManager: VirtualSpaceManager
     @Inject lateinit var agentRuntime: AgentRuntime
+    @Inject lateinit var eventStore: AgentEventStore
     @Inject lateinit var runtimeSurfaceController: RuntimeSurfaceController
     @Inject lateinit var debugLogManager: DebugLogManager
     @Inject lateinit var operationRecorder: OperationRecorder
@@ -118,6 +125,7 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
     private val pendingLearningCaptures = AtomicInteger(0)
     private var closingTeachingSession = false
     private var stopRequested = false
+    private var returningToResult = false
     private var backDispatchInFlight = false
     private val performanceTracker = VirtualSpaceViewerPerformanceTracker()
     private val density: Float get() = resources.displayMetrics.density
@@ -218,6 +226,7 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
                 launch {
                     runtimeSurfaceController.virtualSpaceHandCue.collect(::replayHandCue)
                 }
+                launch { returnAfterTaskCompletion() }
             }
         }
     }
@@ -255,6 +264,24 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
     }
 
     private fun hasViewableVirtualSpace(): Boolean = virtualSpaceManager.activeBinding() != null
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private suspend fun returnAfterTaskCompletion() {
+        agentRuntime.currentConversationId.flatMapLatest { conversationId ->
+            if (conversationId == null) emptyFlow()
+            else eventStore.observeThreadProjectionResult(conversationId)
+                .map { projection ->
+                    (projection as? AgentThreadProjectionResult.Projected)?.thread
+                        ?.takeUnless { it.metadata.tombstoned }?.turns.orEmpty()
+                }
+                .completedViewerTasks()
+        }.collect { turn ->
+            if (!viewerVisible || isTeaching() || stopRequested || returningToResult || isFinishing) return@collect
+            returningToResult = true
+            startActivity(MainActivity.taskResultIntent(this, turn.threadId))
+            finish()
+        }
+    }
 
     private fun buildContentView(): View {
         rootContainer = FrameLayout(this).apply {

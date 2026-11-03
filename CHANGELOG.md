@@ -10,6 +10,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Changed
 
+- Automatically return from the virtual-screen viewer to the conversation result when a device task finishes.
 - Reference skills from the chat add menu or @ suggestions, with removable tags and separate built-in capabilities.
 
 ### Fixed
