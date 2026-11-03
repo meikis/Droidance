@@ -34,6 +34,9 @@ class RuntimeProcessClient @Inject constructor(
     val isOwner get() = RuntimeProcessRole.isOwner
     val cacheDir get() = context.cacheDir
     @Volatile var managedStorageEnabled = false
+    private val transferMarker get() = java.io.File(context.noBackupFilesDir, "runtime-storage-transferred")
+    /** Local storage stays authoritative until the one initial transfer to the resident owner succeeds. */
+    val storageTransferred get() = transferMarker.isFile
     fun file(operation: String, path: String, arguments: Bundle = Bundle()): Bundle =
         command("file", Bundle(arguments).apply { putString("operation", operation); putString("path", path) })
     private val presence = android.os.Binder()
@@ -87,6 +90,7 @@ class RuntimeProcessClient @Inject constructor(
                     synchronized(connectionLock) { if (connection?.asBinder() == owner.asBinder()) connection = null }
                 }, 0)
                 decode(owner.command("attach", Bundle().apply { putBinder("client", presence) }))
+                if (!transferMarker.isFile) transferMarker.createNewFile()
                 connection = owner
                 startPolling()
                 owner

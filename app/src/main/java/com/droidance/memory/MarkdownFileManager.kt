@@ -33,7 +33,7 @@ class MarkdownFileManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val runtimeClient: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>?
 ) : MemoryDocumentStorage, com.droidance.core.knowledge.skill.SkillDocumentStorage {
-    private val remote get() = runtimeClient?.get()?.takeIf { !it.isOwner && it.managedStorageEnabled }
+    private val remote get() = runtimeClient?.get()?.takeIf { !it.isOwner && it.managedStorageEnabled && it.storageTransferred }
     private val ioLock = ReentrantReadWriteLock()
 
     // 数据根目录：权威位置收敛至内部私有目录（noBackupFilesDir）
