@@ -88,10 +88,10 @@
     <string name="drawer_share_markdown">分享为 Markdown</string>
     <string name="composer_pending_image">待发送图片</string>
     <string name="composer_selected_images">已选择 %1$d 张图片</string>
-    <string name="composer_input_hint">输入需求，@ 引用技能</string>
+    <string name="composer_input_hint">发送消息或任务</string>
     <string name="composer_attachment">附件</string>
     <string name="composer_send">发送</string>
-    <string name="composer_choose_skill">引用技能</string>
+    <string name="composer_choose_skill">技能</string>
     <string name="composer_skill_draft">草稿</string>
     <string name="composer_skill_hint">选择后添加到输入框，补充本次需求再发送。技能可以重复使用。</string>
     <string name="composer_skill_search_hint">搜索技能</string>

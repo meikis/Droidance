@@ -88,10 +88,10 @@
     <string name="drawer_share_markdown">Share as Markdown</string>
     <string name="composer_pending_image">Pending image</string>
     <string name="composer_selected_images">%1$d images selected</string>
-    <string name="composer_input_hint">Send a message, @ to add a skill</string>
+    <string name="composer_input_hint">Send a message or task</string>
     <string name="composer_attachment">Attachment</string>
     <string name="composer_send">Send</string>
-    <string name="composer_choose_skill">Reference skill</string>
+    <string name="composer_choose_skill">Skills</string>
     <string name="composer_skill_draft">Draft</string>
     <string name="composer_skill_hint">Add a skill to the composer, describe this request, then send. Skills can be reused.</string>
     <string name="composer_skill_search_hint">Search skills</string>
