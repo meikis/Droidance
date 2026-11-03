@@ -87,12 +87,13 @@
     <string name="drawer_share_markdown">Share as Markdown</string>
     <string name="composer_pending_image">Pending image</string>
     <string name="composer_selected_images">%1$d images selected</string>
-    <string name="composer_input_hint">Send a message or describe a task</string>
+    <string name="composer_input_hint">Send a message, @ to add a skill</string>
     <string name="composer_attachment">Attachment</string>
     <string name="composer_send">Send</string>
-    <string name="composer_choose_skill">Choose skills</string>
+    <string name="composer_choose_skill">Reference skill</string>
+    <string name="composer_skill_draft">Draft</string>
     <string name="composer_skill_hint">Add a skill to the composer, describe this request, then send. Skills can be reused.</string>
-    <string name="composer_skill_search_hint">Search skill name, alias, or keyword</string>
+    <string name="composer_skill_search_hint">Search skills</string>
     <string name="composer_no_skills">No skills yet. Create one from a description or recording.</string>
     <string name="composer_no_skill_results">No matching skills. Try another name, alias, or keyword.</string>
     <string name="composer_camera">Camera</string>
@@ -633,6 +634,8 @@
     <string name="execution_image_next">Next image</string>
     <string name="execution_image_position">%1$d / %2$d</string>
     <string name="skill_library_intro">Save reusable methods to use in chat.</string>
+    <string name="skill_builtin_section">Built-in capabilities</string>
+    <string name="skill_builtin_available">Available by default</string>
     <string name="skill_library_empty">No skills yet</string>
     <string name="skill_create_section">Create a skill</string>
     <string name="skill_create_hint">Describe the goal, variable inputs and desired result</string>

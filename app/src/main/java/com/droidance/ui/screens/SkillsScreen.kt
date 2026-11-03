@@ -74,6 +74,8 @@ fun SkillsScreen(
     val autoDraft by viewModel.autoDraft.collectAsStateWithLifecycle()
     val draftWork by viewModel.draftWorkState.collectAsStateWithLifecycle()
     val language = LocalConfiguration.current.locales[0].language
+    val userSkills = skills.filterNot { it.isReadOnly }
+    val builtinSkills = skills.filter { it.isReadOnly }
     val recording by recorderViewModel.recordingState.collectAsStateWithLifecycle()
     val preparing by recorderViewModel.preparing.collectAsStateWithLifecycle()
     val recordingError by recorderViewModel.recordingError.collectAsStateWithLifecycle()
@@ -184,7 +186,7 @@ fun SkillsScreen(
                     Text(stringResource(R.string.skill_finish_demonstration))
                 }
             }
-            if (skills.isEmpty()) item {
+            if (userSkills.isEmpty()) item {
                 SettingsGroup(stringResource(R.string.skill_library_count, 0)) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -194,9 +196,9 @@ fun SkillsScreen(
                     }
                 }
             }
-            itemsIndexed(skills, key = { _, skill -> skill.selectionKey }) { index, skill ->
+            itemsIndexed(userSkills, key = { _, skill -> skill.selectionKey }) { index, skill ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (index == 0) SettingsGroupTitle(stringResource(R.string.skill_library_count, skills.distinctBy { it.id }.size))
+                    if (index == 0) SettingsGroupTitle(stringResource(R.string.skill_library_count, userSkills.distinctBy { it.id }.size))
                     SettingsCardGroup {
                         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -242,6 +244,17 @@ fun SkillsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+            if (builtinSkills.isNotEmpty()) item {
+                SettingsGroup(stringResource(R.string.skill_builtin_section)) {
+                    builtinSkills.forEach { skill ->
+                        ListItem(headlineContent = { Text(skill.displayName(language)) },
+                            supportingContent = { Text(stringResource(R.string.skill_builtin_available)) },
+                            trailingContent = { Icon(DroidanceIcons.ChevronRight, null, Modifier.size(16.dp)) },
+                            modifier = Modifier.clickable { selectedSkillId = skill.selectionKey },
+                            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
                     }
                 }
             }
@@ -362,7 +375,7 @@ private fun SkillDetailPage(
                 } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
         },
         bottomBar = {
-            Button(onClick = onSelect, modifier = Modifier.fillMaxWidth().padding(16.dp), shape = AppShapes.Control) {
+            if (!skill.isReadOnly) Button(onClick = onSelect, modifier = Modifier.fillMaxWidth().padding(16.dp), shape = AppShapes.Control) {
                 Text(stringResource(R.string.skill_add_to_chat))
             }
         }
@@ -371,7 +384,8 @@ private fun SkillDetailPage(
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(skill.displayDescription(language), style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!skill.isDraft) Row(verticalAlignment = Alignment.CenterVertically) {
+            if (skill.isReadOnly) Text(stringResource(R.string.skill_builtin_available), style = MaterialTheme.typography.labelMedium)
+            else if (!skill.isDraft) Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.skill_auto_use), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 Switch(skill.enabled && skill.allowImplicitInvocation, onCheckedChange = onAutoInvocationChanged)
             } else Text(stringResource(R.string.skill_draft_use_hint), style = MaterialTheme.typography.bodySmall)

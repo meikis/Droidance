@@ -148,6 +148,7 @@ class SkillEngine @Inject constructor(
     }
 
     private fun withLocalPreferences(skill: SkillInfo): SkillInfo {
+        if (skill.isReadOnly) return skill.copy(enabled = true, allowImplicitInvocation = true)
         if (skill.isDraft) return skill
         val path = "skill-preferences/${skill.id}/policy.json"
         if (!fileManager.exists(path)) return skill

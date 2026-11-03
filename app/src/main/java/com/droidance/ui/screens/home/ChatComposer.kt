@@ -8,7 +8,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import com.droidance.ui.theme.AppIconSize
-import com.droidance.ui.components.droidanceFloatingSurfaceColor
 import com.droidance.ui.theme.AppShapes
 import android.app.Activity
 import android.app.ActivityManager
@@ -20,6 +19,7 @@ import android.util.Log
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -38,9 +38,12 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
@@ -65,7 +68,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -85,10 +87,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalFocusManager
@@ -100,15 +98,23 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import com.droidance.ui.components.DroidanceDropdownMenu
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -116,11 +122,8 @@ import coil.compose.AsyncImage
 import com.droidance.R
 import com.droidance.ui.components.rememberAppHaptics
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.ui.platform.LocalConfiguration
 import com.droidance.core.knowledge.skill.SkillInfo
-import com.droidance.core.agent.device.ExecutionSpace
 import com.droidance.agent.ConversationSubmissionMode
 import com.droidance.ui.viewmodel.UIMessage
 import com.droidance.ui.viewmodel.ComposerModelOption
@@ -149,7 +152,7 @@ internal fun ChatInputBar(
     initialText: String = "",
     initialSkillId: String? = null,
     initialSkillDraft: Boolean = false,
-    onOpenSkill: (SkillInfo) -> Unit = {},
+    onManageSkills: () -> Unit = {},
     modelOptions: List<ComposerModelOption> = emptyList(),
     preferences: ComposerPreferences = ComposerPreferences(),
     onOpenModelPicker: () -> Unit = {},
@@ -182,35 +185,71 @@ internal fun ChatInputBar(
     val language = LocalConfiguration.current.locales[0].language
     val draftFormat = stringResource(R.string.skill_selected_draft, "%s")
     val draftLabel: (String) -> String = { draftFormat.replace("%s", it) }
-    val mentions = findSkillMentions(inputText, availableSkills, language, draftLabel)
-    val selectedSkills = mentions.map { it.skill }.distinctBy { it.selectionKey }
-    val mentionQuery = activeSkillQuery(inputText, editorState.selection.start, mentions)
-    val suggestions = mentionQuery?.let { queryRange ->
-        val query = inputText.substring(queryRange.first + 1, editorState.selection.start)
-        availableSkills.filter { it.displayName(language).contains(query, ignoreCase = true) ||
-            it.name.contains(query, ignoreCase = true) }.take(6)
+    val referenceSaver = remember {
+        androidx.compose.runtime.saveable.Saver<List<ComposerSkillReference>, String>(
+            save = { Json.encodeToString(it) }, restore = { Json.decodeFromString(it) })
+    }
+    var selectedSkills by rememberSaveable(stateSaver = referenceSaver) {
+        mutableStateOf(emptyList<ComposerSkillReference>())
+    }
+    var manualSkillPicker by remember { mutableStateOf(false) }
+    var skillSearch by remember { mutableStateOf("") }
+    var dismissedSkillQuery by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    var highlightedSkill by remember { mutableStateOf(0) }
+    var skillPreview by remember { mutableStateOf<ComposerSkillReference?>(null) }
+    val mentionQuery = if (editorState.selection.collapsed)
+        activeSkillQuery(inputText, editorState.selection.start, emptyList()) else null
+    val queryIdentity = inputText to editorState.selection.start
+    val showMentionPicker = mentionQuery != null && dismissedSkillQuery != queryIdentity && isInputFocused
+    val skillQuery = if (manualSkillPicker) skillSearch else mentionQuery?.let {
+        inputText.substring(it.first + 1, editorState.selection.start)
     }.orEmpty()
+    val suggestions = selectableSkills(availableSkills, skillQuery)
+    LaunchedEffect(skillQuery) { highlightedSkill = 0 }
     var initialSkillInserted by rememberSaveable(initialSkillId, initialSkillDraft) { mutableStateOf(false) }
     LaunchedEffect(initialSkillId, initialSkillDraft, availableSkills) {
         if (!initialSkillInserted && initialSkillId != null) {
-            val skill = availableSkills.firstOrNull { it.id == initialSkillId && it.isDraft == initialSkillDraft }
+            val skill = availableSkills.firstOrNull { !it.isReadOnly && it.id == initialSkillId && it.isDraft == initialSkillDraft }
             if (skill != null) {
-                val prefix = skillMentionLabel(skill, language, draftLabel) + " "
-                editorState.edit { replace(0, 0, prefix); selection = TextRange(prefix.length) }
+                val reference = ComposerSkillReference.from(skill, language)
+                if (selectedSkills.none { it.selectionKey == reference.selectionKey }) selectedSkills = selectedSkills + reference
                 initialSkillInserted = true
             }
         }
     }
-    LaunchedEffect(inputText) { onDraftChanged(inputText.isNotEmpty()) }
 
     var showAttachments by remember { mutableStateOf(false) }
     var pendingImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var composerTop by remember { mutableStateOf(0f) }
+    val density = LocalDensity.current
+    LaunchedEffect(inputText, selectedSkills, pendingImageUris) {
+        onDraftChanged(inputText.isNotEmpty() || selectedSkills.isNotEmpty() || pendingImageUris.isNotEmpty())
+    }
 
     fun requestKeyboardActivation() {
         keyboardActivationId++
         keyboardActivationRequested = true
     }
+
+    fun selectSkill(skill: SkillInfo) {
+        val reference = ComposerSkillReference.from(skill, language)
+        selectedSkills = selectedSkills.filterNot { it.selectionKey == reference.selectionKey } + reference
+        if (!manualSkillPicker && mentionQuery != null) {
+            val start = mentionQuery.first
+            val end = editorState.selection.start
+            editorState.edit { replace(start, end, ""); selection = TextRange(start) }
+        }
+        manualSkillPicker = false
+        showAttachments = false
+        dismissedSkillQuery = null
+        requestKeyboardActivation()
+    }
+    fun dismissSkillPicker() {
+        manualSkillPicker = false
+        dismissedSkillQuery = queryIdentity
+    }
+    BackHandler(enabled = showMentionPicker && !manualSkillPicker) { dismissSkillPicker() }
 
     // Both editor and padding taps authorize exactly one activation. Loading messages,
     // restored focus and returning from another window must never authorize a show.
@@ -297,10 +336,8 @@ internal fun ChatInputBar(
         if (!isEnabled ||
             (inputText.isBlank() && pendingImageUris.isEmpty() && selectedSkills.isEmpty())
         ) return
-        val text = inputText.trim()
-        val requestedSkills = selectedSkills.map {
-            com.droidance.core.agent.RequestedSkill(it.name, it.revision, it.isDraft)
-        }
+        val text = skillSubmissionText(inputText, selectedSkills, draftLabel)
+        val requestedSkills = selectedSkills.map { it.requestedSkill() }
         val uris = pendingImageUris
         val accepted = if (uris.isNotEmpty()) onSendImages(text, uris, ConversationSubmissionMode.QUEUE, requestedSkills)
             else onSendMessage(text, ConversationSubmissionMode.QUEUE, requestedSkills)
@@ -313,6 +350,9 @@ internal fun ChatInputBar(
             keyboardController?.hide()
         }
         pendingImageUris = emptyList()
+        selectedSkills = emptyList()
+        manualSkillPicker = false
+        dismissedSkillQuery = null
         editorState.edit { replace(0, length, "") }
         showAttachments = false
     }
@@ -374,284 +414,267 @@ internal fun ChatInputBar(
             PendingImageStrip(pendingImageUris, onRemove = { uri -> pendingImageUris = pendingImageUris - uri })
         }
 
-        ChatComposerSurface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .animateContentSize(
-                    animationSpec = tween(AppMotion.ContentMillis, easing = AppMotion.Settle),
-                    alignment = Alignment.BottomStart
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    if (isEnabled) {
-                        requestKeyboardActivation()
-                    }
-                },
-            shape = AppShapes.Large,
-            isFocused = isInputFocused
-        ) {
-            Column(
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+            .onGloballyPositioned { composerTop = it.positionInWindow().y }) {
+            ChatComposerSurface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 6.dp)
-            ) {
-                if (suggestions.isNotEmpty() && mentionQuery != null) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
-                        suggestions.forEach { skill ->
-                            Text(
-                                text = skillMentionLabel(skill, language, draftLabel),
-                                color = Color(0xFF3478F6),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    val label = skillMentionLabel(skill, language, draftLabel) + " "
-                                    val start = mentionQuery.first
-                                    val end = editorState.selection.start
-                                    editorState.edit {
-                                        replace(start, end, label)
-                                        selection = TextRange(start + label.length)
-                                    }
-                                    requestKeyboardActivation()
-                                }.padding(horizontal = 16.dp, vertical = 10.dp)
-                            )
+                    .animateContentSize(
+                        animationSpec = tween(AppMotion.ContentMillis, easing = AppMotion.Settle),
+                        alignment = Alignment.BottomStart
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        if (isEnabled) {
+                            requestKeyboardActivation()
                         }
-                    }
-                }
-                // Idle and empty: one row with attach, editor and send. Focus or content opens the
-                // full composer with the model controls; the editor keeps its slot either way.
-                val compact = !isInputFocused && !modelMenuOpen && inputText.isEmpty() && selectedSkills.isEmpty() &&
-                    pendingImageUris.isEmpty()
-                val attachButton: @Composable () -> Unit = {
-                    IconButton(
-                        onClick = {
-                            keyboardActivationRequested = false
-                            keyboardFocusAuthorized = false
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                            showAttachments = !showAttachments
-                        },
-                        enabled = isEnabled,
-                        modifier = Modifier.size(ComposerIconButtonSize)
-                    ) {
-                        ConversationActionGlyph(
-                            R.drawable.ic_conversation_add,
-                            contentDescription = stringResource(R.string.composer_attachment),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-                val sendButton: @Composable () -> Unit = {
-                    val sendInteractionSource = remember { MutableInteractionSource() }
-                    val isSendPressed by sendInteractionSource.collectIsPressedAsState()
-                    val sendScale by animateFloatAsState(
-                        targetValue = if (isSendPressed) 0.97f else 1f,
-                        animationSpec = tween(
-                            if (isSendPressed) AppMotion.PressMillis else AppMotion.FeedbackMillis,
-                            easing = AppMotion.Settle
-                        ),
-                        label = "sendButtonScale"
-                    )
-                    val canSubmit = isEnabled &&
-                        (inputText.isNotBlank() || pendingImageUris.isNotEmpty() || selectedSkills.isNotEmpty())
-                    val sendContainerColor by animateColorAsState(
-                        if (canSubmit) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f),
-                        tween(AppMotion.FeedbackMillis, easing = AppMotion.Settle),
-                        label = "sendContainerColor"
-                    )
-                    val sendContentColor by animateColorAsState(
-                        if (canSubmit) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.26f),
-                        tween(AppMotion.FeedbackMillis, easing = AppMotion.Settle),
-                        label = "sendContentColor"
-                    )
-                    val sendBorderColor by animateColorAsState(
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = if (canSubmit) 0f else 0.06f),
-                        tween(AppMotion.FeedbackMillis, easing = AppMotion.Settle),
-                        label = "sendBorderColor"
-                    )
-                    IconButton(
-                        onClick = { submitMessage() },
-                        enabled = canSubmit,
-                        interactionSource = sendInteractionSource,
-                        modifier = Modifier.size(ComposerIconButtonSize),
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(ComposerActionControlSize)
-                                .graphicsLayer {
-                                    scaleX = sendScale
-                                    scaleY = sendScale
+                    },
+                shape = AppShapes.Large,
+                isFocused = isInputFocused
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 6.dp)
+                ) {
+                    ComposerSkillReferences(selectedSkills, isEnabled,
+                        onOpen = { skillPreview = it },
+                        onRemove = { reference -> selectedSkills = selectedSkills.filterNot { it.selectionKey == reference.selectionKey } })
+                    // Idle and empty: one row with attach, editor and send. Focus or content opens the
+                    // full composer with the model controls; the editor keeps its slot either way.
+                    val compact = !isInputFocused && !modelMenuOpen && inputText.isEmpty() && selectedSkills.isEmpty() &&
+                        pendingImageUris.isEmpty()
+                    val attachButton: @Composable () -> Unit = {
+                        Box {
+                            IconButton(
+                                onClick = {
+                                    keyboardActivationRequested = false
+                                    keyboardFocusAuthorized = false
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    dismissSkillPicker()
+                                    showAttachments = !showAttachments
                                 },
-                            shape = CircleShape,
-                            color = sendContainerColor,
-                            contentColor = sendContentColor,
-                            border = BorderStroke(1.dp, sendBorderColor)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+                                enabled = isEnabled,
+                                modifier = Modifier.size(ComposerIconButtonSize)
+                            ) {
                                 ConversationActionGlyph(
-                                    R.drawable.ic_conversation_send,
-                                    stringResource(R.string.composer_send)
+                                    R.drawable.ic_conversation_add,
+                                    contentDescription = stringResource(R.string.composer_attachment),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            DroidanceDropdownMenu(showAttachments && isEnabled,
+                                onDismissRequest = { showAttachments = false }) {
+                                AttachmentPanel(
+                                    onChooseSkill = { showAttachments = false; skillSearch = ""; manualSkillPicker = true },
+                                    onTakePhoto = {
+                                        runCatching { createComposerCameraUri(context) }.onSuccess { uri ->
+                                            pendingCameraUri = uri; cameraLauncher.launch(uri)
+                                        }.onFailure { pendingCameraUri = null; onError(context.getString(R.string.composer_camera_failed)) }
+                                    },
+                                    onPickImage = { imagePicker.launch("image/*") },
+                                    onDismiss = { showAttachments = false }
                                 )
                             }
                         }
                     }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) 6.dp else 0.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (compact) attachButton()
-                    val mentionColor = if (LocalAppIsDark.current) Color(0xFF8AB4FF) else Color(0xFF276CE0)
-                    var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-                    val density = LocalDensity.current
-                    val editorScroll = rememberScrollState()
-                    BasicTextField(
-                        state = editorState,
-                        enabled = isEnabled,
-                        interactionSource = inputInteractionSource,
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(focusRequester)
-                            .onFocusChanged { isInputFocused = it.isFocused }
-                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                            .drawWithContent {
-                                drawContent()
-                                val layout = textLayout
-                                if (layout != null) {
-                                    val leftInset = 12.dp.toPx()
-                                    val topInset = 8.dp.toPx() - editorScroll.value
-                                    mentions.forEach { mention ->
-                                        for (index in mention.start until minOf(mention.end, layout.layoutInput.text.length)) {
-                                            val bounds = layout.getBoundingBox(index)
-                                            clipRect(bounds.left + leftInset, bounds.top + topInset,
-                                                bounds.right + leftInset, bounds.bottom + topInset) {
-                                                drawRect(mentionColor, blendMode = BlendMode.SrcAtop)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .semantics {
-                                onClick {
-                                    if (isEnabled) requestKeyboardActivation()
-                                    true
-                                }
-                            }
-                            .pointerInput(isEnabled, mentions) {
-                                awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                    val up = waitForUpOrCancellation(pass = PointerEventPass.Initial)
-                                    if (up != null && isEnabled) {
-                                        val position = up.position - androidx.compose.ui.geometry.Offset(
-                                            with(density) { 12.dp.toPx() }, with(density) { 8.dp.toPx() } - editorScroll.value)
-                                        val layout = textLayout
-                                        val nearest = layout?.getOffsetForPosition(position)
-                                        val offset = nearest?.let { index ->
-                                            listOf(index, index - 1).firstOrNull {
-                                                it >= 0 && it < inputText.length && layout.getBoundingBox(it).contains(position)
-                                            }
-                                        }
-                                        val mention = mentions.firstOrNull { offset != null && offset >= it.start && offset < it.end }
-                                        if (mention != null) onOpenSkill(mention.skill) else requestKeyboardActivation()
-                                    }
-                                }
-                            },
-                        onTextLayout = { getResult -> textLayout = getResult() },
-                        scrollState = editorScroll,
-                        decorator = { innerTextField ->
-                            OutlinedTextFieldDefaults.DecorationBox(
-                                value = inputText,
-                                innerTextField = innerTextField,
-                                enabled = isEnabled,
-                                singleLine = false,
-                                visualTransformation = VisualTransformation.None,
-                                interactionSource = inputInteractionSource,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                placeholder = {
-                                    Text(
-                                        text = stringResource(R.string.composer_input_hint),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    val sendButton: @Composable () -> Unit = {
+                        val sendInteractionSource = remember { MutableInteractionSource() }
+                        val isSendPressed by sendInteractionSource.collectIsPressedAsState()
+                        val sendScale by animateFloatAsState(
+                            targetValue = if (isSendPressed) 0.97f else 1f,
+                            animationSpec = tween(
+                                if (isSendPressed) AppMotion.PressMillis else AppMotion.FeedbackMillis,
+                                easing = AppMotion.Settle
+                            ),
+                            label = "sendButtonScale"
+                        )
+                        val canSubmit = isEnabled &&
+                            (inputText.isNotBlank() || pendingImageUris.isNotEmpty() || selectedSkills.isNotEmpty())
+                        val sendContainerColor by animateColorAsState(
+                            if (canSubmit) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f),
+                            tween(AppMotion.FeedbackMillis, easing = AppMotion.Settle),
+                            label = "sendContainerColor"
+                        )
+                        val sendContentColor by animateColorAsState(
+                            if (canSubmit) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.26f),
+                            tween(AppMotion.FeedbackMillis, easing = AppMotion.Settle),
+                            label = "sendContentColor"
+                        )
+                        val sendBorderColor by animateColorAsState(
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = if (canSubmit) 0f else 0.06f),
+                            tween(AppMotion.FeedbackMillis, easing = AppMotion.Settle),
+                            label = "sendBorderColor"
+                        )
+                        IconButton(
+                            onClick = { submitMessage() },
+                            enabled = canSubmit,
+                            interactionSource = sendInteractionSource,
+                            modifier = Modifier.size(ComposerIconButtonSize),
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .size(ComposerActionControlSize)
+                                    .graphicsLayer {
+                                        scaleX = sendScale
+                                        scaleY = sendScale
+                                    },
+                                shape = CircleShape,
+                                color = sendContainerColor,
+                                contentColor = sendContentColor,
+                                border = BorderStroke(1.dp, sendBorderColor)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    ConversationActionGlyph(
+                                        R.drawable.ic_conversation_send,
+                                        stringResource(R.string.composer_send)
                                     )
+                                }
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) 6.dp else 0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (compact) attachButton()
+                        val editorScroll = rememberScrollState()
+                        BasicTextField(
+                            state = editorState,
+                            enabled = isEnabled,
+                            interactionSource = inputInteractionSource,
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { isInputFocused = it.isFocused }
+                                .semantics {
+                                    onClick {
+                                        if (isEnabled) requestKeyboardActivation()
+                                        true
+                                    }
+                                }
+                                .pointerInput(isEnabled) {
+                                    awaitEachGesture {
+                                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                        val up = waitForUpOrCancellation(pass = PointerEventPass.Initial)
+                                        if (up != null && isEnabled) requestKeyboardActivation()
+                                    }
+                                }
+                                .onPreviewKeyEvent { event ->
+                                    if (!showMentionPicker || manualSkillPicker || editorState.composition != null ||
+                                        event.type != KeyEventType.KeyDown) false
+                                    else when (event.key) {
+                                        Key.Escape -> { dismissSkillPicker(); true }
+                                        Key.DirectionDown, Key.DirectionUp -> if (suggestions.isEmpty()) false else {
+                                            highlightedSkill = (highlightedSkill + if (event.key == Key.DirectionDown) 1 else -1)
+                                                .mod(suggestions.size)
+                                            true
+                                        }
+                                        Key.Enter -> suggestions.getOrNull(highlightedSkill.coerceAtMost(suggestions.lastIndex))
+                                            ?.let { selectSkill(it); true } ?: false
+                                        else -> false
+                                    }
                                 },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    disabledBorderColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    disabledContainerColor = Color.Transparent
-                                ),
-                                container = {}
-                            )
-                        },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Send,
-                            keyboardType = KeyboardType.Text,
-                            showKeyboardOnFocus = keyboardFocusAuthorized
-                        ),
-                        onKeyboardAction = { submitMessage() }
-                    )
+                            scrollState = editorScroll,
+                            decorator = { innerTextField ->
+                                OutlinedTextFieldDefaults.DecorationBox(
+                                    value = inputText,
+                                    innerTextField = innerTextField,
+                                    enabled = isEnabled,
+                                    singleLine = false,
+                                    visualTransformation = VisualTransformation.None,
+                                    interactionSource = inputInteractionSource,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    placeholder = {
+                                        Text(
+                                            text = stringResource(R.string.composer_input_hint),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                        )
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent,
+                                        disabledBorderColor = Color.Transparent,
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent
+                                    ),
+                                    container = {}
+                                )
+                            },
+                            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Send,
+                                keyboardType = KeyboardType.Text,
+                                showKeyboardOnFocus = keyboardFocusAuthorized
+                            ),
+                            onKeyboardAction = {
+                                if (showMentionPicker && !manualSkillPicker && suggestions.isNotEmpty())
+                                    selectSkill(suggestions[highlightedSkill.coerceIn(0, suggestions.lastIndex)])
+                                else submitMessage()
+                            }
+                        )
 
-                    if (compact) sendButton()
-                }
+                        if (compact) sendButton()
+                    }
 
-                if (!compact) Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 6.dp, end = 6.dp, top = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    attachButton()
-                    ComposerSelectionControls(
-                        modelOptions = modelOptions,
-                        preferences = preferences,
-                        enabled = isEnabled,
-                        onOpenPicker = {
-                            modelMenuOpen = true
-                            keyboardActivationRequested = false
-                            keyboardFocusAuthorized = false
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        },
-                        onPickerClosed = { modelMenuOpen = false },
-                        onOpenModelPicker = onOpenModelPicker,
-                        onModelSelected = onModelSelected,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    sendButton()
+                    if (!compact) Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 6.dp, end = 6.dp, top = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        attachButton()
+                        ComposerSelectionControls(
+                            modelOptions = modelOptions,
+                            preferences = preferences,
+                            enabled = isEnabled,
+                            onOpenPicker = {
+                                modelMenuOpen = true
+                                keyboardActivationRequested = false
+                                keyboardFocusAuthorized = false
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            },
+                            onPickerClosed = { modelMenuOpen = false },
+                            onOpenModelPicker = onOpenModelPicker,
+                            onModelSelected = onModelSelected,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        sendButton()
+                    }
                 }
             }
+            if (isEnabled && (manualSkillPicker || showMentionPicker)) {
+                ComposerSkillPicker(
+                    skills = suggestions,
+                    selectedKeys = selectedSkills.map { it.selectionKey }.toSet(),
+                    language = language,
+                    width = maxWidth,
+                    maxHeight = (with(density) { composerTop.toDp() } - 24.dp).coerceIn(120.dp, 360.dp),
+                    query = skillQuery,
+                    manual = manualSkillPicker,
+                    highlightedIndex = highlightedSkill.coerceIn(0, suggestions.lastIndex.coerceAtLeast(0)),
+                    onQueryChanged = { skillSearch = it },
+                    onSelect = ::selectSkill,
+                    onManage = { dismissSkillPicker(); onManageSkills() },
+                    onBack = { manualSkillPicker = false; showAttachments = true },
+                    onDismiss = ::dismissSkillPicker
+                )
+            }
         }
-
     }
-    if (showAttachments && isEnabled) ModalBottomSheet(onDismissRequest = { showAttachments = false },
-        containerColor = droidanceFloatingSurfaceColor()) {
-        AttachmentPanel(
-            onChooseSkill = {
-                showAttachments = false
-                val start = editorState.selection.min
-                val end = editorState.selection.max
-                editorState.edit { replace(start, end, "@"); selection = TextRange(start + 1) }
-                requestKeyboardActivation()
-            },
-            onTakePhoto = {
-                runCatching { createComposerCameraUri(context) }.onSuccess { uri ->
-                    pendingCameraUri = uri; cameraLauncher.launch(uri)
-                }.onFailure { pendingCameraUri = null; onError(context.getString(R.string.composer_camera_failed)) }
-            },
-            onPickImage = { imagePicker.launch("image/*") },
-            onDismiss = { showAttachments = false }
-        )
-    }
+    skillPreview?.let { reference -> ComposerSkillDetails(reference) { skillPreview = null } }
 
 }
 
@@ -741,8 +764,8 @@ private fun AttachmentPanel(
     onPickImage: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-        AttachmentOption(stringResource(R.string.skills_title), rememberVectorPainter(DroidanceIcons.Sparkles)) {
+    Column(Modifier.width(208.dp)) {
+        AttachmentOption(stringResource(R.string.composer_choose_skill), rememberVectorPainter(DroidanceIcons.Sparkles)) {
             onChooseSkill()
         }
         AttachmentOption(stringResource(R.string.composer_album), painterResource(R.drawable.ic_conversation_image)) {
@@ -756,15 +779,11 @@ private fun AttachmentPanel(
 
 @Composable
 private fun AttachmentOption(label: String, icon: Painter, onClick: () -> Unit) {
-    // Every option shares one leading size and one trailing chevron size, on the sheet's own colour.
-    ListItem(headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
-        leadingContent = { Icon(icon, null, Modifier.size(AppIconSize.Leading)) },
-        trailingContent = {
-            Icon(DroidanceIcons.ChevronRight, null, Modifier.size(AppIconSize.Inline),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f))
-        },
-        modifier = Modifier.clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+    androidx.compose.material3.DropdownMenuItem(
+        text = { Text(label, style = MaterialTheme.typography.bodyMedium) },
+        leadingIcon = { Icon(icon, null, Modifier.size(AppIconSize.Leading)) },
+        onClick = onClick
+    )
 }
 
 private fun createComposerCameraUri(context: Context): Uri {

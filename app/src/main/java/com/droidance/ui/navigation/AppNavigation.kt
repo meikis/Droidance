@@ -400,6 +400,7 @@ fun AppNavigation(
                     onConnectDevice = connectionViewModel::showDetails,
                     connectionState = connectionState,
                     onOpenSkill = { skill -> navController.navigate("skills/detail?key=${Uri.encode(skill.selectionKey)}") },
+                    onManageSkills = { navController.navigate(SubRoutes.SKILLS) },
                     initialSkillId = backStackEntry.arguments?.getString("skillId"),
                     initialSkillDraft = backStackEntry.arguments?.getBoolean("skillDraft") ?: false
                 )
@@ -419,7 +420,8 @@ fun AppNavigation(
                     onNewConversation = { navController.navigateToNewConversation() },
                     onConnectDevice = connectionViewModel::showDetails,
                     connectionState = connectionState,
-                    onOpenSkill = { skill -> navController.navigate("skills/detail?key=${Uri.encode(skill.selectionKey)}") }
+                    onOpenSkill = { skill -> navController.navigate("skills/detail?key=${Uri.encode(skill.selectionKey)}") },
+                    onManageSkills = { navController.navigate(SubRoutes.SKILLS) }
                 )
             }
 

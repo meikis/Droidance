@@ -47,7 +47,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -83,11 +82,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.platform.LocalConfiguration
 import com.droidance.core.knowledge.skill.SkillInfo
-import com.droidance.ui.theme.LocalAppIsDark
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1055,6 +1051,7 @@ internal fun formatMessageTimestamp(
     ).format(Date(timestampMs))
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun ChatBubble(
     text: String,
@@ -1223,29 +1220,29 @@ internal fun ChatBubble(
                         if (text.isNotBlank()) {
                             val language = LocalConfiguration.current.locales[0].language
                             val draftFormat = stringResource(R.string.skill_selected_draft, "%s")
-                            val mentions = findSkillMentions(text, availableSkills, language) { draftFormat.replace("%s", it) }
-                            if (mentions.isEmpty()) {
-                                SelectionContainer {
-                                    Text(text = text, style = MaterialTheme.typography.bodyMedium,
-                                        textAlign = TextAlign.Justify, color = MaterialTheme.colorScheme.onSurface)
-                                }
-                            } else {
-                                val blue = if (LocalAppIsDark.current) Color(0xFF8AB4FF) else Color(0xFF276CE0)
-                                val annotated = buildAnnotatedString {
-                                    append(text)
-                                    mentions.forEach { mention ->
-                                        addStyle(SpanStyle(color = blue), mention.start, mention.end)
-                                        addStringAnnotation("skill", mention.skill.selectionKey, mention.start, mention.end)
+                            val (skillMentions, messageText) = skillMessageContent(text, availableSkills, language) {
+                                draftFormat.replace("%s", it)
+                            }
+                            if (skillMentions.isNotEmpty()) {
+                                androidx.compose.foundation.layout.FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(bottom = if (messageText.isBlank()) 0.dp else 8.dp)
+                                ) {
+                                    skillMentions.forEach { mention ->
+                                        Surface(onClick = { onOpenSkill(mention.skill) }, shape = AppShapes.Control,
+                                            color = MaterialTheme.colorScheme.secondaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer) {
+                                            Text(skillMentionLabel(mention.skill, language) { draftFormat.replace("%s", it) },
+                                                style = MaterialTheme.typography.labelMedium,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                                        }
                                     }
                                 }
-                                ClickableText(text = annotated,
-                                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface,
-                                        textAlign = TextAlign.Justify),
-                                    onClick = { offset ->
-                                        annotated.getStringAnnotations("skill", offset, offset).firstOrNull()?.let { annotation ->
-                                            mentions.firstOrNull { it.skill.selectionKey == annotation.item }?.let { onOpenSkill(it.skill) }
-                                        }
-                                    })
+                            }
+                            if (messageText.isNotBlank()) SelectionContainer {
+                                Text(text = messageText, style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Justify, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }

@@ -87,12 +87,13 @@
     <string name="drawer_share_markdown">分享为 Markdown</string>
     <string name="composer_pending_image">待发送图片</string>
     <string name="composer_selected_images">已选择 %1$d 张图片</string>
-    <string name="composer_input_hint">发送消息或任务</string>
+    <string name="composer_input_hint">输入需求，@ 引用技能</string>
     <string name="composer_attachment">附件</string>
     <string name="composer_send">发送</string>
-    <string name="composer_choose_skill">选择技能</string>
+    <string name="composer_choose_skill">引用技能</string>
+    <string name="composer_skill_draft">草稿</string>
     <string name="composer_skill_hint">选择后添加到输入框，补充本次需求再发送。技能可以重复使用。</string>
-    <string name="composer_skill_search_hint">搜索技能名称、别名或关键词</string>
+    <string name="composer_skill_search_hint">搜索技能</string>
     <string name="composer_no_skills">还没有技能，可以先描述需求创建或录制操作学习。</string>
     <string name="composer_no_skill_results">没有匹配到技能，换个名称、别名或关键词试试。</string>
     <string name="composer_camera">相机</string>
@@ -630,6 +631,8 @@
     <string name="execution_image_next">下一张</string>
     <string name="execution_image_position">%1$d / %2$d</string>
     <string name="skill_library_intro">保存常用方法，随时在对话中使用。</string>
+    <string name="skill_builtin_section">内置能力</string>
+    <string name="skill_builtin_available">默认可用</string>
     <string name="skill_library_empty">还没有技能</string>
     <string name="skill_create_section">创建技能</string>
     <string name="skill_create_hint">说明目标、可变参数和希望得到的结果</string>

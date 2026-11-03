@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Changed
+
+- Reference skills from the chat add menu or @ suggestions, with removable tags and separate built-in capabilities.
+
 ### Fixed
 
 - Replace the platform reference with Android system actions, including typed alarm calls, direct calendar writes, Shell guidance and result verification.
