@@ -9,16 +9,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Seeds built-in read-only packages from the APK without replacing user-authored packages. */
+/** Installs the complete APK catalog before retiring obsolete built-ins. */
 @Singleton
 class BuiltinSkillInstaller @Inject constructor(
     @ApplicationContext private val context: Context,
     private val engine: SkillEngine
 ) {
     fun install() {
-        context.assets.list("skills").orEmpty().forEach { id ->
-            val existing = engine.loadSkill(id)
-            if (existing != null && !existing.isReadOnly) return@forEach
+        val packages = requireNotNull(context.assets.list("skills")).map { id ->
             val files = linkedMapOf<String, String>()
             fun read(path: String) {
                 val children = context.assets.list("skills/$id/$path").orEmpty()
@@ -26,7 +24,8 @@ class BuiltinSkillInstaller @Inject constructor(
                 else children.forEach { read(if (path.isEmpty()) it else "$path/$it") }
             }
             read("")
-            engine.installBuiltinPackage(files)
+            files
         }
+        engine.installBuiltinPackages(packages)
     }
 }

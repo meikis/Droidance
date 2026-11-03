@@ -476,6 +476,10 @@ class AndroidContentQueryService(
     private fun jsonObjectToContentValues(values: JsonObject): ContentValues {
         val cv = ContentValues()
         for ((k, v) in values) {
+            if (v == JsonNull) {
+                cv.putNull(k)
+                continue
+            }
             val prim = v as? JsonPrimitive ?: continue
             if (prim.isString) {
                 cv.put(k, prim.content)

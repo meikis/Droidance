@@ -8,6 +8,11 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Replace the platform reference with Android system actions, including typed alarm calls, direct calendar writes, Shell guidance and result verification.
+- Validate Intent extra types and retain dispatch diagnostics; retire obsolete built-in skills on upgrade.
+
 ## [0.1.6] - 2026-11-03
 
 ### Added

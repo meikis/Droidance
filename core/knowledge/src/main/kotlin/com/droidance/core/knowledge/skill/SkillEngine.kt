@@ -157,17 +157,28 @@ class SkillEngine @Inject constructor(
             allowImplicitInvocation = policy.getValue("allow_implicit_invocation").jsonPrimitive.boolean)
     }
 
-    /** Installs a trusted APK package while preserving any user-owned package with the same name. */
+    /** Reconciles the complete APK catalog, preserving user packages and retiring removed built-ins. */
     @Synchronized
-    fun installBuiltinPackage(files: Map<String, String>): Boolean {
-        SkillPackageArchive.validate(files)
-        val parsed = parse("", files.getValue("SKILL.md"), false)
-        require(validId(parsed.name) && parsed.source == "system") { "BUILTIN_SKILL_INVALID" }
-        val current = loadSkill(parsed.name)
-        if (current != null && !current.isReadOnly) return false
-        validateScripts(files)
-        fileManager.replaceDirectory(root(parsed.name, false), files)
-        return true
+    fun installBuiltinPackages(packages: List<Map<String, String>>) {
+        val entries = packages.map { files ->
+            SkillPackageArchive.validate(files)
+            val parsed = parse("", files.getValue("SKILL.md"), false)
+            require(validId(parsed.name) && parsed.source == "system") { "BUILTIN_SKILL_INVALID" }
+            validateScripts(files)
+            parsed.name to files
+        }
+        val names = entries.map { it.first }.toSet()
+        require(names.size == entries.size) { "BUILTIN_SKILL_DUPLICATE" }
+        entries.forEach { (name, files) ->
+            val current = loadSkill(name)
+            if (current == null || current.isReadOnly) fileManager.replaceDirectory(root(name, false), files)
+        }
+        loadSkillCatalog().filter { it.isReadOnly && it.id !in names }.forEach { retired ->
+            check(fileManager.deleteDirectory(root(retired.id, false))) { "BUILTIN_SKILL_REMOVE_FAILED" }
+            if (fileManager.exists("skill-preferences/${retired.id}")) {
+                check(fileManager.deleteDirectory("skill-preferences/${retired.id}")) { "BUILTIN_SKILL_PREFERENCES_REMOVE_FAILED" }
+            }
+        }
     }
 
     @Synchronized

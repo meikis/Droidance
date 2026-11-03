@@ -29,10 +29,14 @@ internal object OpenAppToolSchema {
         "categories" to ToolParameter("array", "Android intent categories", false,
             items = ToolParameter("string", "Android intent category name.", false)),
         "mime_type" to ToolParameter("string", "Android intent MIME type", false),
-        "string_extras" to ToolParameter("object", "String extras keyed by documented extra name", false),
-        "int_extras" to ToolParameter("object", "Integer extras keyed by documented extra name", false),
-        "long_extras" to ToolParameter("object", "Long extras keyed by documented extra name", false),
-        "boolean_extras" to ToolParameter("object", "Boolean extras keyed by documented extra name", false),
+        "string_extras" to ToolParameter("object", "String extras keyed by documented extra name. Choose the map from the platform contract, not the appearance of a value.", false,
+            additionalPropertySchema = ToolParameter("string", "", false)),
+        "int_extras" to ToolParameter("object", "32-bit integer extras keyed by documented extra name; JSON numbers without quotes.", false,
+            additionalPropertySchema = ToolParameter("integer", "", false)),
+        "long_extras" to ToolParameter("object", "64-bit integer extras keyed by documented extra name; JSON numbers without quotes.", false,
+            additionalPropertySchema = ToolParameter("integer", "", false)),
+        "boolean_extras" to ToolParameter("object", "Boolean extras keyed by documented extra name; JSON true/false without quotes. Each extra name belongs in exactly one typed map.", false,
+            additionalPropertySchema = ToolParameter("boolean", "", false)),
         "expect_screen_change" to ToolParameter("boolean", "Set false only for a documented native action that completes without rendering a destination. The tool returns the synchronous Android command receipt instead of waiting for a screen transition.", false),
         "completion_evidence" to ToolParameter("string", "Use platform_contract only when Android documentation defines command acceptance as completion of the requested native action.", false, listOf("platform_contract")),
         "route_action" to ToolParameter("string", "Semantic Deep Link catalog action. Always pair it with app_name or package_name so the route cannot resolve into an unrelated app. Catalog routes are exclusive with explicit uri, activity, intent_action and Intent options; choose one destination mode.", false),
@@ -53,6 +57,12 @@ internal object OpenAppToolSchema {
                 put("allowed_fields", JsonArray(parameters.keys.map(::JsonPrimitive)))
             }
         )
+        runCatching { ExplicitIntentOptions.parse(input) }.exceptionOrNull()?.let { error ->
+            return ToolProtocolResult.notExecuted("ARGUMENT_SCHEMA_MISMATCH", true, buildJsonObject {
+                put("tool", JsonPrimitive(DeviceToolNames.ANDROID_ACT))
+                put("issue", JsonPrimitive(error.message.orEmpty()))
+            })
+        }
         val routeAction = (input["route_action"] as? JsonPrimitive)?.contentOrNull
         if (routeAction.isNullOrBlank()) return null
         val hasAppTarget = listOf("package_name", "app_name").any { field ->
@@ -145,7 +155,11 @@ data class ExplicitIntentOptions(
                 NativeCompletionEvidence.entries.firstOrNull { it.wireName == raw }
                     ?: throw IllegalArgumentException("completion_evidence must be platform_contract")
             }
-        )
+        ).also { options ->
+            val keys = options.stringExtras.keys.toList() + options.intExtras.keys.toList() +
+                options.longExtras.keys.toList() + options.booleanExtras.keys.toList()
+            require(keys.size == keys.toSet().size) { "Each Intent extra name must occur in exactly one typed map" }
+        }
 
         private fun JsonObject.arrayOfStrings(key: String): List<String> {
             val element = this[key] ?: return emptyList()
@@ -180,7 +194,7 @@ data class ExplicitIntentOptions(
 
         private fun JsonObject.booleanMap(key: String): Map<String, Boolean> =
             objectField(key)?.mapValuesChecked(key) { primitive ->
-                primitive.lenientBooleanOrNull()
+                primitive.booleanOrNull?.takeUnless { primitive.isString }
             } ?: emptyMap()
 
         private fun <T> JsonObject.mapValuesChecked(

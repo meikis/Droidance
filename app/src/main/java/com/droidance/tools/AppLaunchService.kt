@@ -492,6 +492,14 @@ class AppLaunchService(
             options = options
         )
         val result = deviceBackend.openIntentCommand(command)
+        val dispatchReceipt = "\n[INTENT_DISPATCH] " + buildJsonObject {
+            put("options", JsonPrimitive(options.receiptSummary()))
+            put("exit_code", JsonPrimitive(result.exitCode))
+            put("stdout", JsonPrimitive(result.stdout.take(4000)))
+            put("stderr", JsonPrimitive(result.stderr.take(2000)))
+            put("stdout_truncated", JsonPrimitive(result.stdoutTruncated || result.stdout.length > 4000))
+            put("stderr_truncated", JsonPrimitive(result.stderrTruncated || result.stderr.length > 2000))
+        }
         val output = listOf(result.stdout, result.stderr)
             .filter(String::isNotBlank)
             .joinToString("\n")
@@ -530,7 +538,7 @@ class AppLaunchService(
             ?: activity.orEmpty()
         if (options.expectScreenChange == false) {
             val platformContract = options.completionEvidence == NativeCompletionEvidence.PLATFORM_CONTRACT
-            return ToolProtocolResult.accepted("[${options.receiptMarker()}] display_id=${execution.displayId} target=${target.take(240)} ${options.receiptSummary()}").copy(
+            return ToolProtocolResult.accepted("[${options.receiptMarker()}] display_id=${execution.displayId} target=${target.take(240)}$dispatchReceipt").copy(
                 platformContractAccepted = platformContract,
                 evidenceStatus = if (platformContract) com.droidance.core.agent.event.ToolEvidenceStatus.NOT_REQUIRED
                     else com.droidance.core.agent.event.ToolEvidenceStatus.UNKNOWN
@@ -552,13 +560,13 @@ class AppLaunchService(
                 else -> "ACTIVITY_ROUTE_FAILED"
             }
             return appendLocalValidation(
-                ToolProtocolResult.accepted("[$failedLabel] Android accepted the explicit launch on display ${execution.displayId}, but the expected route did not render: ${target.take(240)}").copy(diagnosticCode = failedLabel),
+                ToolProtocolResult.accepted("[$failedLabel] Android accepted the explicit launch on display ${execution.displayId}, but the expected route did not render: ${target.take(240)}$dispatchReceipt").copy(diagnosticCode = failedLabel),
                 validation
             )
         }
         return appendLocalValidation(
             ToolProtocolResult.accepted("[$label] Android accepted the explicit launch on display ${execution.displayId}: " +
-                "${target.take(240)} resolved=${resolvedTarget.packageName}/${resolvedTarget.name}"),
+                "${target.take(240)} resolved=${resolvedTarget.packageName}/${resolvedTarget.name}$dispatchReceipt"),
             validation
         )
     }
