@@ -8,9 +8,14 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Added
+
+- Add a Back button to the virtual-space control island during manual control and teaching.
+
 ### Fixed
 
 - Keep automatic device reconnection quiet unless a connection problem was shown to the user.
+- Improve system Back focus handoff while preserving native keyboard input, and bind each manual Back to its original virtual session.
 
 ## [0.1.5] - 2026-11-02
 

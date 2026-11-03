@@ -31,6 +31,10 @@ object RuntimeIslandStyle {
     const val SCALE = 1.25f
     const val WIDTH_DP = 172f * SCALE
     const val HEIGHT_DP = 32f * SCALE
+    // The expanded viewer reserves room for Back and non-overlapping touch targets.
+    const val VIEWER_WIDTH_DP = 268f
+    const val VIEWER_HEIGHT_DP = 48f
+    const val VIEWER_CONTROL_TARGET_DP = 44f
     const val CHIP_SIZE_DP = 20f * SCALE
     const val STOP_GLYPH_SIZE_DP = 8f * SCALE
     const val STOP_GLYPH_RADIUS_DP = 2f * SCALE

@@ -16,6 +16,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.drawable.InsetDrawable
 import android.os.SystemClock
 import android.os.Build
 import android.view.Gravity
@@ -43,6 +44,7 @@ import kotlin.math.abs
 internal class ViewerControlIslandView(
     context: Context,
     private val onClose: () -> Unit,
+    private val onBack: () -> Unit,
     private val onToggle: () -> Unit,
     private val onStop: () -> Unit,
     private val onDragStart: (Float, Float) -> Unit,
@@ -50,6 +52,7 @@ internal class ViewerControlIslandView(
     private val onDragEnd: () -> Unit
 ) : LinearLayout(context) {
     private lateinit var statusView: RuntimeIslandLabelView
+    private lateinit var backView: ImageButton
     private lateinit var controlView: ImageButton
     private lateinit var stopView: ImageButton
     private var dragStartRawX = 0f
@@ -59,6 +62,7 @@ internal class ViewerControlIslandView(
     private var executing = false
     private val density: Float get() = resources.displayMetrics.density
     private val chipSizePx: Int get() = dp(RuntimeIslandStyle.CHIP_SIZE_DP)
+    private val controlTargetPx: Int get() = dp(RuntimeIslandStyle.VIEWER_CONTROL_TARGET_DP)
     private fun dp(value: Float): Int = (value * density).toInt()
 
     private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -155,10 +159,18 @@ internal class ViewerControlIslandView(
             dp(RuntimeIslandStyle.LABEL_INSET_DP + RuntimeIslandStyle.SPACE_TOGGLE_WIDTH_DP),
             ViewGroup.LayoutParams.MATCH_PARENT
         ))
-        // Manual input tools live below the island, preserving the task label slot.
+        // The label absorbs spare width; controls keep separate touch targets.
         addView(RuntimeIslandLabelView(context).apply {
             setLabel("", executing = false)
         }.also { statusView = it }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        addView(
+            controlIconChip(R.drawable.ic_overlay_arrow_back, R.string.common_back) {
+                onBack()
+            }.also {
+                backView = it
+                it.visibility = View.GONE
+            }
+        )
         addView(
             controlIconChip(R.drawable.ic_overlay_pause, R.string.takeover_start_control) {
                 onToggle()
@@ -169,11 +181,6 @@ internal class ViewerControlIslandView(
                 onStop()
             }.also {
                 stopView = it
-                it.background = RuntimeIslandStyle.chip(
-                    density,
-                    RuntimeIslandStyle.NEUTRAL_CHIP_FILL,
-                    radiusDp = RuntimeIslandStyle.CHIP_SIZE_DP / 2f
-                )
                 it.setImageDrawable(RuntimeIslandStyle.stopIcon(density))
                 it.imageTintList =
                     ColorStateList.valueOf(Color.parseColor(RuntimeIslandStyle.STOP_TINT))
@@ -190,29 +197,34 @@ internal class ViewerControlIslandView(
         contentDescription = context.getString(description)
         scaleType = ImageView.ScaleType.CENTER_INSIDE
         // The vectors include viewport insets; leave enough room for their visible glyphs to match stop.
-        val padding = dp(2f * RuntimeIslandStyle.SCALE)
+        val padding = (controlTargetPx - chipSizePx) / 2 + dp(2f * RuntimeIslandStyle.SCALE)
         setPadding(padding, padding, padding, padding)
         setOnClickListener { onClick() }
-        layoutParams = LinearLayout.LayoutParams(chipSizePx, chipSizePx)
-            .apply { marginStart = dp(RuntimeIslandStyle.CHIP_GAP_DP) }
+        background = controlBackground()
+        imageTintList = ColorStateList.valueOf(Color.parseColor(RuntimeIslandStyle.LABEL))
+        layoutParams = LinearLayout.LayoutParams(controlTargetPx, controlTargetPx)
     }
+
+    private fun controlBackground(): InsetDrawable = InsetDrawable(
+        RuntimeIslandStyle.chip(
+            density, RuntimeIslandStyle.NEUTRAL_CHIP_FILL,
+            radiusDp = RuntimeIslandStyle.CHIP_SIZE_DP / 2f
+        ),
+        (controlTargetPx - chipSizePx) / 2
+    )
 
     fun render(label: String, manual: Boolean, teaching: Boolean, state: RuntimeIslandPresentation.State) {
         val wasExecuting = executing
         executing = state == RuntimeIslandPresentation.State.EXECUTING && !manual && !teaching
         if (executing && !wasExecuting) animationStartedAtMs = SystemClock.uptimeMillis()
         statusView.setLabel(label, executing)
+        backView.visibility = if (manual || teaching) View.VISIBLE else View.GONE
         controlView.visibility = if (teaching) View.GONE else View.VISIBLE
         controlView.setImageResource(
             if (manual) R.drawable.ic_overlay_play else R.drawable.ic_overlay_pause
         )
         controlView.contentDescription = context.getString(
             if (manual) R.string.takeover_return_control else R.string.takeover_start_control
-        )
-        controlView.background = RuntimeIslandStyle.chip(
-            density,
-            RuntimeIslandStyle.chipFill(manual),
-            radiusDp = RuntimeIslandStyle.CHIP_SIZE_DP / 2f
         )
         controlView.imageTintList = ColorStateList.valueOf(RuntimeIslandStyle.chipTint(manual))
         if (Build.VERSION.SDK_INT >= 35 && !executing) {

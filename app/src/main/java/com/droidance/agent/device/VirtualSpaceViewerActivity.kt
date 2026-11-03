@@ -118,6 +118,7 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
     private val pendingLearningCaptures = AtomicInteger(0)
     private var closingTeachingSession = false
     private var stopRequested = false
+    private var backDispatchInFlight = false
     private val performanceTracker = VirtualSpaceViewerPerformanceTracker()
     private val density: Float get() = resources.displayMetrics.density
 
@@ -159,7 +160,7 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
         setContentView(buildContentView())
         refreshControlState()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = sendVirtualBack()
+            override fun handleOnBackPressed() = sendVirtualBack("system")
         })
         lifecycleScope.launch(Dispatchers.IO) {
             for (sample in touchSamples) {
@@ -372,10 +373,10 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
             }
         )
 
-        // 岛宽固定：按钮显隐和状态文案长短都不该让整条岛左右伸缩。尺寸与落点跟主屏运行岛
-        // 取同一套令牌——两处是同一个岛，挪一处等于挪它。
+        // The viewer reserves room for manual Back without resizing on state changes.
+        // Its placement stays shared with the collapsed runtime island.
         islandView = ViewerControlIslandView(
-            this, ::closeViewer, ::toggleTakeover,
+            this, ::closeViewer, onBack = { sendVirtualBack("island") }, onToggle = ::toggleTakeover,
             onStop = ::stopTaskFromIsland,
             onDragStart = ::beginIslandDrag, onDragMove = ::dragIslandTo, onDragEnd = ::endIslandDrag
         )
@@ -515,10 +516,12 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
     private fun islandWidthPx(): Int {
         val maxWidth = resources.displayMetrics.widthPixels - currentLeftInsetPx - currentRightInsetPx -
             dp(RuntimeIslandStyle.SIDE_MIN_MARGIN_DP.toInt()) * 2
-        return (RuntimeIslandStyle.WIDTH_DP * density).toInt().coerceAtMost(maxWidth)
+        return (RuntimeIslandStyle.VIEWER_WIDTH_DP * density).toInt().coerceAtMost(maxWidth)
     }
 
-    private fun islandHeightPx(): Int = RuntimeIslandTextPainter(this).heightPx()
+    private fun islandHeightPx(): Int = maxOf(
+        dp(RuntimeIslandStyle.VIEWER_HEIGHT_DP.toInt()), RuntimeIslandTextPainter(this).heightPx()
+    )
 
     private fun islandBottomMarginPx(parentHeight: Int): Int =
         maxOf(currentBottomInsetPx, parentHeight - islandHeightPx() -
@@ -635,47 +638,60 @@ class VirtualSpaceViewerActivity : AppCompatActivity() {
         RuntimeIslandPosition.write(this, islandDragOffsetX, islandDragOffsetPx)
     }
 
-    private fun sendVirtualBack() {
-        if (!manualInputEnabled()) return
-        if (nativeImeBottomInsetPx > 0) {
-            dismissNativeIme()
-            return
-        }
+    private fun sendVirtualBack(source: String) {
+        val binding = displayedBinding
+        debugLogManager.appendEvent(
+            "virtual_space: back requested source=$source hostFocus=${hasWindowFocus()} " +
+                "display=${binding?.displayId} manual=${manualInputEnabled()} pending=$backDispatchInFlight"
+        )
+        if (!viewerVisible || !manualInputEnabled() || stopRequested || closingTeachingSession || backDispatchInFlight) return
         // Back belongs to the app being handled. Only the explicit collapse control closes this host.
-        if (displayedBinding == null || displayedBinding != virtualSpaceManager.activeBinding()) {
+        if (binding == null || binding != virtualSpaceManager.activeBinding()) {
             showChannelError()
             return
         }
+        backDispatchInFlight = true
         val recordingKey = isTeaching()
         if (recordingKey) pendingLearningCaptures.incrementAndGet()
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch {
             try {
                 awaitInputSettlement()
-                val beforeFrame = if (recordingKey) virtualSpaceManager.captureLatestPreviewJpeg() else null
-                val sent = virtualSpaceManager.injectKey(KeyEvent.KEYCODE_BACK)
+                if (!canSendVirtualBack(binding)) return@launch
+                val beforeFrame = if (recordingKey) withContext(Dispatchers.IO) {
+                    virtualSpaceManager.captureLatestPreviewJpeg()
+                } else null
+                if (!canSendVirtualBack(binding)) return@launch
+                // One display-bound Back lets the target IME consume it before app navigation.
+                // Hiding the host IME as well can turn a single gesture into two back actions.
+                val sent = withContext(Dispatchers.IO) {
+                    virtualSpaceManager.injectKey(binding, KeyEvent.KEYCODE_BACK)
+                }
+                debugLogManager.appendEvent("virtual_space: back dispatched source=$source display=${binding.displayId} sent=$sent")
                 if (!sent) showChannelError()
-                recordKeyAfterSettling(
-                    keyCode = KeyEvent.KEYCODE_BACK,
-                    actionType = UserDemonstrationActionType.BACK,
-                    beforeFrame = beforeFrame,
-                    success = sent
-                )
+                if (recordingKey && binding == virtualSpaceManager.activeBinding()) {
+                    withContext(Dispatchers.IO) {
+                        recordKeyAfterSettling(
+                            keyCode = KeyEvent.KEYCODE_BACK,
+                            actionType = UserDemonstrationActionType.BACK,
+                            beforeFrame = beforeFrame,
+                            success = sent
+                        )
+                    }
+                }
             } finally {
+                backDispatchInFlight = false
                 if (recordingKey) pendingLearningCaptures.decrementAndGet()
             }
         }
     }
 
-    private fun dismissNativeIme() {
-        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.hide(WindowInsetsCompat.Type.ime())
-        val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-        imm?.hideSoftInputFromWindow(window.decorView.windowToken, 0)
-        lifecycleScope.launch(Dispatchers.IO) {
-            virtualSpaceManager.injectKey(KeyEvent.KEYCODE_BACK)
+    private fun canSendVirtualBack(binding: SidecarSessionBinding): Boolean {
+        val ready = viewerVisible && manualInputEnabled() && !stopRequested && !closingTeachingSession &&
+            displayedBinding == binding && binding == virtualSpaceManager.activeBinding() && pendingTouchSamples.get() == 0
+        if (!ready) {
+            debugLogManager.appendEvent("virtual_space: back dropped after input settlement display=${binding.displayId}")
         }
-        nativeImeBottomInsetPx = 0
-        updateInputBottomInset()
+        return ready
     }
 
     private fun applyFrameAppearance(colors: ViewerSystemBarColors) {

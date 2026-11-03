@@ -433,7 +433,12 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             boolean completesGesture =
                     action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL;
             try {
-                if (action == MotionEvent.ACTION_DOWN && viewerIme != null) viewerIme.focusEditor();
+                // Independent focus lets the virtual app receive the touch without taking
+                // the physical viewer's system Back target. Wait until UP to focus its IME;
+                // a system edge gesture ends in CANCEL and must not steal top focus.
+                boolean focusEditor = SidecarPlatformCompat.hasOwnDisplayFocus(Build.VERSION.SDK_INT)
+                        ? action == MotionEvent.ACTION_UP : action == MotionEvent.ACTION_DOWN;
+                if (focusEditor && viewerIme != null) viewerIme.focusEditor();
                 if (action == MotionEvent.ACTION_DOWN && manualTouchActive) {
                     manualTouchActive = false;
                     endRuntimeInputDispatch();
@@ -487,6 +492,12 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 if (completesGesture && manualTouchActive) {
                     manualTouchActive = false;
                     endRuntimeInputDispatch();
+                }
+                if (action == MotionEvent.ACTION_CANCEL && viewerIme != null) {
+                    try { viewerIme.returnInputFocus(); }
+                    catch (Exception unavailable) {
+                        Log.w("DroidanceVSpace", "Cannot return canceled touch focus: " + safeMessage(unavailable));
+                    }
                 }
             }
         }

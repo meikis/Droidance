@@ -493,12 +493,16 @@ class VirtualSpaceManager @Inject constructor(
         return result.ok
     }
 
-    fun injectKey(keyCode: Int): Boolean {
-        if (!active) return false
-        val id = capabilityRegistry.getVirtualDisplayId() ?: return false
-        val session = sidecarSession?.takeIf { it.displayId == id } ?: return false
-        val binding = SidecarSessionBinding(session.mode, id, session.backendSessionId)
-        return sidecarBridge.injectKey(binding, keyCode).ok
+    fun injectKey(binding: SidecarSessionBinding, keyCode: Int): Boolean {
+        if (!active || activeBinding() != binding) return false
+        val result = sidecarBridge.injectKey(binding, keyCode)
+        if (!result.ok) {
+            debugLogManager.appendEvent(
+                "virtual_space: manual key injection failed display=${binding.displayId} key=$keyCode " +
+                    "detail=${result.detail} " + sidecarBridge.lastInputEvidence(binding.runtimeMode)
+            )
+        }
+        return result.ok
     }
 
     /**

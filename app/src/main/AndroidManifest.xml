@@ -123,6 +123,7 @@
 
         <activity
             android:name=".agent.device.VirtualSpaceViewerActivity"
+            android:enableOnBackInvokedCallback="true"
             android:exported="true"
             android:permission="android.permission.DUMP"
             android:excludeFromRecents="true"

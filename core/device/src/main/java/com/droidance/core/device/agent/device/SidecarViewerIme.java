@@ -9,14 +9,17 @@ import com.droidance.core.device.agent.device.*;
 
 import android.content.Context;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.view.WindowInsets;
 import android.view.Display;
 import java.lang.reflect.Method;
+import java.util.function.LongSupplier;
 
 /** Owns the platform IME policy for one viewer lifetime; it is not an input method service. */
 final class SidecarViewerIme implements AutoCloseable {
     static final int LOCAL = 0;
     static final int HIDE = 2;
+    static final long EDITOR_FOCUS_SETTLE_MS = 750;
 
     interface Platform {
         void setPolicy(int displayId, int policy) throws Exception;
@@ -27,18 +30,23 @@ final class SidecarViewerIme implements AutoCloseable {
 
     private final int displayId;
     private final Platform platform;
+    private final LongSupplier clock;
     private String owner;
     private IBinder lifetime;
     private IBinder.DeathRecipient deathRecipient;
     private boolean active;
+    private boolean awaitingFocusReturn;
+    private boolean keyboardWasVisible;
+    private long editorFocusedAtMs;
 
     SidecarViewerIme(int displayId) throws Exception {
-        this(displayId, new WindowPlatform());
+        this(displayId, new WindowPlatform(), SystemClock::uptimeMillis);
     }
 
-    SidecarViewerIme(int displayId, Platform platform) throws Exception {
+    SidecarViewerIme(int displayId, Platform platform, LongSupplier clock) throws Exception {
         this.displayId = displayId;
         this.platform = platform;
+        this.clock = clock;
         platform.setPolicy(displayId, HIDE);
     }
 
@@ -60,7 +68,7 @@ final class SidecarViewerIme implements AutoCloseable {
         deathRecipient = recipient;
         try {
             platform.setPolicy(displayId, LOCAL);
-            platform.focusDisplay(displayId);
+            focusForInput();
             active = true;
         } catch (Exception error) {
             try { close(); } catch (Exception cleanup) { error.addSuppressed(cleanup); }
@@ -69,20 +77,37 @@ final class SidecarViewerIme implements AutoCloseable {
     }
 
     synchronized int bottomInset() throws Exception {
-        return active ? platform.bottomInset(displayId) : 0;
+        if (!active) return 0;
+        int bottom = platform.bottomInset(displayId);
+        if (bottom > 0) {
+            keyboardWasVisible = true;
+        } else if (awaitingFocusReturn && (keyboardWasVisible
+                || clock.getAsLong() - editorFocusedAtMs >= EDITOR_FOCUS_SETTLE_MS)) {
+            restoreHostFocus();
+        }
+        return bottom;
     }
 
     synchronized void focusEditor() throws Exception {
-        if (active) platform.focusDisplay(displayId);
+        if (active) focusForInput();
     }
 
     /** Runs for any owner: keys need the focus whether or not the keyboard is shown. */
     synchronized void focusForInput() throws Exception {
         platform.focusDisplay(displayId);
+        awaitingFocusReturn = true;
+        keyboardWasVisible = false;
+        editorFocusedAtMs = clock.getAsLong();
     }
 
     synchronized void returnInputFocus() throws Exception {
-        if (!active) platform.focusDisplay(Display.DEFAULT_DISPLAY);
+        if (!active || platform.bottomInset(displayId) == 0) restoreHostFocus();
+    }
+
+    private void restoreHostFocus() throws Exception {
+        platform.focusDisplay(Display.DEFAULT_DISPLAY);
+        awaitingFocusReturn = false;
+        keyboardWasVisible = false;
     }
 
     private synchronized void releaseAfterDeath(String requestedOwner) {
@@ -97,7 +122,7 @@ final class SidecarViewerIme implements AutoCloseable {
         active = false;
         if (owner != null) {
             platform.hideIme();
-            platform.focusDisplay(Display.DEFAULT_DISPLAY);
+            restoreHostFocus();
         }
         if (lifetime != null && deathRecipient != null) {
             try { lifetime.unlinkToDeath(deathRecipient, 0); }

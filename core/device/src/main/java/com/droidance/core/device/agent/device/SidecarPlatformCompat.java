@@ -50,6 +50,8 @@ final class SidecarPlatformCompat {
         // OWN_FOCUS keeps input events scoped to this display. The platform IME stays
         // hidden by default. The viewer or the same Agent can explicitly enable the
         // selected native keyboard; background text uses display-scoped keys/clipboard.
+        // Do not disable stealing top focus: Android's native IME needs the editor's
+        // display to become top focused. The viewer IME owner returns focus when hidden.
         if (hasOwnDisplayFocus(sdk)) flags |= OWN_FOCUS;
         return flags;
     }
