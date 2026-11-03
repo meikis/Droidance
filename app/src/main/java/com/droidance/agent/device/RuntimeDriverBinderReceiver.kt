@@ -102,6 +102,28 @@ private class NativePlatformDriver(private val context: Context) {
             com.droidance.core.agent.event.ToolExecutionResult.serializer(), result)) }
     }
 
+    /** Running-task status is quiet; results alert, and each notice alerts at most once. */
+    private fun notifyFromRuntime(args: Bundle) {
+        val manager = context.getSystemService(android.app.NotificationManager::class.java)
+        val ongoing = args.getBoolean("ongoing")
+        val channel = if (ongoing) android.app.NotificationChannel(RUNTIME_STATUS_CHANNEL,
+            args.getString("statusChannel"), android.app.NotificationManager.IMPORTANCE_LOW)
+        else android.app.NotificationChannel(RUNTIME_RESULT_CHANNEL, args.getString("resultChannel"),
+            android.app.NotificationManager.IMPORTANCE_HIGH)
+        manager.createNotificationChannel(channel)
+        val id = args.getInt("id")
+        val text = args.getString("text").orEmpty()
+        val launch = Intent().setClassName(context.packageName, "com.droidance.MainActivity")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val content = android.app.PendingIntent.getActivity(context, id, launch,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+        manager.notify(RUNTIME_NOTIFICATION_TAG, id, android.app.Notification.Builder(context, channel.id)
+            .setSmallIcon(com.droidance.R.drawable.ic_launcher_monochrome)
+            .setContentTitle(args.getString("title")).setContentText(text)
+            .setStyle(android.app.Notification.BigTextStyle().bigText(text))
+            .setContentIntent(content).setOngoing(ongoing).setAutoCancel(!ongoing).setOnlyAlertOnce(true).build())
+    }
+
     private fun dispatch(operation: String, args: Bundle) = Bundle().apply {
         when (operation) {
             "probeReset" -> { VirtualSpaceProbeLanding.displayId = null }
@@ -127,6 +149,9 @@ private class NativePlatformDriver(private val context: Context) {
                         !path.startsWith("/data/") && !path.startsWith("/apex/") && path.endsWith(".so") &&
                             path.substringAfterLast('/').contains("jni", ignoreCase = true)
                     }))
+            "notify" -> notifyFromRuntime(args)
+            "cancelNotification" -> context.getSystemService(android.app.NotificationManager::class.java)
+                .cancel(RUNTIME_NOTIFICATION_TAG, args.getInt("id"))
             "restore" -> putString("ime", AgentTextInputMethodService.restorationTarget(context))
             "begin" -> AgentTextInputMethodService.beginSession(context, args.getString("ime")!!)
             "end" -> AgentTextInputMethodService.endSession(context, args.getBoolean("restored"))
@@ -149,3 +174,7 @@ private class NativePlatformDriver(private val context: Context) {
         }
     }
 }
+
+private const val RUNTIME_NOTIFICATION_TAG = "Droidance"
+private const val RUNTIME_STATUS_CHANNEL = "droidance_resident_status"
+private const val RUNTIME_RESULT_CHANNEL = "droidance_resident_tasks"
