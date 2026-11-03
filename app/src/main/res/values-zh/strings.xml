@@ -48,6 +48,7 @@
     <string name="chat_permission_grant_action">去授权</string>
     <string name="chat_permission_grant_settings_action">前往设置开启权限</string>
     <string name="chat_permission_grant_hint">授权后将继续执行当前任务</string>
+    <string name="chat_permission_settings_hint">请在应用设置中开启所需权限；如被系统限制，请先允许受限设置。授权完成前，任务会继续等待。</string>
     <string name="takeover_channel_error">画面通道暂时不可用，请稍候或结束接管</string>
     <string name="virtual_space_viewer_open_failed">暂时无法打开应用画面</string>
     <string name="virtual_space_viewer_empty">尚未打开应用。</string>

@@ -628,7 +628,10 @@ private fun PermissionActionBlock(
     TakeoverStyleActionCard(
         title = stringResource(R.string.chat_permission_title),
         reason = reasonText,
-        hint = stringResource(R.string.chat_permission_grant_hint),
+        hint = stringResource(
+            if (pendingPermission.settingsRequired) R.string.chat_permission_settings_hint
+            else R.string.chat_permission_grant_hint
+        ),
         buttonText = stringResource(
             if (pendingPermission.settingsRequired) R.string.chat_permission_grant_settings_action
             else R.string.chat_permission_grant_action

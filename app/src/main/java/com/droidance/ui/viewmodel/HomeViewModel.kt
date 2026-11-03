@@ -398,7 +398,8 @@ class HomeViewModel @Inject constructor(
                     PendingPermissionUiState(
                         requestId = request.requestId,
                         permissions = request.permissions,
-                        reason = request.reason
+                        reason = request.reason,
+                        settingsRequired = request.settingsRequired
                     )
                 } else {
                     null

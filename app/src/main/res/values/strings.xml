@@ -48,6 +48,7 @@
     <string name="chat_permission_grant_action">Authorize</string>
     <string name="chat_permission_grant_settings_action">Open App Settings</string>
     <string name="chat_permission_grant_hint">Execution will resume once permission is granted</string>
+    <string name="chat_permission_settings_hint">Open app settings and grant the required permission. If access is restricted, allow restricted settings first. The task will keep waiting until permission is granted.</string>
     <string name="takeover_channel_error">Screen channel is temporarily unavailable; wait or end takeover</string>
     <string name="virtual_space_viewer_open_failed">The app screen is temporarily unavailable</string>
     <string name="virtual_space_viewer_empty">No app is open yet.</string>

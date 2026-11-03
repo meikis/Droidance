@@ -41,28 +41,35 @@ fun RuntimePermissionRequestHost(permissionBroker: PermissionBroker) {
     var launchedRequestId by rememberSaveable { mutableStateOf<String?>(null) }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
+    ) { grants ->
         val requestId = launchedRequestId
-        val request = pending?.takeIf { it.requestId == requestId }
+        val request = permissionBroker.pendingRequest.value?.takeIf { it.requestId == requestId }
         if (requestId != null) {
-            val settingsRequired = request != null && activity != null &&
+            val settingsRequired = grants.isEmpty() || (request != null && activity != null &&
                 permissionBroker.missingPermissions(request.permissions).any { permission ->
                     !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
-                }
+                })
             permissionBroker.resolve(requestId, settingsRequired)
         }
         launchedRequestId = null
+    }
+
+    LaunchedEffect(isResumed, pending?.requestId) {
+        if (isResumed) pending?.let { permissionBroker.recheckGrantedPermissions(it.requestId) }
     }
 
     LaunchedEffect(systemPromptRequested, pending?.requestId, isResumed, launchedRequestId) {
         if (!isResumed) return@LaunchedEffect
         val requestId = systemPromptRequested ?: return@LaunchedEffect
         if (launchedRequestId != null) return@LaunchedEffect
-        val request = pending?.takeIf { it.requestId == requestId } ?: return@LaunchedEffect
+        val request = pending?.takeIf { it.requestId == requestId && !it.settingsRequired } ?: return@LaunchedEffect
         launchedRequestId = request.requestId
         permissionBroker.markLaunched(request.requestId)
         permissionBroker.consumeSystemDialogRequest(request.requestId)
         runCatching { launcher.launch(request.permissions.toTypedArray()) }
-            .onFailure { permissionBroker.launchFailed(request.requestId) }
+            .onFailure {
+                launchedRequestId = null
+                permissionBroker.launchFailed(request.requestId)
+            }
     }
 }

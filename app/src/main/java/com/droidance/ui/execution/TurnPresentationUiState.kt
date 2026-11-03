@@ -22,6 +22,7 @@ import com.droidance.core.agent.event.LifecycleActivityKind
 import com.droidance.core.agent.event.LifecycleActivityReadModel
 import com.droidance.core.agent.event.ToolActivityReadModel
 import com.droidance.core.agent.event.ToolActivityState
+import com.droidance.core.agent.event.ToolPresentationCategory
 import com.droidance.core.agent.event.reportedToolResults
 
 /**
@@ -122,7 +123,7 @@ data class TurnPresentationUiState(
     val hasDurablePresentation: Boolean
         get() = if (!isCurrentSegment) hasPublicResponse() ||
             EventStoreExecutionTimelinePresenter.hasHistory(activity, publicUpdates())
-        else !isTerminal || hasExecutionPresentation ||
+        else !isTerminal || showExecutionLog() ||
             opening.isNotBlank() ||
             finalSummary.isNotBlank() ||
             intervention.isNotBlank() ||
@@ -144,7 +145,10 @@ data class TurnPresentationUiState(
     }.map { PublicAssistantText.sanitize(it).trim() }.filter(String::isNotBlank).joinToString("\n\n")
 
     fun showExecutionLog(): Boolean =
-        hasExecutionPresentation
+        hasExecutionPresentation || activity.entries.any {
+            it is ToolActivityReadModel && it.turnId == turnId && it.visible &&
+                it.presentation.category != ToolPresentationCategory.COMPLETION
+        }
 }
 
 object RetainedVirtualExecutionOwnerPolicy {

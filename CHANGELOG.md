@@ -15,6 +15,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Keep permission requests paused when Android requires app settings, resume the same operation after authorization, and retain execution history.
+
 - Replace the platform reference with Android system actions, including typed alarm calls, direct calendar writes, Shell guidance and result verification.
 - Validate Intent extra types and retain dispatch diagnostics; retire obsolete built-in skills on upgrade.
 

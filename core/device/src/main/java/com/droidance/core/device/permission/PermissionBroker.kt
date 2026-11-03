@@ -22,7 +22,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 enum class PermissionRequestOutcome {
     GRANTED,
     DENIED,
-    SETTINGS_REQUIRED,
     POLICY_RESTRICTED,
     INSTALLER_RESTRICTED,
     TIMED_OUT,
@@ -37,7 +36,8 @@ data class PendingPermissionRequest(
     val permissions: List<String>,
     val reason: String,
     val requestedAtMs: Long,
-    val launched: Boolean = false
+    val launched: Boolean = false,
+    val settingsRequired: Boolean = false
 )
 
 /**
@@ -154,7 +154,7 @@ class PermissionBroker(
                     _systemDialogPromptRequested.value = null
                 }
                 if (activeWaiter === waiter) activeWaiter = null
-                if (outcome in setOf(PermissionRequestOutcome.DENIED, PermissionRequestOutcome.SETTINGS_REQUIRED)) {
+                if (outcome == PermissionRequestOutcome.DENIED) {
                     request.permissions.forEach { deniedInTurn += "${request.turnId}:$it" }
                     preferences.edit().putStringSet("denied_in_turn", deniedInTurn.toSet()).commit()
                 }
@@ -168,6 +168,7 @@ class PermissionBroker(
     fun requestSystemPermissionDialog(requestId: String) {
         synchronized(lock) {
             val current = _pendingRequest.value?.takeIf { it.requestId == requestId } ?: return
+            if (current.launched || current.settingsRequired) return
             _systemDialogPromptRequested.value = current.requestId
         }
     }
@@ -194,10 +195,16 @@ class PermissionBroker(
         synchronized(lock) {
             val current = _pendingRequest.value?.takeIf { it.requestId == requestId } ?: return
             _systemDialogPromptRequested.value = null
+            // A suppressed dialog is still an unresolved request. Keep the same tool call
+            // suspended while the user fixes access in app settings.
+            if (settingsRequired && missingPermissions(current.permissions).isNotEmpty()) {
+                val waitingForSettings = current.copy(launched = false, settingsRequired = true)
+                persist(waitingForSettings)
+                _pendingRequest.value = waitingForSettings
+                return
+            }
             val outcome = if (missingPermissions(current.permissions).isEmpty()) {
                 PermissionRequestOutcome.GRANTED
-            } else if (settingsRequired) {
-                PermissionRequestOutcome.SETTINGS_REQUIRED
             } else {
                 PermissionRequestOutcome.DENIED
             }
@@ -211,18 +218,18 @@ class PermissionBroker(
         }
     }
 
-    fun launchFailed(requestId: String) {
+    /** Returning from settings without a grant must never resume the Agent. */
+    fun recheckGrantedPermissions(requestId: String) {
         synchronized(lock) {
             val current = _pendingRequest.value?.takeIf { it.requestId == requestId } ?: return
-            _systemDialogPromptRequested.value = null
-            val waiter = activeWaiter
-            if (waiter != null) {
-                waiter.complete(PermissionRequestOutcome.LAUNCH_FAILED)
-            } else {
-                clearPersistedRequest()
-                _pendingRequest.value = null
+            if (missingPermissions(current.permissions).isEmpty()) {
+                resolve(requestId, settingsRequired = false)
             }
         }
+    }
+
+    fun launchFailed(requestId: String) {
+        resolve(requestId, settingsRequired = true)
     }
 
     private suspend fun showPermissionHost(request: PendingPermissionRequest) {
@@ -247,6 +254,7 @@ class PermissionBroker(
             .putString(KEY_REASON, request.reason)
             .putLong(KEY_REQUESTED_AT, request.requestedAtMs)
             .putBoolean(KEY_LAUNCHED, request.launched)
+            .putBoolean(KEY_SETTINGS_REQUIRED, request.settingsRequired)
             .commit()
     }
 
@@ -265,13 +273,15 @@ class PermissionBroker(
             permissions = permissions,
             reason = preferences.getString(KEY_REASON, "").orEmpty(),
             requestedAtMs = preferences.getLong(KEY_REQUESTED_AT, 0L),
-            launched = preferences.getBoolean(KEY_LAUNCHED, false)
+            launched = preferences.getBoolean(KEY_LAUNCHED, false),
+            settingsRequired = preferences.getBoolean(KEY_SETTINGS_REQUIRED, false)
         )
     }
 
     private fun clearPersistedRequest() {
         preferences.edit().remove(KEY_REQUEST_ID).remove(KEY_PERMISSIONS).remove(KEY_REASON)
-            .remove(KEY_REQUESTED_AT).remove(KEY_LAUNCHED).remove("turn_id").remove("call_id").commit()
+            .remove(KEY_REQUESTED_AT).remove(KEY_LAUNCHED).remove(KEY_SETTINGS_REQUIRED)
+            .remove("turn_id").remove("call_id").commit()
     }
 
     companion object {
@@ -282,6 +292,7 @@ class PermissionBroker(
         private const val KEY_REASON = "reason"
         private const val KEY_REQUESTED_AT = "requested_at"
         private const val KEY_LAUNCHED = "launched"
+        private const val KEY_SETTINGS_REQUIRED = "settings_required"
         private const val PERMISSION_SEPARATOR = "\u001f"
     }
 }
