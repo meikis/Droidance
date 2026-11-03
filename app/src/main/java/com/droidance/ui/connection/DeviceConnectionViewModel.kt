@@ -72,7 +72,7 @@ internal class DeviceConnectionViewModel @Inject constructor(
         }
         val previous = _state.value
         _state.update { it.observe(next, SystemClock.elapsedRealtime()) }
-        if (next == DeviceConnectionStatus.READY && previous.noticeVisible) {
+        if (previous.shouldNotifyRecovery(next)) {
             messages.trySend(R.string.connection_restored)
         }
     }

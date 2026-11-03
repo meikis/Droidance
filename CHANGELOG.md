@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep automatic device reconnection quiet unless a connection problem was shown to the user.
+
 ## [0.1.5] - 2026-11-02
 
 ### Added

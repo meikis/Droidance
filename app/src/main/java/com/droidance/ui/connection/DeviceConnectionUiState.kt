@@ -70,6 +70,10 @@ internal data class DeviceConnectionUiState(
     val noticeVisible: Boolean
         get() = status != DeviceConnectionStatus.CHECKING && status != DeviceConnectionStatus.READY
 
+    /** Inline automatic reconnects need no recovery message unless the user was prompted. */
+    fun shouldNotifyRecovery(next: DeviceConnectionStatus): Boolean =
+        next == DeviceConnectionStatus.READY && noticeVisible && prompted
+
     /** Only consecutive foreground observations can confirm a failure. Recovery is immediate. */
     fun observe(next: DeviceConnectionStatus, nowMs: Long): DeviceConnectionUiState {
         if (next == DeviceConnectionStatus.READY) return DeviceConnectionUiState(next)
