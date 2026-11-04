@@ -106,6 +106,7 @@ internal fun HomeScreen(
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val tokenUsage by viewModel.tokenUsage.collectAsStateWithLifecycle()
     val conversationLoaded by viewModel.conversationLoaded.collectAsStateWithLifecycle()
+    val runtimeConnection by viewModel.runtimeConnection.collectAsStateWithLifecycle()
     val turnPresentations by viewModel.turnPresentations.collectAsStateWithLifecycle()
     val threadProjectionFailure by viewModel.threadProjectionFailure.collectAsStateWithLifecycle()
     val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
@@ -271,6 +272,10 @@ internal fun HomeScreen(
                         item(key = "conversation_empty_state") {
                             if (conversationLoaded) {
                                 WelcomeMessage(hasDraft)
+                            } else if (runtimeConnection == com.droidance.runtime.RuntimeConnectionState.UNAVAILABLE) {
+                                TextButton(onClick = onConnectDevice) {
+                                    Text(stringResource(R.string.home_conversation_reconnect))
+                                }
                             } else {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),

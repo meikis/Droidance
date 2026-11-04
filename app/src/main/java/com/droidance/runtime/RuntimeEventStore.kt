@@ -244,8 +244,9 @@ internal class RuntimeEventStore(private val client: RuntimeProcessClient) : Age
     private fun <T> observe(read: suspend () -> T): Flow<T> = flow {
         while (currentCoroutineContext().isActive) {
             try {
-                client.owner()
-                client.historyRevision.filterNotNull().collect { emit(read()) }
+                // The first durable read must not depend on display/overlay snapshot delivery.
+                // Subscribe first so a commit during that read cannot be missed.
+                client.historyRevision.collect { emit(read()) }
             } catch (cancel: CancellationException) { throw cancel }
             catch (_: com.droidance.core.device.agent.device.RuntimeUnavailableException) { delay(1000) }
             catch (_: android.os.RemoteException) { delay(1000) }

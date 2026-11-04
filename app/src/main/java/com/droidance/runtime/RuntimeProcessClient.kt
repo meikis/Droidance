@@ -13,10 +13,13 @@ import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
+
+enum class RuntimeConnectionState { CONNECTING, CONNECTED, UNAVAILABLE }
 
 /** GUI state is a projection. The resident process is the only task and database owner. */
 @Singleton
@@ -51,6 +54,8 @@ class RuntimeProcessClient @Inject constructor(
     private val connectionLock = Any()
     @Volatile private var connection: IAgentRuntimeOwner? = null
     private val pollStarted = java.util.concurrent.atomic.AtomicBoolean()
+    private val _connectionState = MutableStateFlow(RuntimeConnectionState.CONNECTING)
+    val connectionState = _connectionState.asStateFlow()
 
     val historyRevision = MutableStateFlow<String?>(null)
     val usage = MutableStateFlow<List<com.droidance.config.TokenUsageRepository.DailyUsage>>(emptyList())
@@ -101,11 +106,15 @@ class RuntimeProcessClient @Inject constructor(
                     catch (error: android.os.RemoteException) { throw RuntimeUnavailableException(error) }
                     finally { storage.close() }
                 owner.asBinder().linkToDeath({
-                    synchronized(connectionLock) { if (connection?.asBinder() == owner.asBinder()) connection = null }
+                    synchronized(connectionLock) { if (connection?.asBinder() == owner.asBinder()) {
+                        connection = null
+                        _connectionState.value = RuntimeConnectionState.UNAVAILABLE
+                    } }
                 }, 0)
                 decode(owner.command("attach", Bundle().apply { putBinder("client", presence) }))
                 if (!transferMarker.isFile) transferMarker.createNewFile()
                 connection = owner
+                _connectionState.value = RuntimeConnectionState.CONNECTED
                 startPolling()
                 owner
             }
@@ -196,23 +205,29 @@ class RuntimeProcessClient @Inject constructor(
 
     private fun startPolling() {
         if (!pollStarted.compareAndSet(false, true)) return
+        val displayUpdates = kotlinx.coroutines.channels.Channel<Bundle>(kotlinx.coroutines.channels.Channel.CONFLATED)
         scope.launch(Dispatchers.IO) {
+            var lastFailure: String? = null
+            for (snapshot in displayUpdates) {
+                try {
+                    applyDisplaySnapshot(snapshot)
+                    lastFailure = null
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) {
+                    val failure = error.javaClass.name
+                    if (failure != lastFailure) android.util.Log.w("DroidanceRuntime", "Display projection unavailable", error)
+                    lastFailure = failure
+                }
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            var lastFailure: String? = null
             while (isActive) {
-                runCatching {
+                try {
                     val snapshot = decode(owner().state())
+                    _connectionState.value = RuntimeConnectionState.CONNECTED
+                    historyRevision.value = snapshot.getString("historyRevision")
                     navigation.recordOnboarding(snapshot.getBoolean("onboardingComplete"))
-                    snapshot.getBundle("display")?.let {
-                        virtualSpace.get().adoptRuntimeDisplay(it.getInt("id"), it.getInt("width"),
-                            it.getInt("height"), it.getInt("density"), it.getString("thread"), it.getString("execution"),
-                            it.getBoolean("content"))
-                    } ?: virtualSpace.get().adoptRuntimeDisplay(0, 0, 0, 0, null, null, false)
-                    surfaces.get().adoptRuntimeHandCue(snapshot.getBundle("handCue")?.let {
-                        val action = if (it.containsKey("endX")) com.droidance.core.device.tools.InputAction.Swipe(
-                            it.getInt("x"), it.getInt("y"), it.getInt("endX"), it.getInt("endY"), it.getInt("duration"))
-                        else com.droidance.core.device.tools.InputAction.Tap(it.getInt("x"), it.getInt("y"))
-                        com.droidance.ui.overlay.VirtualSpaceHandCue(it.getString("id")!!, it.getInt("display"), action,
-                            it.getLong("started"), it.getLong("finished"), it.getInt("fromX"), it.getInt("fromY"), it.getLong("travel"))
-                    })
                     val permission = snapshot.getBundle("permission")?.let {
                         com.droidance.core.device.permission.PendingPermissionRequest(it.getString("id")!!,
                             it.getString("turn")!!, it.getString("call")!!, it.getStringArrayList("permissions")!!,
@@ -226,7 +241,6 @@ class RuntimeProcessClient @Inject constructor(
                             it.getString("source")?.let(UserInteractionResponseSource::valueOf),
                             if (it.containsKey("resolved")) it.getLong("resolved") else null)
                     }
-                    historyRevision.value = snapshot.getString("historyRevision")
                     usage.value = Json.decodeFromString(snapshot.getString("usage")!!)
                     turnUsage.value = Json.decodeFromString(snapshot.getString("turnUsage")!!)
                     automationDefinitions.value = Json.decodeFromString(snapshot.getString("automationDefinitions")!!)
@@ -258,9 +272,33 @@ class RuntimeProcessClient @Inject constructor(
                     }
                     skillDraftWorkState.value = IdleWorkScheduler.State(snapshot.getInt("skillPending"),
                         snapshot.getBoolean("skillRunning"), snapshot.getInt("skillFailures"))
+                    displayUpdates.trySend(snapshot)
+                    lastFailure = null
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) {
+                    _connectionState.value = RuntimeConnectionState.UNAVAILABLE
+                    val failure = error.javaClass.name
+                    if (failure != lastFailure) android.util.Log.w("DroidanceRuntime", "Runtime state unavailable; reconnecting", error)
+                    lastFailure = failure
                 }
                 delay(if (foreground.isInForeground) transport.foregroundPollMs else transport.backgroundPollMs)
             }
         }
+    }
+
+    /** Optional display presentation cannot hold up history, permission state or owner reconnects. */
+    private fun applyDisplaySnapshot(snapshot: Bundle) {
+        snapshot.getBundle("display")?.let {
+            virtualSpace.get().adoptRuntimeDisplay(it.getInt("id"), it.getInt("width"),
+                it.getInt("height"), it.getInt("density"), it.getString("thread"), it.getString("execution"),
+                it.getBoolean("content"))
+        } ?: virtualSpace.get().adoptRuntimeDisplay(0, 0, 0, 0, null, null, false)
+        surfaces.get().adoptRuntimeHandCue(snapshot.getBundle("handCue")?.let {
+            val action = if (it.containsKey("endX")) com.droidance.core.device.tools.InputAction.Swipe(
+                it.getInt("x"), it.getInt("y"), it.getInt("endX"), it.getInt("endY"), it.getInt("duration"))
+            else com.droidance.core.device.tools.InputAction.Tap(it.getInt("x"), it.getInt("y"))
+            com.droidance.ui.overlay.VirtualSpaceHandCue(it.getString("id")!!, it.getInt("display"), action,
+                it.getLong("started"), it.getLong("finished"), it.getInt("fromX"), it.getInt("fromY"), it.getLong("travel"))
+        })
     }
 }

@@ -22,6 +22,7 @@
     <string name="home_open_drawer">Open drawer</string>
     <string name="home_new_conversation">New conversation</string>
     <string name="home_conversation_loading">Loading conversation</string>
+    <string name="home_conversation_reconnect">Reconnect to load this conversation</string>
     <string name="home_welcome_title">Hi, I am Droidance</string>
     <string name="home_welcome_subtitle">Tell me what you want to do, and I will help you finish it</string>
     <string name="runtime_status_thinking">Thinking</string>

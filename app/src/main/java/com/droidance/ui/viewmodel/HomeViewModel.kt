@@ -86,9 +86,11 @@ class HomeViewModel @Inject constructor(
     private val composerSettingsRepository: ComposerSettingsRepository,
     private val reasoningCapabilities: com.droidance.settings.ReasoningCapabilityRepository,
     tokenUsageRepository: TokenUsageRepository,
+    runtimeClient: com.droidance.runtime.RuntimeProcessClient,
     @ApplicationContext private val context: Context,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+    val runtimeConnection = runtimeClient.connectionState
 
     /** 当前对话 ID —— 持久化到 SavedStateHandle，跨 ViewModel 重建（屏幕旋转/低内存）保持稳定 */
     val conversationId: String = run {
