@@ -44,7 +44,8 @@ Read only the relevant method before execution:
    own documented column names and native JSON scalar types.
 4. On ordinary tool calls, put a stable `effect_key` on a call that may persist the intended object. Keep that
    identity across native and GUI recovery; use a different key only for a different
-   requested object. Verify the requested effect from a scoped readback or the actual current interface.
+   requested object. Verify native effects with scoped official readback; for an
+   operation requiring GUI, inspect its actual current interface.
    Keep inserted record URIs, affected-row counts and per-item receipts. An Intent
    dispatch receipt records what was sent and command output; it does not prove that
    the receiving app applied the extras or saved a record. A successful data operation
@@ -56,9 +57,11 @@ Read only the relevant method before execution:
    whether the first operation worked. If retry is necessary, reconcile the original
    `effect_key` using `effect_checkpoint` and current external evidence first. A record
    missing from one viewport or a partially read list does not prove non-execution.
-6. Use GUI for a concrete missing feature or verification gap after a well-formed direct
-   method proves unsuitable. A permission denial must not be evaded by switching to
-   Root, another UID or private files. A documented public editor may be offered as a
+6. For Android 11+, use the documented public API/Provider readback for native changes.
+   Do not open GUI solely for verification. Where the official contract exposes no
+   readback, retain the receipt and report the precise unconfirmed fields. Use GUI only
+   when the operation itself requires it or the user explicitly requests visual review.
+   A permission denial must not be evaded by switching to Root, another UID or private files. A documented public editor may be offered as a
    separate user-visible method that keeps the platform's own authorization boundary.
 
 Report what was actually completed and what remains unconfirmed. Treat each requested

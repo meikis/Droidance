@@ -139,6 +139,7 @@ internal fun captureNativeDeviceState(context: Context): kotlinx.serialization.j
         put("storage_total_bytes", storage?.totalBytes?.let(::JsonPrimitive) ?: JsonNull)
         put("storage_available_bytes", storage?.availableBytes?.let(::JsonPrimitive) ?: JsonNull)
         put("device_time", JsonPrimitive(java.time.ZonedDateTime.now().toString()))
+        put("next_alarm_clock", captureNextAlarmClock(context))
         put("network_interface", linkProperties?.interfaceName?.let(::JsonPrimitive) ?: JsonNull)
         put("network_addresses", linkProperties?.let { links -> kotlinx.serialization.json.JsonArray(
             links.linkAddresses.map { JsonPrimitive(it.toString()) }) } ?: JsonNull)
@@ -158,6 +159,24 @@ internal fun captureNativeDeviceState(context: Context): kotlinx.serialization.j
         put("network_vpn", networkCapabilities?.let {
             JsonPrimitive(it.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
         } ?: JsonNull)
+    }
+}
+
+/** Public API since level 21; no exact-alarm scheduling grant is needed for this read. */
+internal fun captureNextAlarmClock(context: Context): kotlinx.serialization.json.JsonObject {
+    val result = runCatching {
+        requireNotNull(context.getSystemService(android.app.AlarmManager::class.java)).nextAlarmClock
+    }
+    return buildJsonObject {
+        put("source", JsonPrimitive("AlarmManager.getNextAlarmClock"))
+        put("scope", JsonPrimitive("next_scheduled_alarm_clock_for_current_user"))
+        put("status", JsonPrimitive(when {
+            result.isFailure -> "unavailable"
+            result.getOrNull() == null -> "none"
+            else -> "scheduled"
+        }))
+        put("trigger_at_ms", result.getOrNull()?.triggerTime?.let(::JsonPrimitive) ?: JsonNull)
+        result.exceptionOrNull()?.let { put("error_type", JsonPrimitive(it.javaClass.simpleName)) }
     }
 }
 
