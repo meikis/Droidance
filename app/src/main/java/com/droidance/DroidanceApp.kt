@@ -97,7 +97,7 @@ class DroidanceApp : Application(), Configuration.Provider {
             applicationScope.launch(Dispatchers.IO) { installedAppsManager.init() }
             return
         }
-        runtimeProcessClient.managedStorageEnabled = true
+        runtimeProcessClient.startPresentation()
         // 追踪自身 Activity 前台状态，用于悬浮窗可见性判断
         val foregroundActivities = RuntimeForegroundActivities<Activity>()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

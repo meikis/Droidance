@@ -10,7 +10,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
-- Preserve the task page during permission requests and render startup while reconnecting after an update.
+- Open the normal interface without a startup waiting page, restore pending permission conversations, and reconnect to the installed runtime after updates.
 - Keep runtime permission requests in their task conversation and hide the progress island while awaiting authorization.
 - Prevent virtual-display recovery from waking the physical screen when power groups are shared or scoped wake APIs fail.
 - Read the next alarm through Android's public API and verify native actions without opening screens.

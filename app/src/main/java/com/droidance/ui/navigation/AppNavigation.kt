@@ -124,13 +124,15 @@ private fun NavHostController.navigateToNewConversation(
  */
 @Composable
 fun AppNavigation(
-    onboardingComplete: Boolean,
+    onboardingComplete: Boolean?,
     agentRuntime: AgentRuntime,
     lastConversationId: String? = null,
     initialPrompt: String? = null,
     initialAutoSend: Boolean = false,
     resultConversationId: String? = null,
     permissionNavigation: Boolean = false,
+    onConversationShown: (String) -> Unit,
+    onOnboardingCompleted: () -> Unit,
     onResultOpened: () -> Unit = {}
 ) = Box(Modifier.fillMaxSize()) {
     val navController = rememberNavController()
@@ -147,7 +149,7 @@ fun AppNavigation(
             connectionViewModel.monitor()
         }
     }
-    var onboardingFinished by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(onboardingComplete) }
+    var onboardingFinished by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(onboardingComplete == true) }
     val normalizedInitialPrompt = initialPrompt?.trim()?.takeIf { it.isNotBlank() }
     val initialResultConversationId = remember { resultConversationId }
 
@@ -155,7 +157,7 @@ fun AppNavigation(
     val startDestination = remember(normalizedInitialPrompt, initialAutoSend, lastConversationId) {
         when {
             initialResultConversationId != null -> SubRoutes.buildChatRoute(initialResultConversationId)
-            !onboardingFinished -> SubRoutes.ONBOARDING
+            onboardingComplete == false -> SubRoutes.ONBOARDING
             normalizedInitialPrompt != null ->
                 SubRoutes.buildNewChatRoute(normalizedInitialPrompt, initialAutoSend)
             agentRuntime.currentConversationId.value != null &&
@@ -185,6 +187,17 @@ fun AppNavigation(
     val currentConversationId = remember(navBackStackEntry) {
         navBackStackEntry?.arguments?.getString("conversationId")
             ?: navBackStackEntry?.arguments?.getString("threadId")?.takeIf { it.isNotBlank() }
+    }
+
+    LaunchedEffect(currentConversationId) {
+        currentConversationId?.let(onConversationShown)
+    }
+    LaunchedEffect(onboardingComplete) {
+        if (onboardingComplete == true) onboardingFinished = true
+        if (onboardingComplete == false && !onboardingFinished &&
+            navController.currentDestination?.route?.startsWith("home/") == true && resultConversationId == null) {
+            navController.navigate(SubRoutes.ONBOARDING) { popUpTo(navController.graph.id); launchSingleTop = true }
+        }
     }
 
     LaunchedEffect(resultConversationId, permissionNavigation) {
@@ -266,6 +279,7 @@ fun AppNavigation(
                 OnboardingScreen(
                     onComplete = {
                         onboardingFinished = true
+                        onOnboardingCompleted()
                         navController.navigateToNewConversation()
                     },
                     onNavigateToProviders = { navController.navigate(SubRoutes.PROVIDER_LIST) },

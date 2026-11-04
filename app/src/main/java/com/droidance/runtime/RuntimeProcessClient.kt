@@ -28,12 +28,20 @@ class RuntimeProcessClient @Inject constructor(
     private val surfaces: Lazy<com.droidance.ui.overlay.RuntimeSurfaceController>,
     private val permissions: Lazy<com.droidance.core.device.permission.PermissionBroker>,
     private val virtualSpace: Lazy<com.droidance.agent.device.VirtualSpaceManager>,
+    private val navigation: com.droidance.ui.navigation.StartupNavigationStore,
     @com.droidance.core.agent.di.ApplicationScope private val scope: CoroutineScope
 ) {
     private val transport by lazy { RuntimeTransportPolicy.read(rules.get()) }
     val isOwner get() = RuntimeProcessRole.isOwner
     val cacheDir get() = context.cacheDir
     @Volatile var managedStorageEnabled = false
+    /** Read polling policy locally before file access is redirected to the resident owner. */
+    fun startPresentation() {
+        check(!isOwner)
+        transport
+        managedStorageEnabled = true
+        startPolling()
+    }
     private val transferMarker get() = java.io.File(context.noBackupFilesDir, "runtime-storage-transferred")
     /** Local storage stays authoritative until the one initial transfer to the resident owner succeeds. */
     val storageTransferred get() = transferMarker.isFile
@@ -80,7 +88,13 @@ class RuntimeProcessClient @Inject constructor(
         connection?.takeIf { it.asBinder().isBinderAlive }?.let { return it }
         return synchronized(connectionLock) {
             connection?.takeIf { it.asBinder().isBinderAlive } ?: run {
-                if (!bridge.get().isShellBridgeAvailable()) throw RuntimeUnavailableException()
+                // A live Binder from the previous APK is incompatible but can launch its replacement.
+                // Do not reject it before the bridge has had a chance to perform that handoff.
+                val metrics = context.resources.displayMetrics
+                if (!bridge.get().ensureResidentChannel(metrics.widthPixels, metrics.heightPixels,
+                        metrics.densityDpi, com.droidance.core.agent.device.RuntimeMode.STANDARD)) {
+                    throw RuntimeUnavailableException()
+                }
                 RuntimeStorageSnapshot.installationId(context)
                 val storage = RuntimeStorageSnapshot.create(context)
                 val owner = try { bridge.get().startAgentRuntime(context.packageName, RuntimeStorageSnapshot.installationId(context), storage) }
@@ -186,6 +200,7 @@ class RuntimeProcessClient @Inject constructor(
             while (isActive) {
                 runCatching {
                     val snapshot = decode(owner().state())
+                    navigation.recordOnboarding(snapshot.getBoolean("onboardingComplete"))
                     snapshot.getBundle("display")?.let {
                         virtualSpace.get().adoptRuntimeDisplay(it.getInt("id"), it.getInt("width"),
                             it.getInt("height"), it.getInt("density"), it.getString("thread"), it.getString("execution"),

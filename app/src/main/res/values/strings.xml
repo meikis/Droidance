@@ -750,7 +750,4 @@
     <string name="air_adb_persistence_usb_required">Enable USB debugging in Developer options to keep local reconnection available.</string>
     <string name="connection_local_unavailable_title">Local debugging connection interrupted</string>
     <string name="runtime_island_expand">Expand task controls</string>
-    <string name="startup_loading">Opening Droidance…</string>
-    <string name="startup_failed">Could not open your data. Please try again.</string>
-    <string name="startup_retry">Retry</string>
 </resources>

@@ -38,6 +38,7 @@ internal interface RuntimeOwnerEntryPoint {
     fun runtime(): AgentRuntime
     fun events(): com.droidance.core.agent.event.AgentEventStore
     fun files(): com.droidance.memory.MarkdownFileManager
+    fun deviceProfile(): com.droidance.core.knowledge.agent.device.DeviceProfileStore
     fun providers(): com.droidance.settings.ProviderConfigManager
     fun rules(): com.droidance.config.RuleConfigManager
     fun historyDeletion(): com.droidance.agent.ConversationHistoryDeletion
@@ -390,6 +391,7 @@ object RuntimeProcessHost {
         override fun state(): ParcelFileDescriptor = authenticated { RuntimeWire.write(application.cacheDir, snapshot()) }
 
         private fun snapshot(): Bundle = Bundle().apply {
+            putBoolean("onboardingComplete", entry.deviceProfile().isOnboardingComplete())
             putString("queuedTasks", Json.encodeToString(entry.tasks().activeTasks.value.mapValues { (_, tasks) ->
                 tasks.map { it.copy(request = it.request.copy(images = emptyList(), modelPlan = null)) }
             }))

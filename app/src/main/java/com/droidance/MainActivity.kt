@@ -3,13 +3,6 @@
 
 package com.droidance
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.droidance.agent.AgentRuntime
 import com.droidance.core.knowledge.agent.device.DeviceProfileStore
 import com.droidance.core.agent.event.AgentEventStore
@@ -34,9 +28,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Droidance 主界面 Activity
@@ -45,6 +37,8 @@ import kotlinx.coroutines.withContext
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
+    @Inject lateinit var navigationPresentation: com.droidance.ui.navigation.StartupNavigationStore
+    @Inject lateinit var runtimeClient: com.droidance.runtime.RuntimeProcessClient
     @Inject lateinit var deviceProfileStore: DeviceProfileStore
     @Inject lateinit var agentRuntime: AgentRuntime
     @Inject lateinit var eventStore: AgentEventStore
@@ -74,7 +68,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var permissionNavigation by mutableStateOf(false)
-    private var startup by mutableStateOf<MainStartupState>(MainStartupState.Loading)
 
     private var resultConversationId by mutableStateOf<String?>(null)
 
@@ -128,68 +121,45 @@ class MainActivity : AppCompatActivity() {
         // the shell can read via `run-as`.
         val debugAutoSend = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_DEBUG_AUTO_SEND, false) &&
             debugTokenMatches(intent.getStringExtra(EXTRA_DEBUG_TOKEN))
+        val lastConversationId = navigationPresentation.lastConversationId
         setContent {
             val themeMode by generalSettings.themeMode.collectAsStateWithLifecycle()
+            val onboardingComplete by navigationPresentation.onboardingComplete.collectAsStateWithLifecycle()
             DroidanceTheme(themeMode = themeMode) {
-                val loaded = startup as? MainStartupState.Ready
-                if (loaded == null) {
-                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (startup == MainStartupState.Failed) {
-                                Text(stringResource(R.string.startup_failed))
-                                TextButton(onClick = ::loadStartup) { Text(stringResource(R.string.startup_retry)) }
-                            } else {
-                                CircularProgressIndicator()
-                                Spacer(Modifier.height(16.dp))
-                                Text(stringResource(R.string.startup_loading))
-                            }
-                        }
+                RuntimePermissionRequestHost(permissionBroker)
+                AppUpdateHost()
+                AppNavigation(
+                    onboardingComplete = onboardingComplete,
+                    agentRuntime = agentRuntime,
+                    lastConversationId = lastConversationId,
+                    initialPrompt = debugPrompt,
+                    initialAutoSend = debugAutoSend,
+                    resultConversationId = resultConversationId,
+                    permissionNavigation = permissionNavigation,
+                    onConversationShown = navigationPresentation::recordConversation,
+                    onOnboardingCompleted = { navigationPresentation.recordOnboarding(true) },
+                    onResultOpened = {
+                        resultConversationId = null
+                        permissionNavigation = false
+                        intent.removeExtra(EXTRA_RESULT_CONVERSATION_ID)
+                        intent.removeExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID)
                     }
-                } else {
-                    RuntimePermissionRequestHost(permissionBroker)
-                    AppUpdateHost()
-                    AppNavigation(
-                        onboardingComplete = loaded.onboardingComplete,
-                        agentRuntime = agentRuntime,
-                        lastConversationId = loaded.lastConversationId,
-                        initialPrompt = debugPrompt,
-                        initialAutoSend = debugAutoSend,
-                        resultConversationId = resultConversationId,
-                        permissionNavigation = permissionNavigation,
-                        onResultOpened = {
-                            resultConversationId = null
-                            permissionNavigation = false
-                            intent.removeExtra(EXTRA_RESULT_CONVERSATION_ID)
-                            intent.removeExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID)
-                        }
-                    )
-                }
+                )
             }
         }
-        loadStartup()
-    }
-
-    private fun loadStartup() {
-        startup = MainStartupState.Loading
         lifecycleScope.launch {
-            try {
-                startup = withContext(Dispatchers.IO) {
-                    val latest = eventStore.latestConversationThreadId()
-                    MainStartupState.Ready(deviceProfileStore.isOnboardingComplete(), latest)
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                var restoredRequest: String? = null
+                kotlinx.coroutines.flow.combine(permissionBroker.pendingRequest, runtimeClient.currentConversationId) { request, conversation ->
+                    request?.requestId to conversation
+                }.collect { (requestId, conversation) ->
+                    if (requestId != null && conversation != null && requestId != restoredRequest) {
+                        restoredRequest = requestId
+                        permissionNavigation = true
+                        resultConversationId = conversation
+                    }
                 }
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (error: Exception) {
-                android.util.Log.w("DroidanceStartup", "Startup data unavailable: ${error.javaClass.simpleName}")
-                startup = MainStartupState.Failed
             }
         }
     }
-}
-
-internal sealed interface MainStartupState {
-    data object Loading : MainStartupState
-    data object Failed : MainStartupState
-    data class Ready(val onboardingComplete: Boolean, val lastConversationId: String?) : MainStartupState
 }
