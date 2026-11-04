@@ -10,6 +10,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Prevent virtual-display recovery from waking the physical screen when power groups are shared or scoped wake APIs fail.
 - Read the next alarm through Android's public API and verify native actions without opening screens.
 - Reduce the gap between chat replies and their copy, time and token row.
 - Load skills with reference files and retain complete diagnostic exports.

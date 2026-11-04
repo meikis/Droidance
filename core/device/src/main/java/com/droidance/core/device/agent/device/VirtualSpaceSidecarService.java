@@ -1757,13 +1757,23 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
      */
     private boolean keepDisplayInteractive(String reason) {
         if (displayId < 0) return false;
-        // 人工接管的 ACTION_MOVE 是每秒几十次的连续流：确认过 interactive 就短时间内复用结论，
-        // 别把每个 move 都变成两次 Binder 往返。持锁期间电源组不会中途睡回去。
-        long now = SystemClock.uptimeMillis();
-        if (now - lastInteractiveConfirmedAtMs < DISPLAY_INTERACTIVE_REUSE_MS) return true;
         StringBuilder evidence = new StringBuilder();
         try {
             Object powerManager = resolveContext().getSystemService(Context.POWER_SERVICE);
+            if (!hasIndependentDisplayGroup()) {
+                releaseDisplayWakeLock();
+                Boolean interactive = displayInteractive(powerManager);
+                if (interactive == null) {
+                    interactive = ((android.os.PowerManager) powerManager).isInteractive();
+                }
+                displayWakeEvidence = "wakelock=skipped(shared-or-unknown-group), interactive=" + interactive;
+                // Older platforms and some vendor displays share the physical screen's power group.
+                // They may run while it is awake, but must never wake or keep that group awake.
+                return interactive;
+            }
+            // Reuse a recent confirmation during continuous touch input while the scoped lock is held.
+            long now = SystemClock.uptimeMillis();
+            if (now - lastInteractiveConfirmedAtMs < DISPLAY_INTERACTIVE_REUSE_MS) return true;
             evidence.append(refreshDisplayWakeLock(powerManager) ? "wakelock=held" : "wakelock=unavailable");
             for (int attempt = 0; attempt < DISPLAY_INTERACTIVE_ATTEMPTS; attempt++) {
                 Boolean interactive = displayInteractive(powerManager);
@@ -1773,7 +1783,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                     lastInteractiveConfirmedAtMs = SystemClock.uptimeMillis();
                     return true;
                 }
-                wakeDisplayGroup(powerManager, reason);
+                wakeDisplayGroup(powerManager);
                 reportUserActivity();
                 SystemClock.sleep(DISPLAY_INTERACTIVE_SETTLE_MS);
             }
@@ -1804,8 +1814,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
 
     /** The visible mirror owns this lease, including cleanup on Binder death. */
     private AutoCloseable holdViewerDisplayAwake() throws Exception {
-        // Android 11 has no per-display power state; the virtual display follows the device.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return () -> { };
+        if (!hasIndependentDisplayGroup()) return () -> { };
         Object lock = newDisplayWakeLock(resolveContext().getSystemService(Context.POWER_SERVICE),
                 VIEWER_WAKE_LOCK_TAG);
         lock.getClass().getMethod("acquire").invoke(lock);
@@ -1813,13 +1822,35 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     }
 
     private Object newDisplayWakeLock(Object powerManager, String tag) throws Exception {
+        int targetDisplayId = displayId;
+        if (targetDisplayId <= Display.DEFAULT_DISPLAY || !hasIndependentDisplayGroup()) {
+            throw new IllegalStateException("Virtual display has no confirmed independent power group");
+        }
         Method newWakeLock = powerManager.getClass().getMethod(
                 "newWakeLock", int.class, String.class, int.class);
         Object lock = newWakeLock.invoke(powerManager,
-                SCREEN_BRIGHT_WAKE_LOCK | ACQUIRE_CAUSES_WAKEUP, tag, displayId);
+                SCREEN_BRIGHT_WAKE_LOCK | ACQUIRE_CAUSES_WAKEUP, tag, targetDisplayId);
         if (lock == null) throw new IllegalStateException("Display wake lock unavailable");
         lock.getClass().getMethod("setReferenceCounted", boolean.class).invoke(lock, false);
         return lock;
+    }
+
+    private boolean hasIndependentDisplayGroup() {
+        VirtualDisplay current = display;
+        if (displayId <= Display.DEFAULT_DISPLAY || current == null) return false;
+        Display target = current.getDisplay();
+        if (target == null || target.getDisplayId() != displayId) return false;
+        try {
+            Class<?> infoClass = Class.forName("android.view.DisplayInfo");
+            Object info = infoClass.getConstructor().newInstance();
+            boolean available = (Boolean) Display.class.getMethod("getDisplayInfo", infoClass)
+                    .invoke(target, info);
+            // Display group zero owns the physical screen; -1 means the group is unknown.
+            return available && infoClass.getField("displayGroupId").getInt(info) > 0;
+        } catch (Throwable error) {
+            lastReflectionFailure = "display power group: " + error.getClass().getSimpleName();
+            return false;
+        }
     }
 
     private Boolean displayInteractive(Object powerManager) {
@@ -1832,7 +1863,9 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
         }
     }
 
-    private void wakeDisplayGroup(Object powerManager, String reason) {
+    private void wakeDisplayGroup(Object powerManager) {
+        int targetDisplayId = displayId;
+        if (targetDisplayId <= Display.DEFAULT_DISPLAY) return;
         try {
             Method wakeUp = powerManager.getClass().getMethod(
                     "wakeUp", long.class, int.class, String.class, int.class);
@@ -1841,33 +1874,17 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                     SystemClock.uptimeMillis(),
                     WAKE_REASON_APPLICATION,
                     "android.server.wm:display_wakeup",
-                    displayId);
-            return;
-        } catch (Throwable ignored) {
-        }
-        try {
-            Class<?> serviceManagerClass = Class.forName("android.os.ServiceManager");
-            Method getService = serviceManagerClass.getDeclaredMethod("getService", String.class);
-            IBinder binder = (IBinder) getService.invoke(null, Context.POWER_SERVICE);
-            if (binder != null) {
-                Class<?> stubClass = Class.forName("android.os.IPowerManager$Stub");
-                Object powerService = stubClass.getDeclaredMethod("asInterface", IBinder.class).invoke(null, binder);
-                try {
-                    Method m = powerService.getClass().getMethod("wakeDisplayGroup", int.class, long.class, int.class, String.class, String.class);
-                    m.invoke(powerService, displayId, SystemClock.uptimeMillis(), WAKE_REASON_APPLICATION, "android.server.wm:display_wakeup", "com.android.shell");
-                    return;
-                } catch (Throwable ignored) {}
-                try {
-                    Method m = powerService.getClass().getMethod("wakeUp", long.class, int.class, String.class, String.class);
-                    m.invoke(powerService, SystemClock.uptimeMillis(), WAKE_REASON_APPLICATION, "android.server.wm:display_wakeup", "com.android.shell");
-                } catch (Throwable ignored) {}
-            }
-        } catch (Throwable ignored) {
+                    targetDisplayId);
+        } catch (Throwable error) {
+            // A device-wide wakeUp fallback wakes the user's physical screen.
+            lastReflectionFailure = "display wake: " + error.getClass().getSimpleName();
         }
     }
 
     /** 喂一次"用户活动"，让电源组的息屏计时从现在重新开始算。 */
     private void reportUserActivity() {
+        int targetDisplayId = displayId;
+        if (targetDisplayId <= Display.DEFAULT_DISPLAY) return;
         try {
             Class<?> serviceManagerClass = Class.forName("android.os.ServiceManager");
             Method getService = serviceManagerClass.getDeclaredMethod("getService", String.class);
@@ -1879,7 +1896,7 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
             Class<?> powerInterface = Class.forName("android.os.IPowerManager");
             Method userActivity = powerInterface.getMethod(
                     "userActivity", int.class, long.class, int.class, int.class);
-            userActivity.invoke(powerService, displayId, SystemClock.uptimeMillis(), 0, 0);
+            userActivity.invoke(powerService, targetDisplayId, SystemClock.uptimeMillis(), 0, 0);
         } catch (Throwable ignored) {
         }
     }
