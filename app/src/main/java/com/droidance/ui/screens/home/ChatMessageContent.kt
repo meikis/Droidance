@@ -51,11 +51,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -1140,14 +1142,13 @@ internal fun ChatBubble(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (copyText.isNotBlank()) {
-                        IconButton(
+                        MessageCopyButton(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(copyText))
                                 haptics.confirm()
                                 justCopied = true
                                 copyRequest++
-                            },
-                            modifier = Modifier.size(48.dp)
+                            }
                         ) {
                             AnimatedContent(
                                 targetState = justCopied,
@@ -1266,14 +1267,13 @@ internal fun ChatBubble(
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             if (!isThinking && copyText.isNotBlank()) {
-                IconButton(
+                MessageCopyButton(
                     onClick = {
                         clipboardManager.setText(AnnotatedString(copyText))
                         haptics.confirm()
                         justCopied = true
                         copyRequest++
-                    },
-                    modifier = Modifier.size(48.dp)
+                    }
                 ) {
                     AnimatedContent(
                         targetState = justCopied,
@@ -1335,6 +1335,13 @@ private fun SimpleMessageBubble(
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), content = content)
         }
     } else {
-        Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 6.dp), content = content)
+        Column(modifier = Modifier.padding(start = 2.dp, end = 2.dp, top = 6.dp), content = content)
+    }
+}
+
+@Composable
+private fun MessageCopyButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        IconButton(onClick = onClick, modifier = Modifier.size(32.dp), content = content)
     }
 }
