@@ -41,7 +41,6 @@ import androidx.navigation.navArgument
 import com.droidance.R
 import com.droidance.agent.AgentRuntime
 import com.droidance.core.agent.AgentState
-import com.droidance.core.knowledge.agent.device.DeviceProfileStore
 import com.droidance.ui.screens.*
 import com.droidance.ui.components.DroidanceSnackbar
 import com.droidance.ui.connection.DeviceConnectionDialog
@@ -125,12 +124,13 @@ private fun NavHostController.navigateToNewConversation(
  */
 @Composable
 fun AppNavigation(
-    deviceProfileStore: DeviceProfileStore,
+    onboardingComplete: Boolean,
     agentRuntime: AgentRuntime,
     lastConversationId: String? = null,
     initialPrompt: String? = null,
     initialAutoSend: Boolean = false,
     resultConversationId: String? = null,
+    permissionNavigation: Boolean = false,
     onResultOpened: () -> Unit = {}
 ) = Box(Modifier.fillMaxSize()) {
     val navController = rememberNavController()
@@ -147,6 +147,7 @@ fun AppNavigation(
             connectionViewModel.monitor()
         }
     }
+    var onboardingFinished by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(onboardingComplete) }
     val normalizedInitialPrompt = initialPrompt?.trim()?.takeIf { it.isNotBlank() }
     val initialResultConversationId = remember { resultConversationId }
 
@@ -154,7 +155,7 @@ fun AppNavigation(
     val startDestination = remember(normalizedInitialPrompt, initialAutoSend, lastConversationId) {
         when {
             initialResultConversationId != null -> SubRoutes.buildChatRoute(initialResultConversationId)
-            !deviceProfileStore.isOnboardingComplete() -> SubRoutes.ONBOARDING
+            !onboardingFinished -> SubRoutes.ONBOARDING
             normalizedInitialPrompt != null ->
                 SubRoutes.buildNewChatRoute(normalizedInitialPrompt, initialAutoSend)
             agentRuntime.currentConversationId.value != null &&
@@ -167,7 +168,7 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: ""
     val isChatRoute = currentRoute.startsWith("home/chat") || currentRoute.startsWith("home/new-chat")
-    val showConnectionFeedback = deviceProfileStore.isOnboardingComplete() &&
+    val showConnectionFeedback = onboardingFinished &&
         currentRoute != SubRoutes.AIR_PAIRING && lifecycle == Lifecycle.State.RESUMED
     LaunchedEffect(connectionViewModel, context, showConnectionFeedback) {
         connectionViewModel.events.collect { message ->
@@ -186,8 +187,15 @@ fun AppNavigation(
             ?: navBackStackEntry?.arguments?.getString("threadId")?.takeIf { it.isNotBlank() }
     }
 
-    LaunchedEffect(resultConversationId) {
+    LaunchedEffect(resultConversationId, permissionNavigation) {
         val conversationId = resultConversationId ?: return@LaunchedEffect
+        val shown = navController.currentBackStackEntry?.arguments?.let {
+            it.getString("conversationId") ?: it.getString("threadId")
+        }
+        if (permissionNavigation && shown == conversationId) {
+            onResultOpened()
+            return@LaunchedEffect
+        }
         drawerState.close()
         navController.navigate(SubRoutes.buildChatRoute(conversationId)) {
             // A fresh chat entry follows the saved result even if this conversation was scrolled up.
@@ -257,6 +265,7 @@ fun AppNavigation(
             composable(SubRoutes.ONBOARDING) {
                 OnboardingScreen(
                     onComplete = {
+                        onboardingFinished = true
                         navController.navigateToNewConversation()
                     },
                     onNavigateToProviders = { navController.navigate(SubRoutes.PROVIDER_LIST) },

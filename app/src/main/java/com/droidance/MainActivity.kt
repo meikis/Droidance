@@ -3,6 +3,13 @@
 
 package com.droidance
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -61,10 +68,13 @@ class MainActivity : AppCompatActivity() {
 
         fun permissionRequestIntent(context: Context, requestId: String, conversationId: String?): Intent =
             Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
                 .putExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID, requestId)
                 .apply { if (!conversationId.isNullOrBlank()) putExtra(EXTRA_RESULT_CONVERSATION_ID, conversationId) }
     }
+
+    private var permissionNavigation by mutableStateOf(false)
+    private var startup by mutableStateOf<MainStartupState>(MainStartupState.Loading)
 
     private var resultConversationId by mutableStateOf<String?>(null)
 
@@ -85,6 +95,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        permissionNavigation = intent.hasExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID)
         resultConversationId = intent.getStringExtra(EXTRA_RESULT_CONVERSATION_ID)?.takeIf { it.isNotBlank() }
         openUpdateIfRequested(intent)
     }
@@ -103,6 +114,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        permissionNavigation = intent.hasExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID)
         resultConversationId = intent.getStringExtra(EXTRA_RESULT_CONVERSATION_ID)?.takeIf { it.isNotBlank() }
         openUpdateIfRequested(intent)
         if (BuildConfig.DEBUG) debugTokenMatches(null) // creates the token file on first debug launch
@@ -116,29 +128,68 @@ class MainActivity : AppCompatActivity() {
         // the shell can read via `run-as`.
         val debugAutoSend = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_DEBUG_AUTO_SEND, false) &&
             debugTokenMatches(intent.getStringExtra(EXTRA_DEBUG_TOKEN))
-        lifecycleScope.launch {
-            val lastConversationId = withContext(Dispatchers.IO) {
-                eventStore.latestConversationThreadId()
-            }
-            setContent {
-                val themeMode by generalSettings.themeMode.collectAsStateWithLifecycle()
-                DroidanceTheme(themeMode = themeMode) {
+        setContent {
+            val themeMode by generalSettings.themeMode.collectAsStateWithLifecycle()
+            DroidanceTheme(themeMode = themeMode) {
+                val loaded = startup as? MainStartupState.Ready
+                if (loaded == null) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (startup == MainStartupState.Failed) {
+                                Text(stringResource(R.string.startup_failed))
+                                TextButton(onClick = ::loadStartup) { Text(stringResource(R.string.startup_retry)) }
+                            } else {
+                                CircularProgressIndicator()
+                                Spacer(Modifier.height(16.dp))
+                                Text(stringResource(R.string.startup_loading))
+                            }
+                        }
+                    }
+                } else {
                     RuntimePermissionRequestHost(permissionBroker)
                     AppUpdateHost()
                     AppNavigation(
-                        deviceProfileStore = deviceProfileStore,
+                        onboardingComplete = loaded.onboardingComplete,
                         agentRuntime = agentRuntime,
-                        lastConversationId = lastConversationId,
+                        lastConversationId = loaded.lastConversationId,
                         initialPrompt = debugPrompt,
                         initialAutoSend = debugAutoSend,
                         resultConversationId = resultConversationId,
+                        permissionNavigation = permissionNavigation,
                         onResultOpened = {
                             resultConversationId = null
+                            permissionNavigation = false
                             intent.removeExtra(EXTRA_RESULT_CONVERSATION_ID)
+                            intent.removeExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID)
                         }
                     )
                 }
             }
         }
+        loadStartup()
     }
+
+    private fun loadStartup() {
+        startup = MainStartupState.Loading
+        lifecycleScope.launch {
+            try {
+                startup = withContext(Dispatchers.IO) {
+                    val latest = eventStore.latestConversationThreadId()
+                    MainStartupState.Ready(deviceProfileStore.isOnboardingComplete(), latest)
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                android.util.Log.w("DroidanceStartup", "Startup data unavailable: ${error.javaClass.simpleName}")
+                startup = MainStartupState.Failed
+            }
+        }
+    }
+}
+
+internal sealed interface MainStartupState {
+    data object Loading : MainStartupState
+    data object Failed : MainStartupState
+    data class Ready(val onboardingComplete: Boolean, val lastConversationId: String?) : MainStartupState
 }

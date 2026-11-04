@@ -747,4 +747,7 @@
     <string name="air_adb_persistence_usb_required">请到开发者选项开启 USB 调试，以保持本机端口重连可用。</string>
     <string name="connection_local_unavailable_title">本机调试连接中断</string>
     <string name="runtime_island_expand">展开任务控制</string>
+    <string name="startup_loading">正在打开 Droidance…</string>
+    <string name="startup_failed">暂时无法读取数据，请重试。</string>
+    <string name="startup_retry">重试</string>
 </resources>
