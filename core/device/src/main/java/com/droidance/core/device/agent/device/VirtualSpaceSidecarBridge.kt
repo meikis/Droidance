@@ -56,7 +56,11 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         val values: Map<String, String> = emptyMap(),
         val channelUnavailable: Boolean = false,
         val textInputEvidence: TextInputEvidence? = null
-    )
+    ) {
+        /** An explicit platform permission rejection, independent of device brand. */
+        val inputPermissionDenied: Boolean
+            get() = !ok && detail.contains("INPUT_INJECTION_DENIED:")
+    }
 
     private val serviceLock = Any()
 

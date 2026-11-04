@@ -10,6 +10,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Offer manual wireless pairing and connection ports, detect denied input permissions before task execution, and retain precise failure diagnostics.
 - Restore conversation history independently of virtual-display presentation, and offer reconnection when the runtime is unavailable.
 - Open the normal interface without a startup waiting page, restore pending permission conversations, and reconnect to the installed runtime after updates.
 - Keep runtime permission requests in their task conversation and hide the progress island while awaiting authorization.

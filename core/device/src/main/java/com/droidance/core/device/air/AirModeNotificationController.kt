@@ -48,6 +48,8 @@ class AirModeNotificationController @Inject constructor(
         const val NOTIFICATION_ID = 9821
         const val ACTION_SUBMIT_CODE = "com.droidance.air.SUBMIT_PAIRING_CODE"
         const val KEY_PAIRING_CODE = "pairing_code"
+        const val ACTION_SUBMIT_MANUAL_PAIRING = "com.droidance.air.SUBMIT_MANUAL_PAIRING"
+        const val KEY_MANUAL_PAIRING = "manual_pairing"
     }
 
     @Volatile private var pairingNotificationActive = false
@@ -68,6 +70,7 @@ class AirModeNotificationController @Inject constructor(
         LocalizedNotifications.refresh(context, setOf(NOTIFICATION_ID, NOTIFICATION_ID + 1)) { builder, notification ->
             if (notification.actions?.isNotEmpty() == true) {
                 builder.clearActions().addAction(pairingCodeAction())
+                if (notification.actions.size > 1) builder.addAction(manualPairingAction())
             }
         }
     }
@@ -118,7 +121,8 @@ class AirModeNotificationController @Inject constructor(
 
     fun showPairingRequest(
         failure: AirPairingFailure? = null,
-        alert: Boolean = true
+        alert: Boolean = true,
+        manualEntry: Boolean = false
     ): PairingNotificationPostResult {
         val availability = availability()
         if (availability != AirPairingNotificationAvailability.AVAILABLE) {
@@ -138,6 +142,7 @@ class AirModeNotificationController @Inject constructor(
             .setOngoing(true)
             .setPriority(if (alert) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
             .addAction(pairingCodeAction())
+            .apply { if (manualEntry) addAction(manualPairingAction()) }
             .build()
 
         // Clear the silent/previous input before alerting so heads-up presentation triggers reliably.
@@ -173,6 +178,18 @@ class AirModeNotificationController @Inject constructor(
         return NotificationCompat.Action.Builder(
             0, localizedContext.getString(R.string.settings_air_notification_action), pendingIntent
         ).addRemoteInput(remoteInput).build()
+    }
+
+    private fun manualPairingAction(): NotificationCompat.Action {
+        val remoteInput = RemoteInput.Builder(KEY_MANUAL_PAIRING)
+            .setLabel(localizedContext.getString(R.string.settings_air_manual_pairing_input))
+            .build()
+        val pendingIntent = PendingIntent.getBroadcast(context, 1,
+            Intent(context, AirModePairingReceiver::class.java).setAction(ACTION_SUBMIT_MANUAL_PAIRING),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
+        return NotificationCompat.Action.Builder(0,
+            localizedContext.getString(R.string.settings_air_manual_pairing_action), pendingIntent)
+            .addRemoteInput(remoteInput).build()
     }
 
     private fun post(kind: String, notification: android.app.Notification): Result<Unit> =
@@ -236,7 +253,7 @@ class AirModeNotificationController @Inject constructor(
         if (allowRetry) {
             // A RemoteInput submission changes the notification's system state. Replace it
             // with a fresh ongoing input notification, rather than updating the submitted one.
-            showPairingRequest(failure)
+            showPairingRequest(failure, manualEntry = true)
             return
         }
         pairingNotificationActive = false

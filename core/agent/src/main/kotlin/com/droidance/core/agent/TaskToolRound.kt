@@ -1128,6 +1128,9 @@ internal suspend fun TaskTurnSession.runToolRound(modelRound: ModelRoundOutput):
                     com.droidance.core.agent.tools.WorkspaceTool.isWorkingStateMutation(tc.arguments))
             val toolDiagnosticCode = ToolResultStatus.diagnosticCode(result)
             lastExecutionDiagnostic = toolDiagnosticCode.takeUnless { ToolResultStatus.isSuccess(result) }
+            if (toolDiagnosticCode in setOf("TOOL_BINDING_MISMATCH", "TOOL_EXECUTION_FAILED")) {
+                return ToolRoundOutcome.Terminal(groundedGuardStop(toolDiagnosticCode))
+            }
             val recovery = ToolRecovery.classify(result, recoveryPolicy.refreshAfterDiagnostics)
             if (toolDiagnosticCode == "VIRTUAL_SPACE_EMPTY" &&
                 result.executionStatus == ToolExecutionStatus.FAILED) {
@@ -1671,6 +1674,7 @@ internal suspend fun TaskTurnSession.runToolRound(modelRound: ModelRoundOutput):
             AttemptDiagnosticCode.BACKEND_UNAVAILABLE,
             AttemptDiagnosticCode.AIR_CHANNEL_RECOVERY_REQUIRED,
             AttemptDiagnosticCode.AIR_PAIRING_REQUIRED,
+            AttemptDiagnosticCode.INPUT_PERMISSION_DENIED,
             AttemptDiagnosticCode.VIRTUAL_DISPLAY_UNSUPPORTED
         )
         val backendUnavailableRejections = roundPlan.rejectedCalls.filter {
@@ -1682,6 +1686,9 @@ internal suspend fun TaskTurnSession.runToolRound(modelRound: ModelRoundOutput):
             backendUnavailableRejections.size == roundPlan.rejectedCalls.size
         ) {
             val diagnosticCode = backendUnavailableRejections.first().diagnosticCode
+            if (diagnosticCode == AttemptDiagnosticCode.INPUT_PERMISSION_DENIED) {
+                return groundedGuardStop(diagnosticCode)
+            }
             val terminationClaim = when (diagnosticCode) {
                 AttemptDiagnosticCode.AIR_CHANNEL_RECOVERY_REQUIRED ->
                     fallbackText("termination_air_channel_recovery_required")

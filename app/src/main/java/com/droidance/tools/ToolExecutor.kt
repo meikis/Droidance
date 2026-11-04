@@ -3,6 +3,8 @@
 
 package com.droidance.tools
 
+import com.droidance.core.agent.debug.recordRuntimeFailure
+
 import com.droidance.core.agent.tools.*
 import com.droidance.core.knowledge.tools.*
 import com.droidance.core.device.tools.*
@@ -77,6 +79,7 @@ class ToolExecutor @Inject constructor(
     private val observeScreenTool: com.droidance.tools.observe.ObserveScreenTool,
     private val toolTurnServices: ToolTurnServices,
     private val diagnostics: DiagnosticsCollector,
+    private val debugLogAppender: com.droidance.core.agent.debug.DebugLogAppender,
     private val ruleConfigManager: com.droidance.config.RuleConfigManager,
     private val executionSettingsRepository: ExecutionSettingsRepository,
     private val platformDriver: com.droidance.agent.device.NativeInputDriverClient,
@@ -658,6 +661,10 @@ class ToolExecutor @Inject constructor(
             if (toolCall.name == DeviceToolNames.SHELL && handlerStarted) invalidateModelFrameBinding()
             throw e
         } catch (e: Exception) {
+            runCatching {
+                debugLogAppender.recordRuntimeFailure(eventToolCallId,
+                    "phase=tool_execution tool=${toolCall.name} handler_started=$handlerStarted", e)
+            }
             if (toolCall.name == DeviceToolNames.SHELL && handlerStarted) {
                 invalidateModelFrameBinding()
                 return finishEvent(ToolProtocolResult.interrupted("SHELL_EFFECT_UNKNOWN"))

@@ -20,6 +20,8 @@ fun AirPairingFailure.messageRes(): Int = when (this) {
     AirPairingFailure.NOTIFICATION_POST_FAILED -> R.string.settings_air_notification_post_failed
     AirPairingFailure.PAIRING_SERVICE_NOT_FOUND -> R.string.settings_air_pairing_service_not_found
     AirPairingFailure.INVALID_PAIRING_CODE -> R.string.settings_air_notification_invalid_code_text
+    AirPairingFailure.INVALID_MANUAL_PAIRING_INPUT -> R.string.settings_air_manual_pairing_invalid
+    AirPairingFailure.INVALID_DEBUG_PORT -> R.string.settings_air_debug_port_invalid
     AirPairingFailure.PAIRING_REQUEST_UNAVAILABLE ->
         R.string.settings_air_notification_unavailable_text
     AirPairingFailure.PAIRING_TIMEOUT -> R.string.settings_air_pairing_timeout

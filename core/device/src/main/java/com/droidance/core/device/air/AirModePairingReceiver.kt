@@ -17,11 +17,23 @@ class AirModePairingReceiver : BroadcastReceiver() {
     @Inject lateinit var notificationController: AirModeNotificationController
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != AirModeNotificationController.ACTION_SUBMIT_CODE) return
+        if (intent.action != AirModeNotificationController.ACTION_SUBMIT_CODE &&
+            intent.action != AirModeNotificationController.ACTION_SUBMIT_MANUAL_PAIRING) return
         val results = RemoteInput.getResultsFromIntent(intent) ?: return
+        if (intent.action == AirModeNotificationController.ACTION_SUBMIT_MANUAL_PAIRING) {
+            val input = results.getCharSequence(AirModeNotificationController.KEY_MANUAL_PAIRING)
+                ?.toString() ?: return
+            val pairing = AirManualPairingInput.parse(input)
+            if (pairing == null) {
+                notificationController.showPairingFailure(AirPairingFailure.INVALID_MANUAL_PAIRING_INPUT, allowRetry = true)
+            } else {
+                pairingManager.requestPairing(pairing.code, pairing.port)
+            }
+            return
+        }
         val code = results.getCharSequence(AirModeNotificationController.KEY_PAIRING_CODE)
             ?.toString()?.trim() ?: return
-        if (code.length != 6 || !code.all { it.isDigit() }) {
+        if (code.length != 6 || !code.all { it in '0'..'9' }) {
             notificationController.showInvalidPairingCode()
             return
         }

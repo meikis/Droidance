@@ -157,7 +157,11 @@ class DiagnosticsCollector @Inject constructor(
         airAdbPersistenceEnabled: Boolean = false,
         airLocalAdbPort: Int? = null,
         airUsbDebuggingEnabled: Boolean? = null,
-        adbdEvidence: String = ""
+        adbdEvidence: String = "",
+        airPairingFailure: String = "",
+        airNotificationAvailability: String = "",
+        airSecureSettingsGranted: Boolean = false,
+        airWirelessDebuggingEnabled: Boolean? = null
     ) {
         envFile().writeText(buildString {
             append("{")
@@ -165,11 +169,18 @@ class DiagnosticsCollector @Inject constructor(
             append(",\"package\":\"${escape(context.packageName)}\"")
             append(",\"build\":\"${escape(buildType)}\"")
             append(",\"device_model\":\"${escape(deviceModel)}\"")
+            append(",\"device_manufacturer\":\"${escape(android.os.Build.MANUFACTURER)}\"")
+            append(",\"system_build\":\"${escape(android.os.Build.DISPLAY)}\"")
+            append(",\"system_incremental\":\"${escape(android.os.Build.VERSION.INCREMENTAL)}\"")
             append(",\"android_version\":\"${escape(androidVersion)}\"")
             append(",\"sdk_int\":\"${escape(sdkInt)}\"")
             append(",\"adb_shell_available\":$adbShellAvailable")
             append(",\"air_previously_paired\":$airPreviouslyPaired")
             append(",\"air_pairing_state\":\"${escape(airPairingState)}\"")
+            append(",\"air_pairing_failure\":\"${escape(airPairingFailure)}\"")
+            append(",\"air_notification_availability\":\"${escape(airNotificationAvailability)}\"")
+            append(",\"air_secure_settings_granted\":$airSecureSettingsGranted")
+            append(",\"air_wireless_debugging_enabled\":$airWirelessDebuggingEnabled")
             append(",\"air_pairing_trust_state\":\"${escape(airPairingTrustState)}\"")
             append(",\"air_wifi_transport_available\":$airWifiTransportAvailable")
             append(",\"air_shell_ready\":$airShellReady")

@@ -54,5 +54,7 @@ internal fun guardStopNoticeKey(diagnostic: String?): String = when (diagnostic)
     "OBSERVATION_RECOVERY_BUDGET_EXHAUSTED", "PRE_ACTION_OBSERVATION_UNAVAILABLE",
     "POST_ACTION_OBSERVATION_UNAVAILABLE", "MAIN_OBSERVATION_TIMEOUT" -> "termination_observation_unavailable"
     "ARGUMENT_SCHEMA_MISMATCH", "SCREEN_ACT_BATCH_REJECTED" -> "termination_tool_arguments"
+    "TOOL_BINDING_MISMATCH" -> "termination_tool_binding_error"
+    "TOOL_EXECUTION_FAILED" -> "termination_internal_error"
     else -> "termination_guard_stop"
 }

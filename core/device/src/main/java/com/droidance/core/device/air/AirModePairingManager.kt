@@ -71,7 +71,9 @@ class AirModePairingManager @Inject constructor(
         val persistenceEnabled: Boolean,
         val localPort: Int?,
         val usbDebuggingEnabled: Boolean?,
-        val adbdEvidence: String
+        val adbdEvidence: String,
+        val pairingFailure: AirPairingFailure?,
+        val notificationAvailability: AirPairingNotificationAvailability
     )
 
     private companion object {
@@ -124,6 +126,8 @@ class AirModePairingManager @Inject constructor(
 
     private val _failure = MutableStateFlow<AirPairingFailure?>(null)
     val failure: StateFlow<AirPairingFailure?> = _failure.asStateFlow()
+    private val _manualPairingAvailable = MutableStateFlow(false)
+    val manualPairingAvailable: StateFlow<Boolean> = _manualPairingAvailable.asStateFlow()
 
     val isPreviouslyPaired: Boolean
         get() = _pairingTrustState.value == PairingTrustState.PAIRED && privateKeyFile().exists()
@@ -299,7 +303,9 @@ class AirModePairingManager @Inject constructor(
         persistenceEnabled = _persistenceEnabled.value,
         localPort = savedLocalPort(),
         usbDebuggingEnabled = isUsbDebuggingEnabled(),
-        adbdEvidence = lastAdbdEvidence
+        adbdEvidence = lastAdbdEvidence,
+        pairingFailure = _failure.value,
+        notificationAvailability = notificationAvailability()
     )
 
     /**
@@ -329,10 +335,16 @@ class AirModePairingManager @Inject constructor(
         }
         _failure.value = null
         queuedPairCode = null
+        _manualPairingAvailable.value = false
         clearPendingPairingEndpoint()
         stopConnectAttempt()
         _state.value = PairingState.DISCOVERING
         logPairingEvent("AIR pairing discovery started")
+        logPairingEvent("AIR environment manufacturer=${android.os.Build.MANUFACTURER} " +
+            "model=${android.os.Build.MODEL} android=${android.os.Build.VERSION.RELEASE} " +
+            "sdk=${android.os.Build.VERSION.SDK_INT} build=${android.os.Build.DISPLAY.take(120)} " +
+            "usb=${isUsbDebuggingEnabled()} wireless=${isWirelessDebuggingEnabled()} " +
+            "notifications=${notificationAvailability()}")
         // Prepare a silent RemoteInput while foreground so it remains usable if frozen.
         // Alert only after discovering the service opened by the system pairing-code dialog.
         if (!showPairingCodeNotification(alert = false)) return false
@@ -349,6 +361,10 @@ class AirModePairingManager @Inject constructor(
             while (_state.value == PairingState.DISCOVERING && pendingPort <= 0) {
                 delay(PAIRING_DISCOVERY_REFRESH_MS)
                 if (_state.value != PairingState.DISCOVERING || pendingPort > 0) break
+                if (!_manualPairingAvailable.value) {
+                    _manualPairingAvailable.value = true
+                    if (!showPairingCodeNotification(alert = false)) break
+                }
                 logPairingEvent("AIR pairing mDNS: discovery_refresh")
                 pairingDiscovery?.stop()
                 pairingDiscovery = null
@@ -407,7 +423,15 @@ class AirModePairingManager @Inject constructor(
     // After submitting, we discover the ADB connect port and attempt connection
     // using the pre-generated key pair (which the system will trust post-pairing).
 
-    fun reconnect(): Boolean {
+    fun reconnect(port: Int? = null): Boolean {
+        if (port != null && port !in 1..65535) {
+            _failure.value = AirPairingFailure.INVALID_DEBUG_PORT
+            return false
+        }
+        if (port != null && isPreviouslyPaired && _state.value == PairingState.CONNECTING) {
+            stopConnectAttempt()
+            _state.value = PairingState.IDLE
+        }
         if (!isPreviouslyPaired || _state.value != PairingState.IDLE) return false
         automaticReconnectSuspended = false
         if (!hasLocalAdbPort && !isWifiTransportAvailable()) {
@@ -416,7 +440,7 @@ class AirModePairingManager @Inject constructor(
         }
         _failure.value = null
         _state.value = PairingState.CONNECTING
-        startConnectDiscovery()
+        startConnectDiscovery(manualPort = port)
         return true
     }
 
@@ -469,11 +493,21 @@ class AirModePairingManager @Inject constructor(
         }.getOrDefault(false)
     }
 
-    fun requestPairing(code: String) {
-        if (code.length != 6 || !code.all { it.isDigit() }) {
+    fun requestPairing(code: String, pairingPort: Int? = null) {
+        if (code.length != 6 || !code.all { it in '0'..'9' }) {
             _failure.value = AirPairingFailure.INVALID_PAIRING_CODE
             runCatching { notificationController.showInvalidPairingCode() }
             return
+        }
+        if (pairingPort != null && pairingPort !in 1..65535) {
+            _failure.value = AirPairingFailure.INVALID_DEBUG_PORT
+            return
+        }
+        // A manually supplied local endpoint also works in split screen without notification input.
+        if (pairingPort != null && _state.value == PairingState.IDLE) {
+            automaticReconnectSuspended = false
+            stopConnectAttempt()
+            _state.value = PairingState.DISCOVERING
         }
         if (_state.value !in setOf(PairingState.DISCOVERING, PairingState.AWAITING_CODE)) {
             _failure.value = AirPairingFailure.PAIRING_REQUEST_UNAVAILABLE
@@ -487,6 +521,13 @@ class AirModePairingManager @Inject constructor(
         pairingDiscoveryGeneration.incrementAndGet()
         clearPendingPairingEndpoint()
         _state.value = PairingState.DISCOVERING
+        if (pairingPort != null) {
+            pairingDiscovery?.stop()
+            pairingDiscovery = null
+            logPairingEvent("AIR pairing using manually supplied local endpoint port=$pairingPort")
+            doExecutePairing(LOCAL_ADB_HOST, pairingPort, code)
+            return
+        }
         logPairingEvent("AIR pairing endpoint refresh requested for submitted code")
         runCatching { notificationController.showPairingWaitingForService() }
         // Time the submitted request, not the user's time spent in system settings.
@@ -494,11 +535,8 @@ class AirModePairingManager @Inject constructor(
         discoveryTimeoutJob = appScope.launch {
             delay(120_000)
             if (_state.value == PairingState.DISCOVERING && queuedPairCode != null) {
-                val failure = AirPairingFailure.PAIRING_SERVICE_NOT_FOUND
-                _failure.value = failure
-                logPairingEvent("AIR pairing endpoint discovery timed out after code submission")
-                stopDiscovery()
-                runCatching { notificationController.showPairingFailure(failure) }
+                resumePairingDiscovery(AirPairingFailure.PAIRING_SERVICE_NOT_FOUND,
+                    "AIR pairing endpoint discovery timed out after code submission")
             }
         }
         startPairingDiscovery()
@@ -513,7 +551,8 @@ class AirModePairingManager @Inject constructor(
     }
 
     private fun showPairingCodeNotification(alert: Boolean): Boolean {
-        val postResult = notificationController.showPairingRequest(_failure.value, alert = alert)
+        val postResult = notificationController.showPairingRequest(_failure.value, alert = alert,
+            manualEntry = _manualPairingAvailable.value)
         if (postResult.posted) {
             return true
         } else {
@@ -549,8 +588,10 @@ class AirModePairingManager @Inject constructor(
         }
 
     private fun logPairingEvent(event: String) {
-        debugLogAppender.appendEvent(event)
-        debugLogAppender.appendPersistentEvent("air-pairing", event)
+        val diagnostic = "$event [state=${_state.value} trust=${_pairingTrustState.value} " +
+            "failure=${_failure.value} wifi=$wifiTransportAvailable]"
+        debugLogAppender.appendEvent(diagnostic)
+        debugLogAppender.appendPersistentEvent("air-pairing", diagnostic)
     }
 
     private fun clearPendingPairingEndpoint() {
@@ -569,6 +610,7 @@ class AirModePairingManager @Inject constructor(
         clearPendingPairingEndpoint()
         _failure.value = failure
         _state.value = PairingState.DISCOVERING
+        _manualPairingAvailable.value = true
         logPairingEvent(diagnostic)
         runCatching { notificationController.showPairingFailure(failure, allowRetry = true) }
         startPairingDiscovery()
@@ -604,6 +646,7 @@ class AirModePairingManager @Inject constructor(
                 pairingTimeoutJob?.cancel()
                 pairingTimeoutJob = null
                 if (success) {
+                    _manualPairingAvailable.value = false
                     markPairingTrusted()
                     runCatching { notificationController.showPairingSucceeded() }
                     _state.value = PairingState.CONNECTING
@@ -927,7 +970,7 @@ class AirModePairingManager @Inject constructor(
         }
     }
 
-    private fun startConnectDiscovery() {
+    private fun startConnectDiscovery(manualPort: Int? = null) {
         if (isConnectionBlockedByPairingRequirement() || automaticReconnectSuspended) return
         val generation = connectAttemptGeneration.incrementAndGet()
         connectScanJob?.cancel()
@@ -960,15 +1003,15 @@ class AirModePairingManager @Inject constructor(
                 },
                 onDiagnostic = { detail -> debugLogAppender.appendEvent("AIR connect mDNS: $detail") }
             ).also { it.start() }
-            val ports = AirAdbPortPolicy.connectPorts(
+            val ports = (listOfNotNull(manualPort) + AirAdbPortPolicy.connectPorts(
                 lastPort = prefs.getInt("air_last_connect_port", -1).takeIf { it in 1..65535 },
                 settingsPort = getAdbWifiPort()
-            )
+            )).distinct()
             for (port in ports) {
                 for (host in listOfNotNull(LOCAL_ADB_HOST, getWifiIpAddress()).distinct()) {
                     currentCoroutineContext().ensureActive()
                     if (_state.value != PairingState.CONNECTING || isConnectionBlockedByPairingRequirement()) return@launch
-                    runCatching { doConnect(host, port, "port_scan", generation) }
+                    runCatching { doConnect(host, port, if (port == manualPort) "manual" else "port_scan", generation) }
                     if (_state.value != PairingState.CONNECTING || isPairingRequired) return@launch
                 }
             }
@@ -1023,6 +1066,7 @@ class AirModePairingManager @Inject constructor(
     }
 
     fun disconnect() {
+        _manualPairingAvailable.value = false
         pairingAttemptGeneration.incrementAndGet()
         pairingDiscoveryGeneration.incrementAndGet()
         automaticReconnectSuspended = true

@@ -748,4 +748,9 @@
     <string name="air_adb_persistence_usb_required">请到开发者选项开启 USB 调试，以保持本机端口重连可用。</string>
     <string name="connection_local_unavailable_title">本机调试连接中断</string>
     <string name="runtime_island_expand">展开任务控制</string>
+    <string name="air_pairing_manual_description">请通过分屏保持系统配对弹窗打开，在这里填写弹窗中的端口和配对码；也可从配对通知输入。请使用配对弹窗中的端口，而非连接端口。</string>
+    <string name="air_pairing_port">配对端口</string>
+    <string name="air_connection_manual_action">填写连接端口</string>
+    <string name="air_connection_manual_description">请填写系统“无线调试”主页显示的端口，它与配对码弹窗中的端口不同。</string>
+    <string name="air_connection_port">连接端口</string>
 </resources>

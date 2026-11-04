@@ -36,9 +36,15 @@ class AndroidExecutionAttemptBackendProbe @Inject constructor(
         val deadline = android.os.SystemClock.elapsedRealtime() +
             ruleConfigManager.harnessPolicy().runtimeThresholds.taskEntryCapabilityWaitMs
         while (true) {
-            if (supported(route) && virtualSpaceReadiness.ensureReadyResult().ready) {
-                val observation = inspect(route)
-                if (observation.backendAvailable) return observation
+            if (supported(route)) {
+                val readiness = virtualSpaceReadiness.ensureReadyResult()
+                if (readiness.status == VirtualSpaceReadinessStatus.INPUT_PERMISSION_DENIED) {
+                    return unavailable(route, AttemptDiagnosticCode.INPUT_PERMISSION_DENIED)
+                }
+                if (readiness.ready) {
+                    val observation = inspect(route)
+                    if (observation.backendAvailable) return observation
+                }
             }
             if (android.os.SystemClock.elapsedRealtime() >= deadline) return unavailable(route)
             kotlinx.coroutines.delay(BACKEND_PREPARE_RETRY_MS)
@@ -56,11 +62,11 @@ class AndroidExecutionAttemptBackendProbe @Inject constructor(
     private fun supported(route: ExecutionAttemptRoute): Boolean =
         route.runtimeMode == RuntimeMode.STANDARD && route.executionSpace == ExecutionSpace.VIRTUAL_SPACE &&
             capabilityRegistry.currentStrategy(capabilityRegistry.refresh(force = true)).selection.effectiveMode == RuntimeMode.STANDARD
-    private fun unavailable(route: ExecutionAttemptRoute): ExecutionBackendObservation {
+    private fun unavailable(route: ExecutionAttemptRoute, diagnostic: String? = null): ExecutionBackendObservation {
         airModePairingManager.notifyPairingRequiredIfNeeded()
         return ExecutionBackendObservation(route.expectedBackend,
             capabilityRegistry.getVirtualDisplayId() ?: 0, "", false, emptySet(),
-            unavailableDiagnosticCode = when {
+            unavailableDiagnosticCode = diagnostic ?: when {
                 !virtualSpaceManager.isDeviceSupported() -> AttemptDiagnosticCode.VIRTUAL_DISPLAY_UNSUPPORTED
                 route.runtimeMode != RuntimeMode.STANDARD || route.executionSpace != ExecutionSpace.VIRTUAL_SPACE -> AttemptDiagnosticCode.BACKEND_UNAVAILABLE
                 airModePairingManager.isPairingRequired || !airModePairingManager.isPreviouslyPaired -> AttemptDiagnosticCode.AIR_PAIRING_REQUIRED

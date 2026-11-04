@@ -54,7 +54,8 @@ class VirtualSpaceReadiness @Inject constructor(
             // 每个动作回合都调本方法；若这里因健康标记未 ready 就重跑探活，会把已打开的目标 App
             // 反复盖成 Droidance 探针页(observe 里 pkg=com.droidance.debug)，导致"开了应用却无法操作"。
             // display 已存在且 active 时直接复用，健康检查只在创建时做一次。
-            if (requireHealthProbe) {
+            if (requireHealthProbe || capabilityRegistry.refresh().virtualSpaceHealthReason
+                    .startsWith("[INPUT_PERMISSION_DENIED]")) {
                 return runHealthProbe(existing, mode)
             }
             return VirtualSpaceReadinessResult(
@@ -105,6 +106,11 @@ class VirtualSpaceReadiness @Inject constructor(
             )
         }
         val frameFailure = waitForNonBlackFrame(displayId, mode)
+        val inputFailure = warmUpInputChannel(displayId, mode)
+        if (inputFailure != null) {
+            return failed(VirtualSpaceReadinessStatus.INPUT_PERMISSION_DENIED, displayId,
+                "[INPUT_PERMISSION_DENIED] ${inputFailure.detail}")
+        }
         // 黑帧/无帧时附上探针实际落点：区分"被重定向主屏"和"虚拟屏渲染黑帧"两类真因
         if (frameFailure != null) {
             val (status, reason) = frameFailure
@@ -130,14 +136,9 @@ class VirtualSpaceReadiness @Inject constructor(
                 message = "$reason; ${describeProbe(displayId)}"
             )
         }
-        // 帧可用（非黑帧）才是"能看屏幕"的真正门槛，据此标记就绪。
-        // 输入探针只做尽力而为的通道预热，不再作为就绪硬门槛：探针 Activity 刚渲染出帧、但目标窗口的
-        // input channel 尚未在 InputDispatcher 注册好的瞬间，injectInputEvent 会假阴性返回 false；而真实
-        // 操作发生在几秒后、目标 App 窗口获焦时，注入其实是通的（injectInputEvent 自带有界重试会自愈）。
-        // 之前把这段启动瞬间的假阴性判成"通道死亡"，会让门禁误报 missing=screen_frame，把帧其实可用、
-        // 真机能操作的任务在门口零操作杀掉（真机日志实证：tap probe failed → 整个设备任务直接失败）。
+        // A rendered frame establishes capture readiness. Explicit input denial was handled above;
+        // transient warm-up failures while the input window registers remain nonfatal.
         capabilityRegistry.markVirtualSpaceHealthReady(displayId)
-        warmUpInputChannel(displayId, mode)
         // 自检做完立刻销毁探针 Activity，避免白屏残留并覆盖目标 App 的首帧。
         driver.command("probeFinish")
         return VirtualSpaceReadinessResult(
@@ -148,17 +149,19 @@ class VirtualSpaceReadiness @Inject constructor(
     }
 
     /**
-     * 尽力而为地用点击预热输入通道；失败不致命，真实操作时注入会自愈。
+     * Retry transient input-channel startup failures; explicit permission denial cannot self-heal.
      */
-    private fun warmUpInputChannel(displayId: Int, mode: RuntimeMode) {
+    private fun warmUpInputChannel(displayId: Int, mode: RuntimeMode): VirtualSpaceSidecarBridge.CommandResult? {
         repeat(INPUT_PROBE_ATTEMPTS) { attempt ->
             val tap = sidecarBridge.injectNative(displayId, "tap 16 16", mode)
-            if (tap.ok) return
+            if (tap.ok) return null
+            if (tap.inputPermissionDenied) return tap
             if (attempt < INPUT_PROBE_ATTEMPTS - 1) Thread.sleep(INPUT_PROBE_RETRY_MS)
         }
         debugLogManager.appendEvent(
             "virtual_space: input warm-up was not confirmed; runtime injection may recover displayId=$displayId"
         )
+        return null
     }
 
     /** 帧探测通过返回 null；失败返回 (状态, 原因)，由调用方补充落点诊断后统一 failed()。 */
@@ -224,5 +227,6 @@ enum class VirtualSpaceReadinessStatus {
     FRAME_FAILED,
     BLACK_FRAME,
     INPUT_FAILED,
+    INPUT_PERMISSION_DENIED,
     TEXT_INPUT_FAILED
 }

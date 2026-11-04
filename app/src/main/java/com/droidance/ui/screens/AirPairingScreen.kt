@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -37,6 +39,8 @@ import com.droidance.R
 import com.droidance.core.device.air.AirPairingNotificationAvailability
 import com.droidance.core.device.air.AirModePairingManager.PairingState
 import com.droidance.core.device.air.messageRes
+import com.droidance.core.device.air.AirManualPairingInput
+import com.droidance.core.device.air.AirPairingFailure
 import com.droidance.ui.components.DroidanceDialog
 import com.droidance.ui.viewmodel.SettingsViewModel
 
@@ -93,13 +97,27 @@ fun AirPairingScreen(
     }
 
     var showPairingDialog by remember { mutableStateOf(false) }
+    var showManualPairingDialog by remember { mutableStateOf(false) }
+    var showConnectionPortDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(pairingState) {
-        if (pairingState == PairingState.AWAITING_CODE) {
+    LaunchedEffect(pairingState, connected) {
+        if (pairingState == PairingState.AWAITING_CODE && !showManualPairingDialog) {
             showPairingDialog = true
         } else if (pairingState != PairingState.DISCOVERING) {
             showPairingDialog = false
         }
+        if (pairingState !in setOf(PairingState.IDLE, PairingState.DISCOVERING, PairingState.AWAITING_CODE)) {
+            showManualPairingDialog = false
+        }
+        if (connected) showConnectionPortDialog = false
+    }
+    if (showManualPairingDialog) {
+        AirManualPairingDialog(onDismiss = { showManualPairingDialog = false },
+            onSubmit = { viewModel.submitAirPairingCode(it.code, it.port) })
+    }
+    if (showConnectionPortDialog) {
+        AirConnectionPortDialog(onDismiss = { showConnectionPortDialog = false },
+            onSubmit = viewModel::connectAirPairingPort)
     }
 
     if (showPairingDialog && pairingState == PairingState.AWAITING_CODE) {
@@ -150,7 +168,10 @@ fun AirPairingScreen(
                     modifier = Modifier.padding(horizontal = 32.dp).padding(top = 4.dp, bottom = 14.dp)
                 )
             }
-            item { AirPairingStatusCard(state = state, viewModel = viewModel, onOpenPairingDialog = { showPairingDialog = true }) }
+            item { AirPairingStatusCard(state = state, viewModel = viewModel,
+                onOpenPairingDialog = { showPairingDialog = true },
+                onOpenManualPairing = { showPairingDialog = false; showManualPairingDialog = true },
+                onOpenConnectionPort = { showConnectionPortDialog = true }) }
             item {
                 SettingsCardGroup {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -190,7 +211,9 @@ fun AirPairingScreen(
 private fun AirPairingStatusCard(
     state: com.droidance.ui.viewmodel.SettingsUiState,
     viewModel: SettingsViewModel,
-    onOpenPairingDialog: () -> Unit
+    onOpenPairingDialog: () -> Unit,
+    onOpenManualPairing: () -> Unit,
+    onOpenConnectionPort: () -> Unit
 ) {
     val pairingState = state.airBridgeState
     val connected = state.airDeviceConnected
@@ -291,6 +314,20 @@ private fun AirPairingStatusCard(
                 modifier = Modifier.padding(horizontal = 32.dp).padding(top = 8.dp)
             )
         }
+        val pairingInputAllowed = pairingState in setOf(PairingState.IDLE, PairingState.DISCOVERING, PairingState.AWAITING_CODE)
+        val notificationInputBlocked = state.airPairingNotificationAvailability != AirPairingNotificationAvailability.AVAILABLE
+        if (!connected && pairingInputAllowed && (state.airManualPairingAvailable ||
+                (notificationInputBlocked && (!state.airPreviouslyPaired || state.airPairingRequired)))) {
+            TextButton(onClick = onOpenManualPairing, modifier = Modifier.padding(horizontal = 20.dp)) {
+                Text(stringResource(com.droidance.core.device.R.string.settings_air_manual_pairing_action))
+            }
+        }
+        if (!connected && state.airPreviouslyPaired && !state.airPairingRequired &&
+            failure in setOf(AirPairingFailure.ADB_ENDPOINT_NOT_FOUND, AirPairingFailure.ADB_CONNECTION_FAILED)) {
+            TextButton(onClick = onOpenConnectionPort, modifier = Modifier.padding(horizontal = 20.dp)) {
+                Text(stringResource(R.string.air_connection_manual_action))
+            }
+        }
     }
 }
 
@@ -320,7 +357,7 @@ private fun AirPairingCodeDialog(
     onSubmit: (String) -> Unit
 ) {
     var code by remember { mutableStateOf("") }
-    val isValid = code.length == 6 && code.all { it.isDigit() }
+    val isValid = code.length == 6 && code.all { it in '0'..'9' }
     DroidanceDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.air_pairing_dialog_title),
@@ -339,16 +376,63 @@ private fun AirPairingCodeDialog(
         OutlinedTextField(
             value = code,
             onValueChange = { input ->
-                val digits = input.filter { it.isDigit() }.take(6)
+                val digits = input.filter { it in '0'..'9' }.take(6)
                 code = digits
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             placeholder = { Text(stringResource(R.string.air_pairing_code_placeholder)) },
             colors = droidanceFieldColors(),
             shape = AppShapes.Control
         )
     }
+}
+
+@Composable
+internal fun AirManualPairingDialog(onDismiss: () -> Unit, onSubmit: (AirManualPairingInput) -> Unit) {
+    var port by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    val input = AirManualPairingInput.parse("$port $code")
+    DroidanceDialog(onDismissRequest = onDismiss,
+        title = stringResource(com.droidance.core.device.R.string.settings_air_manual_pairing_action),
+        text = stringResource(R.string.air_pairing_manual_description),
+        confirmLabel = stringResource(R.string.common_confirm), confirmEnabled = input != null,
+        onConfirm = { input?.let { onSubmit(it); onDismiss() } },
+        dismissLabel = stringResource(R.string.common_cancel), onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            AirPortField(port, { port = it }, R.string.air_pairing_port)
+            OutlinedTextField(value = code,
+                onValueChange = { code = it.filter { digit -> digit in '0'..'9' }.take(6) },
+                label = { Text(stringResource(R.string.air_pairing_code_placeholder)) },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = droidanceFieldColors(), shape = AppShapes.Control)
+        }
+    }
+}
+
+@Composable
+internal fun AirConnectionPortDialog(onDismiss: () -> Unit, onSubmit: (Int) -> Unit) {
+    var port by remember { mutableStateOf("") }
+    val validPort = port.toIntOrNull()?.takeIf { it in 1..65535 }
+    DroidanceDialog(onDismissRequest = onDismiss,
+        title = stringResource(R.string.air_connection_manual_action),
+        text = stringResource(R.string.air_connection_manual_description),
+        confirmLabel = stringResource(R.string.common_confirm), confirmEnabled = validPort != null,
+        onConfirm = { validPort?.let { onSubmit(it); onDismiss() } },
+        dismissLabel = stringResource(R.string.common_cancel), onDismiss = onDismiss) {
+        AirPortField(port, { port = it }, R.string.air_connection_port)
+    }
+}
+
+@Composable
+private fun AirPortField(value: String, onValueChange: (String) -> Unit, @androidx.annotation.StringRes label: Int) {
+    OutlinedTextField(value = value,
+        onValueChange = { onValueChange(it.filter { digit -> digit in '0'..'9' }.take(5)) },
+        label = { Text(stringResource(label)) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        colors = droidanceFieldColors(), shape = AppShapes.Control)
 }
 
 @Composable

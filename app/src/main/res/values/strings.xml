@@ -751,4 +751,9 @@
     <string name="air_adb_persistence_usb_required">Enable USB debugging in Developer options to keep local reconnection available.</string>
     <string name="connection_local_unavailable_title">Local debugging connection interrupted</string>
     <string name="runtime_island_expand">Expand task controls</string>
+    <string name="air_pairing_manual_description">Keep the system pairing dialog open in split screen and enter its port and code here. You can also enter the port and code in the pairing notification. Use the pairing dialog port, not the connection port.</string>
+    <string name="air_pairing_port">Pairing port</string>
+    <string name="air_connection_manual_action">Enter connection port</string>
+    <string name="air_connection_manual_description">Enter the port shown on the main Wireless debugging page. This is different from the port in the pairing-code dialog.</string>
+    <string name="air_connection_port">Connection port</string>
 </resources>
