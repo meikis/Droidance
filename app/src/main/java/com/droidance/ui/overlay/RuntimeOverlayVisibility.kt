@@ -6,8 +6,8 @@ package com.droidance.ui.overlay
 /** Show external task status only outside the host app and its expanded viewer. */
 object RuntimeOverlayVisibility {
     fun shouldShow(active: Boolean, mobileUse: Boolean,
-        hostForeground: Boolean, viewerExpanded: Boolean): Boolean =
-        active && mobileUse && !hostForeground && !viewerExpanded
+        hostForeground: Boolean, viewerExpanded: Boolean, permissionWaiting: Boolean): Boolean =
+        active && mobileUse && !hostForeground && !viewerExpanded && !permissionWaiting
 }
 
 /** Activity identity prevents an old pause/stop callback from clearing a newly resumed host. */

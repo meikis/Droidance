@@ -212,7 +212,8 @@ class AgentStatusOverlay @Inject constructor(
             active = isRuntimeActive(),
             mobileUse = agentRuntime.isMobileUseTaskActive.value || virtualSpaceManager.isActive(),
             hostForeground = foregroundState.isInForeground,
-            viewerExpanded = runtimeSurfaceController.isViewerExpanded
+            viewerExpanded = runtimeSurfaceController.isViewerExpanded,
+            permissionWaiting = agentRuntime.state.value == AgentState.WAITING_PERMISSION
         )
 
     /** Open the current virtual-space viewer. */

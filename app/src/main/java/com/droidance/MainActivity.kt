@@ -58,6 +58,12 @@ class MainActivity : AppCompatActivity() {
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(EXTRA_RESULT_CONVERSATION_ID, conversationId)
+
+        fun permissionRequestIntent(context: Context, requestId: String, conversationId: String?): Intent =
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(PermissionBroker.EXTRA_PERMISSION_REQUEST_ID, requestId)
+                .apply { if (!conversationId.isNullOrBlank()) putExtra(EXTRA_RESULT_CONVERSATION_ID, conversationId) }
     }
 
     private var resultConversationId by mutableStateOf<String?>(null)

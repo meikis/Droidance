@@ -148,10 +148,12 @@ fun AppNavigation(
         }
     }
     val normalizedInitialPrompt = initialPrompt?.trim()?.takeIf { it.isNotBlank() }
+    val initialResultConversationId = remember { resultConversationId }
 
     // 启动决策：任务正在跑 → resume；有历史对话 → resume 最近一条；否则新建
     val startDestination = remember(normalizedInitialPrompt, initialAutoSend, lastConversationId) {
         when {
+            initialResultConversationId != null -> SubRoutes.buildChatRoute(initialResultConversationId)
             !deviceProfileStore.isOnboardingComplete() -> SubRoutes.ONBOARDING
             normalizedInitialPrompt != null ->
                 SubRoutes.buildNewChatRoute(normalizedInitialPrompt, initialAutoSend)

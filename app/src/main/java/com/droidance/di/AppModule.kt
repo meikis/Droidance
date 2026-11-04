@@ -89,6 +89,7 @@ object AppModule {
     fun providePermissionBroker(
         @ApplicationContext context: Context,
         runtime: dagger.Lazy<com.droidance.runtime.RuntimeProcessClient>,
+        agent: dagger.Lazy<com.droidance.agent.AgentRuntime>,
         shell: dagger.Lazy<com.droidance.core.device.tools.AdbShellExecutor>
     ): com.droidance.core.device.permission.PermissionBroker = com.droidance.core.device.permission.PermissionBroker(context,
         if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) null else
@@ -97,13 +98,11 @@ object AppModule {
                     putString("operation", operation); putString("id", id); putBoolean("settings", settings)
                 })
             }) { requestId ->
+        val intent = com.droidance.MainActivity.permissionRequestIntent(
+            context, requestId, agent.get().currentConversationId.value)
         if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) {
-            check(shell.get().exec("am start --user 0 -n ${shell.get().escapeForShell(context.packageName + "/com.droidance.MainActivity")} --es runtimePermissionRequestId ${shell.get().escapeForShell(requestId)}").success)
-        } else context.startActivity(
-            android.content.Intent(context, com.droidance.MainActivity::class.java)
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                .putExtra(com.droidance.core.device.permission.PermissionBroker.EXTRA_PERMISSION_REQUEST_ID, requestId)
-        )
+            check(shell.get().exec("am start --user 0 ${shell.get().escapeForShell(intent.toUri(android.content.Intent.URI_INTENT_SCHEME))}").success)
+        } else context.startActivity(intent)
     }
 
     @Provides
