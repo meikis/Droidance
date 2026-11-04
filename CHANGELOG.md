@@ -8,6 +8,15 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Load skills with reference files and retain complete diagnostic exports.
+- Validate native action parameters, observe precise adjustments and prevent uncertain effects from being submitted again.
+
+### Changed
+
+- **Breaking:** custom rule overrides must refresh `tool_contracts.yaml`; add `decision_boundary_operations` to `harness_policy.yaml` and `intent_extra_contracts` to `device_tools.md`.
+
 ## [0.1.7] - 2026-11-04
 
 ### Changed

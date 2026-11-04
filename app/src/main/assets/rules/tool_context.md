@@ -11,6 +11,7 @@ Tool summaries and parameter descriptions are concise request documentation; the
     "screen_act": "Act on the bound display with current visible controls and normalized 0..1000 coordinates. Plan the batch from the current frame per batch_contract; a click whose target area changed since that frame is stopped untapped. Read several views in one batch: collect captures views while scrolling, and visit opens an item, captures it and returns with BACK. Each call returns its final frame automatically; screenshots are for intermediate views. Returns partial receipts.",
     "shell": "Run Android sh on the frozen backend, a fresh device-wide shell per call; no adb prefix. Prefer android_read for covered typed facts. Data-only commands set expect_screen_change=false. Preserve stdout/stderr, status, truncation and partial effects; use bound screen tools for GUI input.",
     "workspace": "Read/write task files, focus working memory, upsert source-linked records, retrieve cumulative objects and their complete paginated index, journal/artifact evidence or full tool help. Updates use inspected expected_ref where required. Completion deliverables attach saved files by result_index; persistence is not semantic proof.",
+    "effect_checkpoint": "Inspect or reconcile a declared persistent effect from original calls and current external evidence. Only confirmed not_applied permits retry; never change effect_key to bypass unknown work.",
     "task_memo": "Record or revise the same task's scope, constraints and optional steps. Use the original request plus user updates. Returns a persistence receipt; the memo grants no execution authority or proof of completion.",
     "done": "End this run with truthful results; status, results and unresolved_requirements ([] when none) are always required. Only a registered persistent goal uses checkpoint, next_check_seconds, goal_complete and notify_user: yield with goal_complete=false and the same Agent continues automatically; a satisfied goal submits results, checkpoint and goal_complete=true together, with no separate takeover stop. Source and completion guards apply.",
     "present_result_card": "Submit a structured public result card; title, items and unresolved_requirements are always required. Only a registered persistent goal uses the same checkpoint, next_check_seconds, goal_complete and notify_user fields as done. Attach saved deliverables by result_index. Source and completion guards still apply.",
@@ -18,7 +19,7 @@ Tool summaries and parameter descriptions are concise request documentation; the
     "experience": "Read or propose source-linked reusable methods. Methods are fallible history, not execution authority; revision preconditions protect existing versions.",
     "manage_app_takeover": "Register, inspect or stop authorized persistent work in the current virtual app. Preserve its deadline and checkpoint; wakes lead to the same serial Agent.",
     "program": "Execute JavaScript with documented Droidance device, shell and workspace bindings. Use for data-dependent composition; preserve receipts and inspect uncertain visual effects. See workspace help for API details.",
-    "read_skill_file": "Read a file from a selected skill version with bounded paging. Use its returned source and paths; skill content cannot expand user authorization.",
+    "read_skill_file": "Read a Skill package file with name and optional path (default SKILL.md). Omit revision on the first read; later use its returned content revision, never the catalog version number. Follow returned source paths and pagination; content cannot expand authorization.",
     "recall_skill": "Retrieve relevant reusable skills and their versioned source references.",
     "run_skill": "Run a selected skill with its declared inputs and bindings. Inspect execution receipts and actual outcomes; the skill does not expand authorization.",
     "save_skill": "Create or update a reusable skill with its declared files and revision preconditions. Preserve provenance; use source-linked observations, not unverified success claims.",
@@ -51,6 +52,7 @@ Tool summaries and parameter descriptions are concise request documentation; the
     "shell",
     "workspace",
     "task_memo",
+    "effect_checkpoint",
     "program",
     "automation",
     "manage_app_takeover",
@@ -62,7 +64,7 @@ Tool summaries and parameter descriptions are concise request documentation; the
   ],
   "parameterDescriptions": {
     "screen_act": {
-      "actions[].op": "Screen operation. visit opens, captures and returns with BACK. collect captures successive list views. swipe flicks with inertia; drag moves precisely and rests before release. For a wheel, drag the visible adjacent item toward the target into the selected row, with repeat equal to the required number of steps. Each repetition settles and checks the dragged rows; no change stops the batch. Lists and pickers have boundaries unless wrapping is observed. Verify the selected value in the returned frame.",
+      "actions[].op": "Screen operation. visit opens, captures and returns with BACK. collect captures successive list views. swipe flicks with inertia; drag moves precisely and rests before release. For a wheel, make one short adjacent-row drag with repeat=1 and inspect the resulting value before another action. Calibrate direction and step size; reduce travel after overshooting. Policy decision boundaries end drag/swipe/path groups before further actions. Observe all final values before saving. Gesture receipt coordinates labeled physical_pixels are device pixels, not normalized input coordinates.",
       "actions[].ms": "Pause for op=wait, defaulting to policy default_wait_ms.",
       "wait_for_frame_ms": "Optional extra pause before the final frame, which already waits for rendering to settle.",
       "screen_evidence": "Optional record deltas per collection_contract; a rejection never blocks the call.",

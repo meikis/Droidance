@@ -28,6 +28,11 @@ class KnowledgeToolHandler @Inject constructor(
     fun installedVersions(packages: Set<String>) = experiences.installedVersions(packages)
 
     fun registerAll(register: (Tool) -> Unit, programTool: com.droidance.program.ProgramTool) {
+        register(EffectCheckpointTool(programEvents, scope = {
+            toolTurnServices.requireCurrent().sessionContext.let {
+                com.droidance.core.agent.event.TurnEventScope(it.threadId, it.turnId)
+            }
+        }, description = ruleConfigManager.readMarkdownSection("completion_recovery.md", "effect_checkpoint")))
         KnowledgeToolRegistrar(
             readSession = { args -> toolTurnServices.requireCurrent().history.read(args) },
             registerTool = register,

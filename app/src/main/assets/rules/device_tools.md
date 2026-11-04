@@ -83,5 +83,26 @@ At task entry, device_inventory lists non-system launchable apps from the mainta
 ## intent_argument_repair
 For android_act(op="open"), intent_action is an Android Intent action identifier, while action_title is the user-facing description. To open a known installed app's launcher, omit intent_action and use its observed app_name or package_name. If intent_action is explicitly needed, obtain the identifier from the capability/template or use the documented android.intent.action.MAIN launcher action. Example: android_act(op="open", app_name="observed app name", action_title="Open the selected app"). After no_activity_resolved, inspect intent_action in the receipt and repair these arguments; changing to an unrelated market URI or a shell launcher is not a repair of a malformed action. Preserve the virtual execution binding and verify the destination from its returned frame.
 
+## intent_extra_contracts
+[
+  {"intent_action":"android.intent.action.SET_ALARM","extras":{
+    "android.intent.extra.alarm.HOUR":{"type":"int","min":0,"max":23},
+    "android.intent.extra.alarm.MINUTES":{"type":"int","min":0,"max":59},
+    "android.intent.extra.alarm.MESSAGE":{"type":"string"},
+    "android.intent.extra.alarm.SKIP_UI":{"type":"boolean"},
+    "android.intent.extra.alarm.VIBRATE":{"type":"boolean"},
+    "android.intent.extra.alarm.RINGTONE":{"type":"string"}
+  }},
+  {"intent_action":"android.intent.action.SET_TIMER","extras":{
+    "android.intent.extra.alarm.LENGTH":{"type":"int","min":1,"max":86400},
+    "android.intent.extra.alarm.MESSAGE":{"type":"string"},
+    "android.intent.extra.alarm.SKIP_UI":{"type":"boolean"}
+  }},
+  {"intent_action":"android.intent.action.INSERT","uri_prefix":"content://com.android.calendar/","extras":{
+    "beginTime":{"type":"long"},"endTime":{"type":"long"},"allDay":{"type":"boolean"},
+    "title":{"type":"string"},"description":{"type":"string"},"eventLocation":{"type":"string"}
+  }}
+]
+
 ## native_ime_input_policy
 {"timeoutMs":2500,"pollMs":50}

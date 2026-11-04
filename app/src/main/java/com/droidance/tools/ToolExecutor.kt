@@ -379,6 +379,15 @@ class ToolExecutor @Inject constructor(
             return retained
         }
 
+        if (toolCall.name in EffectCheckpointLedger.deviceTools && runCatching {
+            Json.parseToJsonElement(toolCall.arguments).jsonObject.containsKey("effect_key")
+        }.getOrDefault(false)) {
+            EffectCheckpointLedger.admission(toolCall.name, toolCall.arguments,
+                programEvents.eventsForTurn(turnBinding.sessionContext.turnId),
+                com.droidance.core.agent.event.TurnEventScope(turnBinding.sessionContext.threadId, turnBinding.sessionContext.turnId),
+                eventToolCallId)?.let { return finishEvent(it) }
+        }
+
         val frameWaitMs = if (UnifiedDeviceToolProtocol.isScreenAction(toolCall.name)) {
             val value = runCatching { Json.parseToJsonElement(toolCall.arguments).jsonObject["wait_for_frame_ms"] }.getOrNull()
             if (value == null) 0L else {
@@ -1062,6 +1071,8 @@ class ToolExecutor @Inject constructor(
             }
         ).registerAll()
         UnifiedDeviceToolRegistrar(
+            intentExtraContracts = Json.decodeFromString<List<com.droidance.core.agent.config.IntentExtraContract>>(
+                ruleConfigManager.readMarkdownSection("device_tools.md", "intent_extra_contracts")).onEach { it.validate() },
             registerTool = ::register,
             deviceBackend = deviceBackend,
             readDevice = { ToolProtocolResult.success(deviceInfoReader.read()) },

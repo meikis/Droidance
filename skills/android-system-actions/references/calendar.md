@@ -25,6 +25,7 @@ Query only calendars in the relevant scope, for example:
 ```json
 {
   "op": "content",
+  "effect_key": "requested-event-1",
   "uri": "content://com.android.calendar/calendars",
   "projection": ["_id", "calendar_displayName", "calendar_access_level", "visible"],
   "selection": "calendar_access_level >= ? AND visible = ?",
@@ -67,6 +68,10 @@ Compare the persisted title, calendar, instants and time-zone interpretation wit
 request. Successful insertion followed by matching readback establishes this record;
 opening the calendar is unnecessary for completion. It does not establish server sync
 or reminder delivery unless those were separately verified.
+
+Keep this event's effect key when recovering an uncertain insert. A separately requested
+reminder is a distinct linked record with its own effect key; preserve both returned
+identities rather than recreating the event when reminder creation fails.
 
 If a reminder is requested, insert into `content://com.android.calendar/reminders`
 with the observed `event_id`, integer `minutes` and supported integer `method`

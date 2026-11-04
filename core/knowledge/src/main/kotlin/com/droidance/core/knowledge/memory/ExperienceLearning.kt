@@ -51,7 +51,9 @@ class ExperienceEvidenceSources(
         val raw = ref.removePrefix("event:").removePrefix("observation:")
         SessionEvidenceProjector.find(steps, raw)?.let { step ->
             if (step.call.name == "done" || step.result.historicalAttachment != null ||
-                !(step.attachments.isNotEmpty() || (step.call.binding != ToolBinding.TURN_LOCAL &&
+                !(step.attachments.isNotEmpty() || ((step.call.binding != ToolBinding.TURN_LOCAL ||
+                    com.droidance.core.agent.tools.UnifiedDeviceToolProtocol.requirements(step.call.name,
+                        step.call.argumentsJson).scope == com.droidance.core.agent.tools.ExecutionScope.APP_UID) &&
                     step.call.effect == ToolEffect.READ_ONLY && step.result.isVerifiedSuccess &&
                     step.result.outputText.isNotBlank()))) return null
             return step.event.eventId to step.executionContext

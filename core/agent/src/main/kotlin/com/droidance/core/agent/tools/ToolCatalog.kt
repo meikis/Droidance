@@ -62,13 +62,13 @@ object ToolCatalog {
         DeviceToolNames.ANDROID_ACT,
         DeviceToolNames.SHELL,
         DeviceToolNames.SCREEN_ACT,
-        "ask_human", "session_search", "session_read", "update_memory", "task_memo", "report_result", "experience",
+        "ask_human", "session_search", "session_read", "update_memory", "task_memo", "effect_checkpoint", "report_result", "experience",
         "recall_skill", "save_skill", "verify_skill", "run_skill", "read_skill_file", "skill_source",
         "present_result_card", "done"
     )
 
     val localKnowledgeToolNames: Set<String> = linkedSetOf(
-        "session_search", "session_read", "recall_skill", "save_skill", "read_skill_file", "skill_source", "verify_skill", "run_skill", "update_memory", "task_memo", "report_result", "experience", "workspace", "program", "automation", "done"
+        "session_search", "session_read", "recall_skill", "save_skill", "read_skill_file", "skill_source", "verify_skill", "run_skill", "update_memory", "task_memo", "effect_checkpoint", "report_result", "experience", "workspace", "program", "automation", "done"
     )
 
     val backgroundAutomationToolNames: Set<String> = setOf(

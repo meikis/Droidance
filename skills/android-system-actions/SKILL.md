@@ -42,7 +42,9 @@ Read only the relevant method before execution:
    only one map. A number written as text in `string_extras` stays an Android String;
    the receiving app is not required to convert it. Provider `values` instead uses its
    own documented column names and native JSON scalar types.
-4. Verify the requested effect from a scoped readback or the actual current interface.
+4. On ordinary tool calls, put a stable `effect_key` on a call that may persist the intended object. Keep that
+   identity across native and GUI recovery; use a different key only for a different
+   requested object. Verify the requested effect from a scoped readback or the actual current interface.
    Keep inserted record URIs, affected-row counts and per-item receipts. An Intent
    dispatch receipt records what was sent and command output; it does not prove that
    the receiving app applied the extras or saved a record. A successful data operation
@@ -51,7 +53,9 @@ Read only the relevant method before execution:
    warnings first. Repair an editor-opening call when no record has been saved. For
    any call that may already have created or changed something, inspect its external
    state before retrying. Preserve uncertain effects; do not create a duplicate to test
-   whether the first operation worked.
+   whether the first operation worked. If retry is necessary, reconcile the original
+   `effect_key` using `effect_checkpoint` and current external evidence first. A record
+   missing from one viewport or a partially read list does not prove non-execution.
 6. Use GUI for a concrete missing feature or verification gap after a well-formed direct
    method proves unsuitable. A permission denial must not be evaded by switching to
    Root, another UID or private files. A documented public editor may be offered as a

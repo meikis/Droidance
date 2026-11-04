@@ -47,7 +47,7 @@ object ScreenActionBatchProtocol {
         "endX" to ToolParameter("integer", "Normalized gesture end X, 0..1000.", false, requiredWhen = mapOf("op" to listOf("swipe", "drag"))),
         "endY" to ToolParameter("integer", "Normalized gesture end Y, 0..1000.", false, requiredWhen = mapOf("op" to listOf("swipe", "drag"))),
         "duration" to ToolParameter("integer", "Gesture duration in milliseconds.", false),
-        "repeat" to ToolParameter("integer", "Number of identical drags, default 1, bounded by max_drag_repeat. Each drag settles and checks the gestured area; no change stops the remaining batch. Counts report observed changes, not verified values.", false),
+        "repeat" to ToolParameter("integer", "Identical drags, default 1, bounded by policy max_drag_repeat. Receipts count pixel changes and delivery, not recognized or verified values.", false),
         "points" to ToolParameter("array", "2..128 ordered normalized points in one continuous touch.", false,
             items = ToolParameter("object", "Path point.", properties = linkedMapOf(
                 "x" to ToolParameter("integer", "Normalized X, 0..1000."),

@@ -51,6 +51,7 @@ class UnifiedDeviceToolRegistrar(
     private val screenActions: ScreenActionService,
     private val androidReadDescription: String,
     private val androidActDescription: String,
+    private val intentExtraContracts: List<com.droidance.core.agent.config.IntentExtraContract>,
     private val shellDescription: String,
     private val shellPolicy: com.droidance.core.agent.config.ShellExecutionPolicy,
     private val textInputClearDescription: String,
@@ -191,6 +192,7 @@ class UnifiedDeviceToolRegistrar(
                 "op" to ToolParameter("string", "Native action operation.", true, listOf("open", "content", "keyboard"))
             ).apply {
                 putAll(OpenAppToolSchema.parameters)
+                put("effect_key", EffectCheckpointLedger.keyParameter)
                 put("action", ToolParameter("string", "ContentProvider mutation for op=content only. For op=open use intent_action; put the user-facing operation label in action_title.", false,
                     listOf("insert", "update", "delete", "batch")))
                 put("values", ToolParameter("object", "Key-value map of content values for op=content.", false))
@@ -210,9 +212,12 @@ class UnifiedDeviceToolRegistrar(
                 .getOrElse { return ToolProtocolResult.invalidArguments() }
             val operation = UnifiedDeviceToolProtocol.operation(name, arguments)
                 ?: return ToolProtocolResult.invalidArgument("op", "missing_or_unsupported")
-            val payload = JsonObject(input.filterKeys { it != "op" }).toString()
+            val payloadInput = JsonObject(input.filterKeys { it != "op" && it != "effect_key" })
+            val payload = payloadInput.toString()
             return when (operation) {
-                "open" -> OpenAppToolSchema.routeArgumentMismatch(input) ?: openAndroid(payload)
+                "open" -> OpenAppToolSchema.routeArgumentMismatch(payloadInput)
+                    ?: intentExtraContracts.firstNotNullOfOrNull { it.rejection(payloadInput) }
+                    ?: openAndroid(payload)
                 "content" -> mutateContent(payload)
                 "keyboard" -> {
                     if (input.keys.any { it !in setOf("op", "visible") })
@@ -307,6 +312,7 @@ class UnifiedDeviceToolRegistrar(
             parameters = linkedMapOf(
                 "actions" to ToolParameter("array", "Ordered screen primitives grounded in the current frame; use the same shape for one action or several.",
                     items = ToolParameter("object", "One screen primitive.", properties = ScreenActionBatchProtocol.parameters(textInputClearDescription), additionalProperties = false), minItems = 1),
+                "effect_key" to EffectCheckpointLedger.keyParameter,
                 "wait_for_frame_ms" to ToolParameter("integer", "Optional 0..5000 ms pause after the action group before its final frame. Omit normally; use only when a transition needs extra loading time.", false)
             )
         )

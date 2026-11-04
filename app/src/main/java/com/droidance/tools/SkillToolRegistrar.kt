@@ -69,7 +69,7 @@ class SkillToolRegistrar(
             "path" to ToolParameter("string", "Package path; default SKILL.md.", false),
             "draft" to ToolParameter("boolean", "Read pending draft instead of active version.", false),
             "mode" to ToolParameter("string", "Read a package file or paged local assessment records.", false, listOf("file", "assessments")),
-            "revision" to ToolParameter("string", "Expected package revision.", false),
+            "revision" to ToolParameter("string", "Exact content revision returned by a prior read; omit on the first read. The catalog version number is not a revision.", false),
             "offset" to ToolParameter("integer", "UTF-16 character offset; default zero.", false)
         )) { args ->
             val name = args.required("name")
@@ -77,12 +77,21 @@ class SkillToolRegistrar(
             val draft = args["draft"]?.jsonPrimitive?.booleanOrNull == true
             val mode = args.string("mode") ?: "file"
             require(mode in setOf("file", "assessments"))
-            val snapshot = if (name == "skill-creator") null else requireNotNull(engine.findExecutionSnapshot(name, draft))
+            val snapshot = if (name == "skill-creator") null else {
+                engine.findExecutionSnapshot(name, draft)
+                    ?: return@tool ToolProtocolResult.notExecuted("SKILL_NOT_FOUND", false,
+                        buildJsonObject { put("name", name); put("draft", draft) })
+            }
             val content = if (name == "skill-creator") {
                 require(path == "SKILL.md" && mode == "file"); rules("creator")
             } else {
                 val frozen = requireNotNull(snapshot)
-                require(args.string("revision") == null || args.string("revision") == frozen.revision) { "SKILL_REVISION_CHANGED" }
+                if (args.string("revision") != null && args.string("revision") != frozen.revision) {
+                    return@tool ToolProtocolResult.notExecuted("SKILL_REVISION_CHANGED", true, buildJsonObject {
+                        put("name", name); put("current_revision", frozen.revision); put("version", frozen.skill.version)
+                        put("recovery_condition", "Read this current revision; version is a catalog number, not a content revision.")
+                    })
+                }
                 if (mode == "assessments") JsonArray(engine.assessments(frozen).map { Json.parseToJsonElement(it) }).toString()
                 else frozen.files[path] ?: error("SKILL_FILE_NOT_FOUND")
             }

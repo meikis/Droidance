@@ -190,7 +190,7 @@ class SidecarInputController @Inject constructor(
                     released = send(android.view.MotionEvent.ACTION_UP, last)
                     DeviceInputResult(released,
                         "Continuous path ${if (released) "delivered" else "release failed"}; points=${points.size}; " +
-                            "start=${first.first},${first.second}; end=${last.first},${last.second}; " +
+                            "physical_pixels_start=${first.first},${first.second}; physical_pixels_end=${last.first},${last.second}; " +
                             "elapsed_ms=${android.os.SystemClock.uptimeMillis() - downTime}; channel=sidecar-touch; display=${execution.displayId}",
                         actionEvent = event, diagnosticCode = if (released) null else
                             lastDelivery?.let(::sidecarInputDiagnostic) ?: "GESTURE_RELEASE_FAILED")

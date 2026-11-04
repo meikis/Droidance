@@ -13,6 +13,7 @@ Send `android_act` with this shape, replacing the example hour, minute and label
 ```json
 {
   "op": "open",
+  "effect_key": "requested-alarm-1",
   "intent_action": "android.intent.action.SET_ALARM",
   "int_extras": {
     "android.intent.extra.alarm.HOUR": 9,
@@ -53,7 +54,10 @@ For several alarms, derive the full requested set first, then issue one well-for
 native call per item and retain each receipt. Once that method works on the device,
 reuse it for the remaining items rather than editing each time wheel. Stop to inspect
 an inconsistent or uncertain result before continuing mutations. Verify every item;
-do not resend accepted calls merely because verification is pending.
+do not resend accepted calls merely because verification is pending. A next-firing
+countdown is supporting evidence, not the identity of every saved item. Locate the
+original item before modifying a different existing alarm; preserve list coverage and
+never create again solely because the item is below the current viewport.
 
 `android.intent.extra.alarm.DAYS` is an integer ArrayList of repeating weekdays, not
 an arbitrary date. The current tool's typed-extra maps expose scalars, not integer
@@ -67,6 +71,7 @@ Use the same Boolean background contract with an integer length in seconds:
 ```json
 {
   "op": "open",
+  "effect_key": "requested-timer-1",
   "intent_action": "android.intent.action.SET_TIMER",
   "int_extras": {"android.intent.extra.alarm.LENGTH": 300},
   "string_extras": {"android.intent.extra.alarm.MESSAGE": "Requested timer"},

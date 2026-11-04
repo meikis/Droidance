@@ -75,7 +75,7 @@ class MarkdownFileManager @Inject constructor(
         remote?.let { return it.file("read", relativePath).getString("text") }
         return ioLock.read {
             val file = resolve(relativePath)
-            if (file.exists()) file.readText(Charsets.UTF_8) else null
+            if (file.isFile) file.readText(Charsets.UTF_8) else null
         }
     }
 

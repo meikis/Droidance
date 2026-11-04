@@ -226,15 +226,15 @@ class SkillEngine @Inject constructor(
         if (!validId(name)) return null
         val directory = root(name, draft)
         if (!fileManager.exists("$directory/SKILL.md")) return null
-        return runCatching {
-            require(!fileManager.exists("$directory/SCRIPT.json") && !fileManager.exists("$directory/SKILL.yaml")) { "SKILL_FORMAT_UNSUPPORTED" }
-            val files = files(directory).toMap()
-            val revision = packageRevision(files)
-            val skill = withLocalPreferences(parse(name, files.getValue("SKILL.md"), draft)).copy(
-                files = files.keys.sorted(), revision = revision,
-                hasInstalledVersion = fileManager.exists("skills/$name/SKILL.md"))
-            SkillExecutionSnapshot(skill, files, revision)
-        }.getOrNull()
+        if (fileManager.exists("$directory/SCRIPT.json") || fileManager.exists("$directory/SKILL.yaml")) return null
+        // A missing package is distinct from an unreadable or invalid installed package.
+        // Preserve storage/validation failures so callers can report their actual cause.
+        val files = files(directory).toMap()
+        val revision = packageRevision(files)
+        val skill = withLocalPreferences(parse(name, files.getValue("SKILL.md"), draft)).copy(
+            files = files.keys.sorted(), revision = revision,
+            hasInstalledVersion = fileManager.exists("skills/$name/SKILL.md"))
+        return SkillExecutionSnapshot(skill, files, revision)
     }
 
     fun recallSkill(reference: String): String? = findExecutionSnapshot(reference)?.let { snapshot ->

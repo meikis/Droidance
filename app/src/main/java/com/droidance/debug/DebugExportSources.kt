@@ -14,6 +14,18 @@ import java.nio.file.Files
 
 /** Enumerates retained diagnostics without following symlinks or exporting provider settings. */
 internal object DebugExportSources {
+    /** The captured paths remain live until the archive has consumed every supplement. */
+    suspend fun withSources(root: File, cacheDir: File, snapshot: List<AgentEventEnvelope>,
+                            write: suspend (List<DebugArchiveWriter.Supplement>) -> Unit) {
+        try {
+            write(collect(root, snapshot))
+        } finally {
+            if (root.parentFile?.canonicalFile == cacheDir.canonicalFile && root.name.startsWith("runtime-export-")) {
+                root.deleteRecursively()
+            }
+        }
+    }
+
     fun collect(root: File, snapshot: List<AgentEventEnvelope>): List<DebugArchiveWriter.Supplement> = buildList {
         val retainedScopes = snapshot.mapNotNull { it.turnId }.toSet().map(ProviderExchangeRecorder::scopeDirectory).toSet()
         addAll(files(File(root, "diagnostics"), "diagnostics").filter { file ->

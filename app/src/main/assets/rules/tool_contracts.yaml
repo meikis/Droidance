@@ -125,6 +125,13 @@ tool_contracts:
     label: tool.task_memo
     category: DIAGNOSTIC
     result_image_role: NONE
+  effect_checkpoint:
+    binding: TURN_LOCAL
+    effect: STATE_CHANGING
+    grounds_completion: false
+    label: tool.task_memo
+    category: SUPPORTING
+    result_image_role: NONE
   report_result:
     binding: TURN_LOCAL
     effect: STATE_CHANGING

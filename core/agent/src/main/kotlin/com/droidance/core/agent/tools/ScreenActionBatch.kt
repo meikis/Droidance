@@ -158,7 +158,7 @@ sealed interface ScreenActionBatchPlan {
 }
 
 object ScreenActionBatchPlanner {
-    private val ROOT_KEYS = setOf("actions", "wait_for_frame_ms", "observation_id")
+    private val ROOT_KEYS = setOf("actions", "wait_for_frame_ms", "observation_id", "effect_key")
     private val ACTION_KEYS = ScreenActionBatchProtocol.actionFields
 
     fun plan(
@@ -213,6 +213,17 @@ object ScreenActionBatchPlanner {
             if (action.operation == ScreenBatchOperation.TYPE_TEXT && action.targetId == null &&
                 action.targetX == null && index > 0 && mapped[index - 1].operation == ScreenBatchOperation.CLICK)
                 action.copy(focusFrom = index) else action
+        }
+        if ("effect_key" in root && mapped.count {
+            it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT)
+        } > 1) {
+            return rejected("effect_key identifies one committing action; observe preparatory edits in an earlier call")
+        }
+        mapped.forEachIndexed { index, action ->
+            if (action.operation.name.lowercase() in policy.decisionBoundaryOperations &&
+                mapped.drop(index + 1).any { it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT) }) {
+                return rejected("action[$index] op=${action.sourceOperation} requires a new model observation before further actions")
+            }
         }
         val frameWait = root["wait_for_frame_ms"]?.let { value ->
             (value as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull()
