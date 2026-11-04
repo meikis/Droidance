@@ -110,6 +110,8 @@ object RuntimeProcessHost {
      * the view and input path may call those natives, so mirror the libraries the platform driver's
      * zygote-started process holds before any window is created here.
      */
+    // Only called by the shell app_process, outside app hidden-API enforcement.
+    @android.annotation.SuppressLint("SoonBlockedPrivateApi")
     private fun loadSystemJniLibraries(driver: INativeInputDriver) {
         val loaded = File("/proc/self/maps").readText()
         // Framework natives bind through the boot class loader and its system linker namespace.

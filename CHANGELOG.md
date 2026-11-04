@@ -8,17 +8,18 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-04
+
 ### Changed
 
-- Automatically return from the virtual-screen viewer to the conversation result when a device task finishes.
-- Reference skills from the chat add menu or @ suggestions, with removable tags and separate built-in capabilities.
+- Keep tasks running more reliably when the app is frozen in the background, with a collapsible on-screen control island.
+- Reference skills from the chat menu or @ suggestions, and return to the conversation when a device task finishes.
+- Improve Android system actions, including alarms, calendars and result verification.
 
 ### Fixed
 
-- Keep permission requests paused when Android requires app settings, resume the same operation after authorization, and retain execution history.
-
-- Replace the platform reference with Android system actions, including typed alarm calls, direct calendar writes, Shell guidance and result verification.
-- Validate Intent extra types and retain dispatch diagnostics; retire obsolete built-in skills on upgrade.
+- Wait for settings-based permissions and resume the same task after authorization.
+- Improve task notifications and open Droidance when the virtual screen is empty.
 
 ## [0.1.6] - 2026-11-03
 
@@ -108,7 +109,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/YbbLab/Droidance/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/YbbLab/Droidance/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/YbbLab/Droidance/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/YbbLab/Droidance/compare/v0.1.3...v0.1.4
