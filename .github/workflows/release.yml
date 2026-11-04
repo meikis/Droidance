@@ -8,6 +8,10 @@ on:
         description: Existing public version tag, such as v0.1.0-beta.1
         required: true
         type: string
+      release_notes_zh:
+        description: Simplified Chinese notes for this release only (not the local changelog)
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -35,8 +39,17 @@ jobs:
       - name: Validate tagged source and release identity
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_ZH: ${{ inputs.release_notes_zh }}
         run: |
-          python3 scripts/release.py identity --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/release"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          notes = os.environ['RELEASE_NOTES_ZH'].strip()
+          if not notes:
+              raise SystemExit('Simplified Chinese release notes are required')
+          (Path(os.environ['RUNNER_TEMP']) / 'release-notes.zh.md').write_text(notes + '\n', encoding='utf-8')
+          PY
+          python3 scripts/release.py identity --tag "$RELEASE_TAG" --notes-zh "$RUNNER_TEMP/release-notes.zh.md" --output "$RUNNER_TEMP/release"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases" > "$RUNNER_TEMP/releases.json"
           python3 - <<'PY'
           import json, os

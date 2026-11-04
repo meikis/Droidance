@@ -31,6 +31,7 @@ __pycache__/
 *.hprof
 captures/
 *.apk
+*.apk.sha256
 *.aab
 *.apks
 *.log
@@ -40,6 +41,15 @@ captures/
 /screenshots/
 /recordings/
 /debug-exports/
+Droidance-debug-*.zip
+
+# Local release authoring and generated release metadata
+/CHANGELOG.zh.md
+/identity.json
+/release.json
+/notes.md
+/notes.zh.md
+/release-notes.zh.md
 
 # Local documentation, tests and device acceptance tools
 /docs/

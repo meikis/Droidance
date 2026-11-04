@@ -4,7 +4,7 @@ All notable user-visible changes to Droidance are recorded in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/), and public releases use [Semantic Versioning](https://semver.org/).
 
-Record a notable change in `Unreleased` within the same pull request that implements it. Use only the categories that contain changes: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Mark incompatible entries with `**Breaking:**`, name the affected contract, and give migration steps. At release time, move the entries under the exact version and its release date. Add the same version to [CHANGELOG.zh.md](CHANGELOG.zh.md), which supplies the Chinese update notes.
+Record a notable change in `Unreleased` within the same pull request that implements it. Use only the categories that contain changes: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`. Mark incompatible entries with `**Breaking:**`, name the affected contract, and give migration steps. At release time, move the entries under the exact version and its release date. Supply the corresponding Simplified Chinese notes as release input; local authoring records are not part of the public source.
 
 ## [Unreleased]
 
@@ -15,6 +15,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Changed
 
+- Keep Chinese release-note authoring records local; supply only the current release's Chinese notes to the draft workflow.
 - **Breaking:** custom rule overrides must refresh `tool_contracts.yaml`; add `decision_boundary_operations` to `harness_policy.yaml` and `intent_extra_contracts` to `device_tools.md`.
 
 ## [0.1.7] - 2026-11-04
