@@ -65,7 +65,11 @@ class DroidanceApp : Application(), Configuration.Provider {
 
     private var wifiNetworkCallback: ConnectivityManager.NetworkCallback? = null
     private val activeWifiNetworks = ConcurrentHashMap.newKeySet<Network>()
-    private val networkHandler = Handler(Looper.getMainLooper())
+    // Connection callbacks can write remote diagnostics and wait for the owner.
+    // Keep them ordered without occupying the UI looper that receives its Binder.
+    private val networkHandler by lazy {
+        Handler(android.os.HandlerThread("droidance-network-events").apply { start() }.looper)
+    }
     @Volatile private var pendingAirWifiTrigger: String = "registered"
     private val airWifiTransportRefresh = Runnable {
         airModePairingManager.onWifiNetworkChanged(
@@ -133,7 +137,7 @@ class DroidanceApp : Application(), Configuration.Provider {
         KeepAliveJobService.schedule(this)
         heartbeatManager.startHeartbeat()
         registerNetworkCallback()
-        airModePairingManager.ensureConnectedIfPaired()
+        applicationScope.launch(Dispatchers.IO) { airModePairingManager.ensureConnectedIfPaired() }
         applicationScope.launch(Dispatchers.IO) {
             installedAppsManager.init()
             com.droidance.daemon.startAppInventoryMaintenance(this@DroidanceApp, installedAppsManager, applicationScope)

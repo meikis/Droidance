@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,6 +89,7 @@ class HomeViewModel @Inject constructor(
     tokenUsageRepository: TokenUsageRepository,
     runtimeClient: com.droidance.runtime.RuntimeProcessClient,
     @ApplicationContext private val context: Context,
+    private val navigationPresentation: com.droidance.ui.navigation.StartupNavigationStore,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     val runtimeConnection = runtimeClient.connectionState
@@ -158,7 +160,12 @@ class HomeViewModel @Inject constructor(
     }
 
     @Volatile private var latestSubmittedTurnId: String? = null
-    private val _conversationLoaded = MutableStateFlow(false)
+    // Only the first visit to a newly generated route is known to be empty.
+    // A restored route must still read its durable history.
+    private val initiallyEmpty = savedStateHandle.get<String>("conversationId") == null &&
+        savedStateHandle.get<String>("threadId")?.isNotBlank() == true &&
+        savedStateHandle.get<Boolean>("screenInitialized") != true
+    private val _conversationLoaded = MutableStateFlow(initiallyEmpty)
     val conversationLoaded: StateFlow<Boolean> = _conversationLoaded
 
     /** 消息列表 */
@@ -254,6 +261,8 @@ class HomeViewModel @Inject constructor(
     val errorEvent: SharedFlow<String> = _errorEvent.asSharedFlow()
 
     init {
+        savedStateHandle["screenInitialized"] = true
+        if (initiallyEmpty) navigationPresentation.recordConversationEmpty(conversationId, true)
         viewModelScope.launch {
             deferredMemoryQueue.failures.collect { failures ->
                 if (failures.any { it.threadId == conversationId && it.turnId == latestSubmittedTurnId }) {
@@ -263,8 +272,13 @@ class HomeViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             combine(
-                eventStore.observeThreadProjectionResult(conversationId).map { projection ->
+                eventStore.observeThreadProjectionResult(conversationId).transform { projection ->
                     val thread = (projection as? AgentThreadProjectionResult.Projected)?.thread
+                    if (!_conversationLoaded.value && thread != null && !thread.metadata.tombstoned) {
+                        // Publish readable history before fetching any attachment bytes.
+                        emit(projection to projectConversationMessages(thread.conversation.entries,
+                            conversationExecutionSegments(thread.conversation.entries, thread.completeRecord.events)) { null })
+                    }
                     val projected = thread?.takeUnless { it.metadata.tombstoned }?.let {
                         projectConversationMessages(it.conversation.entries,
                             conversationExecutionSegments(it.conversation.entries, it.completeRecord.events)) { attachment ->
@@ -272,7 +286,7 @@ class HomeViewModel @Inject constructor(
                             else runCatching { blobStore.read(attachment.contentRef, MAX_TIMELINE_IMAGE_BYTES) }.getOrNull()
                         }
                     }.orEmpty()
-                    projection to projected
+                    emit(projection to projected)
                 },
                 conversationTasks.activeTasks.map { it[conversationId].orEmpty() }.distinctUntilChanged(),
                 agentRuntime.taskTiming
@@ -302,6 +316,7 @@ class HomeViewModel @Inject constructor(
                         reconcileConversationMessages(current, projected, terminalTurns, active)
                     }
                 }
+                navigationPresentation.recordConversationEmpty(conversationId, _messages.value.isEmpty())
                 _conversationLoaded.value = true
             }
         }
@@ -509,6 +524,7 @@ class HomeViewModel @Inject constructor(
             isTransient = true
         )
         _isProcessing.value = true
+        navigationPresentation.recordConversationEmpty(conversationId, false)
         _messages.update { it + userMessage }
 
         conversationTasks.dispatch(conversationId, request, submissionMode, prepareRequest) { prepared ->

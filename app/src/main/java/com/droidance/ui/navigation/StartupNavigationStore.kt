@@ -25,6 +25,14 @@ class StartupNavigationStore @Inject constructor(@ApplicationContext context: Co
     })
     val onboardingComplete = _onboardingComplete.asStateFlow()
     val lastConversationId: String? get() = prefs.getString("conversation", null)
+        ?.takeUnless { it == prefs.getString("empty_conversation", null) }
+
+    fun recordConversationEmpty(id: String, empty: Boolean) {
+        if (empty) prefs.edit().putString("empty_conversation", id).apply()
+        else if (prefs.getString("empty_conversation", null) == id) {
+            prefs.edit().remove("empty_conversation").apply()
+        }
+    }
 
     fun recordOnboarding(complete: Boolean) {
         if (_onboardingComplete.value == complete && prefs.contains("onboarding_complete")) return
