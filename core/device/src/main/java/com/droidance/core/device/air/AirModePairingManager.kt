@@ -6,6 +6,8 @@ package com.droidance.core.device.air
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
+import androidx.core.app.LocaleManagerCompat
+import androidx.core.content.ContextCompat
 import com.droidance.core.agent.debug.DebugLogAppender
 import com.droidance.core.agent.di.ApplicationScope
 import com.droidance.core.device.agent.device.DeviceConnectionMethod
@@ -164,7 +166,8 @@ class AirModePairingManager @Inject constructor(
         if (isPairingRequired) {
             prefs.edit().remove(KEY_AIR_PAIRED).putBoolean(KEY_AIR_PAIRING_REQUIRED, true).apply()
             _failure.value = AirPairingFailure.PAIRING_REQUIRED
-            if (rootConnection.currentMethod == DeviceConnectionMethod.WIRELESS) {
+            if (rootConnection.currentMethod == DeviceConnectionMethod.WIRELESS &&
+                notificationController.currentPairingSession() == null) {
                 runCatching { notificationController.showPairingRequired() }
             }
         } else if (isPreviouslyPaired) {
@@ -499,6 +502,52 @@ class AirModePairingManager @Inject constructor(
         return runCatching {
             Settings.Global.putInt(context.contentResolver, "adb_wifi_enabled", 1)
         }.getOrDefault(false)
+    }
+
+    fun requestPairingFromNotification(
+        session: String?,
+        input: String?,
+        manualEntry: Boolean,
+        hasResults: Boolean
+    ) {
+        fun record(result: String) = logPairingEvent(
+            "AIR pairing notification input: result=$result manual=$manualEntry " +
+                "has_results=$hasResults input_length=${input?.length ?: -1} " +
+                "system_locales=${LocaleManagerCompat.getSystemLocales(context).toLanguageTags()} " +
+                "app_locales=${ContextCompat.getContextForLanguage(context).resources.configuration.locales.toLanguageTags()} " +
+                "sdk=${android.os.Build.VERSION.SDK_INT}"
+        )
+        if (session == null || session != notificationController.currentPairingSession()) {
+            record("stale_session")
+            return
+        }
+        if (_state.value in setOf(PairingState.PAIRING, PairingState.CONNECTING, PairingState.CONNECTED)) {
+            record("already_in_progress")
+            return
+        }
+        val manual = if (manualEntry && input != null) AirManualPairingInput.parse(input) else null
+        val code = if (manualEntry) manual?.code else input?.trim()
+        val failure = when {
+            input == null -> AirPairingFailure.NOTIFICATION_INPUT_MISSING
+            manualEntry && manual == null -> AirPairingFailure.INVALID_MANUAL_PAIRING_INPUT
+            code == null || code.length != 6 || !code.all { it in '0'..'9' } -> AirPairingFailure.INVALID_PAIRING_CODE
+            else -> null
+        }
+        if (failure != null) {
+            record(if (!hasResults) "missing_results" else if (input == null) "missing_field" else "invalid_input")
+            _failure.value = failure
+            notificationController.showPairingFailure(failure, allowRetry = true)
+            return
+        }
+        if (_state.value == PairingState.IDLE && !isPreviouslyPaired) {
+            automaticReconnectSuspended = false
+            stopConnectAttempt()
+            _state.value = PairingState.DISCOVERING
+            record("session_restored")
+        } else {
+            record("received")
+        }
+        requestPairing(checkNotNull(code), manual?.port)
     }
 
     fun requestPairing(code: String, pairingPort: Int? = null) {

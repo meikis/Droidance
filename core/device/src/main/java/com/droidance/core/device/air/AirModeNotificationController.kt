@@ -12,6 +12,7 @@ import com.droidance.core.device.presentation.LocalizedNotifications
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.Uri
 import android.provider.Settings
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
@@ -23,6 +24,7 @@ import com.droidance.core.agent.debug.DebugLogAppender
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.UUID
 
 enum class AirPairingNotificationAvailability {
     AVAILABLE,
@@ -50,6 +52,8 @@ class AirModeNotificationController @Inject constructor(
         const val KEY_PAIRING_CODE = "pairing_code"
         const val ACTION_SUBMIT_MANUAL_PAIRING = "com.droidance.air.SUBMIT_MANUAL_PAIRING"
         const val KEY_MANUAL_PAIRING = "manual_pairing"
+        private const val KEY_PAIRING_SESSION = "com.droidance.air.pairing_session"
+        private const val KEY_PAIRING_BOOT = "com.droidance.air.pairing_boot"
     }
 
     @Volatile private var pairingNotificationActive = false
@@ -69,11 +73,26 @@ class AirModeNotificationController @Inject constructor(
         if (notificationManager.getNotificationChannel(CHANNEL_ID) != null) ensureChannel()
         LocalizedNotifications.refresh(context, setOf(NOTIFICATION_ID, NOTIFICATION_ID + 1)) { builder, notification ->
             if (notification.actions?.isNotEmpty() == true) {
-                builder.clearActions().addAction(pairingCodeAction())
-                if (notification.actions.size > 1) builder.addAction(manualPairingAction())
+                val session = notification.extras.getString(KEY_PAIRING_SESSION)
+                builder.clearActions()
+                if (session != null) {
+                    builder.addAction(pairingCodeAction(session))
+                    if (notification.actions.size > 1) builder.addAction(manualPairingAction(session))
+                }
             }
         }
     }
+
+    /** Android retains the live input notification across app process recreation. */
+    fun currentPairingSession(): String? = runCatching {
+        val notification = notificationManager.activeNotifications
+            .firstOrNull { it.id == NOTIFICATION_ID && it.tag == null }?.notification
+            ?: return@runCatching null
+        val boot = Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
+        if (boot < 0 || notification.extras.getInt(KEY_PAIRING_BOOT, -2) != boot ||
+            notification.actions.isNullOrEmpty()) return@runCatching null
+        notification.extras.getString(KEY_PAIRING_SESSION)
+    }.getOrNull()
 
     fun availability(): AirPairingNotificationAvailability {
         if (runCatching { ensureChannel() }.isFailure) {
@@ -132,6 +151,7 @@ class AirModeNotificationController @Inject constructor(
             return PairingNotificationPostResult(false, availability)
         }
         pairingNotificationActive = true
+        val session = currentPairingSession() ?: UUID.randomUUID().toString()
         val text = failure?.messageRes() ?: R.string.settings_air_notification_text
         val title = if (failure == null) R.string.settings_air_notification_title
             else R.string.settings_air_notification_failed_title
@@ -141,8 +161,12 @@ class AirModeNotificationController @Inject constructor(
             .setAutoCancel(false)
             .setOngoing(true)
             .setPriority(if (alert) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
-            .addAction(pairingCodeAction())
-            .apply { if (manualEntry) addAction(manualPairingAction()) }
+            .addExtras(android.os.Bundle().apply {
+                putString(KEY_PAIRING_SESSION, session)
+                putInt(KEY_PAIRING_BOOT, Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1))
+            })
+            .addAction(pairingCodeAction(session))
+            .apply { if (manualEntry) addAction(manualPairingAction(session)) }
             .build()
 
         // Clear the silent/previous input before alerting so heads-up presentation triggers reliably.
@@ -164,12 +188,13 @@ class AirModeNotificationController @Inject constructor(
         )
     }
 
-    private fun pairingCodeAction(): NotificationCompat.Action {
+    private fun pairingCodeAction(session: String): NotificationCompat.Action {
         val remoteInput = RemoteInput.Builder(KEY_PAIRING_CODE)
             .setLabel(localizedContext.getString(R.string.settings_air_notification_input_label))
             .build()
         val submitIntent = Intent(context, AirModePairingReceiver::class.java).apply {
             action = ACTION_SUBMIT_CODE
+            data = Uri.parse("droidance://air-pairing/$session")
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context, 0, submitIntent,
@@ -180,12 +205,14 @@ class AirModeNotificationController @Inject constructor(
         ).addRemoteInput(remoteInput).build()
     }
 
-    private fun manualPairingAction(): NotificationCompat.Action {
+    private fun manualPairingAction(session: String): NotificationCompat.Action {
         val remoteInput = RemoteInput.Builder(KEY_MANUAL_PAIRING)
             .setLabel(localizedContext.getString(R.string.settings_air_manual_pairing_input))
             .build()
         val pendingIntent = PendingIntent.getBroadcast(context, 1,
-            Intent(context, AirModePairingReceiver::class.java).setAction(ACTION_SUBMIT_MANUAL_PAIRING),
+            Intent(context, AirModePairingReceiver::class.java)
+                .setAction(ACTION_SUBMIT_MANUAL_PAIRING)
+                .setData(Uri.parse("droidance://air-pairing/$session")),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
         return NotificationCompat.Action.Builder(0,
             localizedContext.getString(R.string.settings_air_manual_pairing_action), pendingIntent)
