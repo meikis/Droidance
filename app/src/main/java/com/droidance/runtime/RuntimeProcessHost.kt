@@ -63,15 +63,18 @@ object RuntimeProcessHost {
         check(RuntimeProcessRole.isOwner)
         val identity = java.util.UUID.fromString(installationId).toString()
         val root = File("/data/local/tmp/droidance-runtime-$clientUid-$identity")
-        // The original application is transferred once. Subsequent clients attach to this owner.
-        if (!File(root, "initialized").isFile) {
-            RuntimeStorageSnapshot.restore(root, storage)
+        // Persistent data is transferred once; each new owner receives current credentials in memory.
+        val initialized = File(root, "initialized").isFile
+        val provider = RuntimeStorageSnapshot.restore(root, storage, restoreFiles = !initialized)
+        if (!initialized) {
             File(root, "initialized").writeText("1")
-        } else storage.close()
+        }
+        RuntimeProviderBootstrap.install(provider)
         SidecarBinderRegistry.set(2000, sidecar)
         isolatePlatformHelperFailures()
         val initialize = java.util.concurrent.FutureTask {
             val application = RuntimeApplicationContext.create(shell, packageName, root)
+            RuntimeStorageSnapshot.removeCredentialCopies(application, root)
             application.onCreate()
             // Acquire the platform-owned session while the submitting client is awake. Drawing
             // and input subsequently use the system session directly, without calling that client.
@@ -215,7 +218,7 @@ object RuntimeProcessHost {
                     Bundle()
                 }
                 "configuration" -> {
-                    if (RuntimeConfigurationSync.apply(application, values)) entry.providers().reloadFromStorage()
+                    RuntimeConfigurationSync.apply(application, values, entry.providers())
                     val locale = java.util.Locale.forLanguageTag(values.getString("language")!!)
                     val configuration = android.content.res.Configuration(application.resources.configuration)
                     configuration.setLocale(locale)

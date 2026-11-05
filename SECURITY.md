@@ -23,6 +23,12 @@ release note once a patched build is available.
 
 ## Scope notes
 
-- API keys and channel secrets are stored in app-private storage on the device. Treat a rooted or
+- API keys and channel secrets are stored in app-private storage. Provider credentials are also
+  passed to the resident shell-identity runtime in memory while it runs. Treat a rooted or
   debuggable device as untrusted.
+- Runtime history, diagnostics and other task data are stored in a shell-owned directory protected
+  from ordinary apps. Shell or Root access can read it, and uninstalling the app does not remove it.
+  Older versions also retained provider and channel credential copies there. The updated runtime
+  removes those copies for the current installation when it starts; directories from earlier
+  uninstalled installations are not automatically removed.
 - Debug builds expose extra test components and are not intended for daily use.

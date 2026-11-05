@@ -8,11 +8,15 @@ import android.os.Bundle
 /** GUI-owned configuration keys. Runtime receipts, usage and learned caches stay in the owner. */
 internal object RuntimeConfigurationSync {
     private val preferences = mapOf(
-        "droidance_providers" to setOf("provider_configs", "provider_config_schema_version"),
         "droidance_settings" to setOf("task_wall_minutes", "enable_deeplink", "device_connection_method"),
         "skill-authoring" to setOf("auto_draft")
     )
     fun snapshot(context: Context): Bundle = Bundle().apply {
+        val provider = RuntimeProviderSnapshot.capture(context)
+        putBundle("droidance_providers", Bundle().apply {
+            putString("provider_configs", provider.configs)
+            putInt("provider_config_schema_version", provider.schemaVersion)
+        })
         preferences.forEach { (name, keys) ->
             val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
             putBundle(name, Bundle().apply { keys.forEach { key ->
@@ -25,8 +29,11 @@ internal object RuntimeConfigurationSync {
         }
         putString("language", com.droidance.config.LanguageManager.resolvedTag(context))
     }
-    fun apply(context: Context, values: Bundle): Boolean {
-        var changed = false
+    fun apply(context: Context, values: Bundle, providers: com.droidance.settings.ProviderConfigManager) {
+        val provider = requireNotNull(values.getBundle("droidance_providers"))
+        providers.updateRuntimeSnapshot(RuntimeProviderSnapshot(
+            provider.getString("provider_configs"), provider.getInt("provider_config_schema_version")
+        ))
         preferences.forEach { (name, keys) ->
             val updates = requireNotNull(values.getBundle(name))
             val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
@@ -44,8 +51,7 @@ internal object RuntimeConfigurationSync {
                     }
                 }
             }
-            if (edited) { check(editor.commit()); changed = true }
+            if (edited) check(editor.commit())
         }
-        return changed
     }
 }

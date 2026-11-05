@@ -9,6 +9,9 @@ import com.droidance.core.model.llm.models.ImageDetailCapabilitySnapshot
 import com.droidance.core.model.llm.models.ImageDetailNegotiation
 import com.droidance.core.model.llm.models.ImageDetailOption
 import com.droidance.core.model.llm.models.ProviderConfig
+import com.droidance.core.device.agent.device.RuntimeProcessRole
+import com.droidance.runtime.RuntimeProviderBootstrap
+import com.droidance.runtime.RuntimeProviderSnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.Serializable
@@ -57,11 +60,29 @@ class ProviderConfigManager @Inject constructor(
     private val _modelFallbackIndex = mutableMapOf<String, Int>()
 
     init {
-        loadConfigs()
+        if (RuntimeProcessRole.isOwner) {
+            updateRuntimeSnapshot(requireNotNull(RuntimeProviderBootstrap.take()) { "Runtime provider configuration is unavailable" })
+        } else loadConfigs()
         loadImageDetailCapabilities()
     }
 
-    @Synchronized fun reloadFromStorage() { loadConfigs() }
+    /** Runtime credentials are delivered by the authenticated client and never saved in shell storage. */
+    @Synchronized internal fun updateRuntimeSnapshot(snapshot: RuntimeProviderSnapshot) {
+        check(RuntimeProcessRole.isOwner)
+        val raw = snapshot.configs
+        _configs = when {
+            raw == null -> presets.map { it.createConfig() }.toMutableList()
+            snapshot.schemaVersion != CURRENT_SCHEMA_VERSION -> {
+                android.util.Log.e("ProviderConfigManager", "Unknown runtime provider config schema rejected")
+                mutableListOf()
+            }
+            else -> try { json.decodeFromString<List<ProviderConfig>>(raw).toMutableList() }
+            catch (_: Exception) {
+                android.util.Log.e("ProviderConfigManager", "Corrupt runtime provider config rejected")
+                mutableListOf()
+            }
+        }
+    }
 
     /** 获取所有 Provider 配置 */
     @Synchronized fun getAllConfigs(): List<ProviderConfig> = _configs.toList()
@@ -274,6 +295,7 @@ class ProviderConfigManager @Inject constructor(
     // ====== 持久化 ======
 
     private fun saveConfigs() {
+        if (RuntimeProcessRole.isOwner) return
         val jsonString = json.encodeToString(_configs.toList())
         check(
             prefs.edit()
@@ -285,6 +307,7 @@ class ProviderConfigManager @Inject constructor(
     }
 
     private fun saveConfigsSafe() {
+        if (RuntimeProcessRole.isOwner) return
         try {
             val jsonString = json.encodeToString(_configs.toList())
             check(
