@@ -4,8 +4,11 @@
 package com.droidance.ui.screens
 
 import com.droidance.ui.components.droidanceFieldColors
+import com.droidance.ui.components.droidanceSwitchColors
 import com.droidance.ui.icons.DroidanceIcons
 import com.droidance.ui.theme.AppShapes
+import com.droidance.ui.theme.LocalAppIsDark
+import com.droidance.ui.theme.Neutral300
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +31,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -173,24 +178,64 @@ fun AirPairingScreen(
                 onOpenManualPairing = { showPairingDialog = false; showManualPairingDialog = true },
                 onOpenConnectionPort = { showConnectionPortDialog = true }) }
             item {
-                SettingsCardGroup {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
+                SettingsCardGroup(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Column(Modifier.weight(1f)) {
                             Text(stringResource(R.string.air_adb_persistence), style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(R.string.air_adb_persistence_exposure),
+                            Text(stringResource(R.string.air_adb_persistence_description),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp))
                         }
+                        Spacer(Modifier.width(12.dp))
                         Switch(checked = state.airPersistenceEnabled,
                             onCheckedChange = viewModel::setAdbPersistence,
-                            enabled = !state.airPersistenceChanging)
+                            enabled = !state.airPersistenceChanging,
+                            colors = droidanceSwitchColors().copy(
+                                uncheckedThumbColor = if (LocalAppIsDark.current) Neutral300 else MaterialTheme.colorScheme.surface
+                            ))
                     }
+                    Text(
+                        stringResource(R.string.air_adb_persistence_exposure),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
+                    )
                     if (state.airPersistenceEnabled && state.airUsbDebuggingEnabled != true) {
                         SettingsInsetDivider()
-                        TextButton(onClick = viewModel::openDeveloperOptions,
-                            modifier = Modifier.padding(horizontal = 8.dp)) {
-                            Text(stringResource(R.string.air_adb_persistence_usb_required))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.air_adb_persistence_usb_title),
+                                    style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.air_adb_persistence_usb_description),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            val openDeveloperOptions = stringResource(R.string.air_adb_persistence_open_developer_options)
+                            Surface(
+                                onClick = viewModel::openDeveloperOptions,
+                                modifier = Modifier.semantics { contentDescription = openDeveloperOptions },
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, settingsHairline())
+                            ) {
+                                Text(
+                                    stringResource(R.string.air_adb_persistence_go),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
