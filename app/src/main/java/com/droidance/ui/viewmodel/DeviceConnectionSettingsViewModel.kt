@@ -18,6 +18,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,6 +85,11 @@ class DeviceConnectionSettingsViewModel @Inject constructor(
                     bridge.ensureResidentChannel(metrics.widthPixels.coerceAtLeast(1), metrics.heightPixels.coerceAtLeast(1),
                         metrics.densityDpi.coerceAtLeast(1), RuntimeMode.STANDARD)
                 }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                android.util.Log.w("DeviceConnection", "Root connection could not start: ${error.javaClass.simpleName}")
+                false
             } finally { root.endRootCandidate() }
             if (ready && !taskRunning()) {
                 root.select(DeviceConnectionMethod.ROOT)

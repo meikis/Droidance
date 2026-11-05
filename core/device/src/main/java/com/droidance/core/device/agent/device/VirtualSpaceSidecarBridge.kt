@@ -217,7 +217,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                 return@synchronized invalid("supervisor restarted without a usable resident Binder")
             }
             return@synchronized when (selectedMode) {
-                RuntimeMode.STANDARD -> startAdbShellAppProcess(width, height, densityDpi)
+                RuntimeMode.STANDARD -> startShellAppProcess(width, height, densityDpi)
                 else -> invalid("Unsupported execution mode")
             }
         }
@@ -1851,7 +1851,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         else -> -1
     }
 
-    private fun startAdbShellAppProcess(width: Int, height: Int, densityDpi: Int): CommandResult {
+    private fun startShellAppProcess(width: Int, height: Int, densityDpi: Int): CommandResult {
         if (!shellRunner.isAvailable(ShellIdentity.SHELL)) {
             return invalid(shellRunner.describeShellUnavailable())
         }
@@ -1861,7 +1861,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             "shell,v2"
         )
         if (shellRunner.isFailure(launch)) {
-            return invalid("adb shell app_process start failed: ${launch.take(160)}")
+            return invalid("device shell app_process start failed: ${launch.take(160)}")
         }
         repeat(ADB_BIND_RETRIES) {
             Thread.sleep(BIND_POLL_MS)
@@ -1874,13 +1874,13 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                     width,
                     height,
                     densityDpi,
-                    "adb_shell_app_process_binder",
+                    "shell_app_process_binder",
                     RuntimeMode.STANDARD
                 )
             }
         }
         return invalid(
-            "adb shell app_process binder timeout; sidecar-log=[${readSidecarLog()}]"
+            "device shell app_process binder timeout; sidecar-log=[${readSidecarLog()}]"
         )
     }
 

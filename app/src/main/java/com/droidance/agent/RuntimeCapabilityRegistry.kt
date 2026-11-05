@@ -95,7 +95,7 @@ class RuntimeCapabilityRegistry @Inject constructor(
         }
         appScope.launch(Dispatchers.IO) {
             com.droidance.core.device.agent.device.SidecarBinderRegistry.deaths.collect {
-                debugLogManager.appendPersistentEvent("air-pairing", "resident sidecar Binder died; probing local ADB immediately")
+                debugLogManager.appendPersistentEvent("air-pairing", "resident sidecar Binder died; recovering the device connection")
                 recoverResidentChannel()
             }
         }
