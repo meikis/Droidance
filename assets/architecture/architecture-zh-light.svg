@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1223" viewBox="0 0 2400 1223" role="img" aria-label="Droidance architecture: wireless debugging or Root starts a shared shell Sidecar for virtual-space control">
+<rect width="2400" height="1223" fill="#ffffff"/>
+<style>text{font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;}</style>
+<rect x="60" y="60" width="360" height="130" rx="20" fill="#f4f6f8" stroke="#d7dde4" stroke-width="2"/>
+<text x="92" y="112" font-size="32" font-weight="700" fill="#161c24" text-anchor="start">你</text>
+<text x="92" y="156" font-size="24" font-weight="400" fill="#657181" text-anchor="start">一句话指令 · 确认与接管</text>
+<rect x="1980" y="60" width="360" height="130" rx="20" fill="#ecf2ff" stroke="#377bf2" stroke-width="2"/>
+<text x="2012" y="112" font-size="32" font-weight="700" fill="#161c24" text-anchor="start">多模态大模型</text>
+<text x="2012" y="156" font-size="24" font-weight="400" fill="#657181" text-anchor="start">自带 Key · 任意服务商</text>
+<text x="1390" y="135" font-size="28" font-weight="650" fill="#377bf2" text-anchor="middle">截图与上下文  ⇄  下一步动作（HTTPS）</text>
+<rect x="60" y="220" width="2280" height="800" rx="40" fill="#ffffff" stroke="#161c24" stroke-width="3"/>
+<text x="100" y="290" font-size="34" font-weight="700" fill="#161c24" text-anchor="start">你的 Android 手机</text>
+<text x="440" y="290" font-size="27" font-weight="650" fill="#13a970" text-anchor="start">无需电脑 · Root 可选 · 无需无障碍</text>
+<rect x="100" y="330" width="455" height="650" rx="26" fill="#f4f6f8" stroke="#d7dde4" stroke-width="2"/>
+<text x="125" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">Droidance App</text>
+<text x="125" y="435" font-size="24" font-weight="400" fill="#657181" text-anchor="start">普通应用身份</text>
+<rect x="125" y="465" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="508" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">单智能体循环</text>
+<text x="144" y="545" font-size="23" font-weight="400" fill="#657181" text-anchor="start">看 → 想 → 做</text>
+<rect x="125" y="588" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="631" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">工具与技能</text>
+<text x="144" y="668" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Markdown 规则 · Skill</text>
+<rect x="125" y="711" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="754" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">隔离脚本</text>
+<text x="144" y="791" font-size="23" font-weight="400" fill="#657181" text-anchor="start">isolatedProcess 中运行 JS</text>
+<rect x="125" y="834" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="877" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">本地事件日志</text>
+<text x="144" y="914" font-size="23" font-weight="400" fill="#657181" text-anchor="start">每一步可追溯</text>
+<rect x="650" y="330" width="520" height="650" rx="26" fill="#eaf8f1" stroke="#13a970" stroke-width="2"/>
+<text x="675" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">设备连接</text>
+<text x="675" y="435" font-size="24" font-weight="400" fill="#657181" text-anchor="start">选择一种启动方式</text>
+<rect x="675" y="465" width="470" height="140" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="696" y="507" font-size="28" font-weight="700" fill="#161c24" text-anchor="start">无线调试</text>
+<text x="696" y="543" font-size="23" font-weight="400" fill="#657181" text-anchor="start">mDNS · SPAKE2 · TLS ADB</text>
+<text x="696" y="579" font-size="23" font-weight="400" fill="#657181" text-anchor="start">配对后启动，无需 Root</text>
+<rect x="675" y="620" width="470" height="140" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="696" y="662" font-size="28" font-weight="700" fill="#161c24" text-anchor="start">Root</text>
+<text x="696" y="698" font-size="23" font-weight="400" fill="#657181" text-anchor="start">已 Root 的设备授予权限</text>
+<text x="696" y="734" font-size="23" font-weight="400" fill="#657181" text-anchor="start">无需无线调试</text>
+<rect x="675" y="775" width="470" height="140" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="696" y="817" font-size="28" font-weight="700" fill="#161c24" text-anchor="start">启动同一个 Sidecar</text>
+<text x="696" y="853" font-size="23" font-weight="400" fill="#657181" text-anchor="start">两种方式共用后续设备能力</text>
+<text x="696" y="889" font-size="23" font-weight="400" fill="#657181" text-anchor="start">以 Shell 身份运行</text>
+<rect x="1255" y="330" width="490" height="650" rx="26" fill="#eaf8f1" stroke="#13a970" stroke-width="2"/>
+<text x="1280" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">Sidecar</text>
+<text x="1280" y="435" font-size="23" font-weight="400" fill="#657181" text-anchor="start">常驻 Shell 身份 · Binder 回连 App</text>
+<rect x="1280" y="465" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="508" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">创建虚拟屏</text>
+<text x="1299" y="545" font-size="23" font-weight="400" fill="#657181" text-anchor="start">独立于主屏</text>
+<rect x="1280" y="588" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="631" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">干净截图</text>
+<text x="1299" y="668" font-size="23" font-weight="400" fill="#657181" text-anchor="start">模型看到的画面</text>
+<rect x="1280" y="711" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="754" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">输入注入</text>
+<text x="1299" y="791" font-size="23" font-weight="400" fill="#657181" text-anchor="start">点击 · 滑动 · 文字</text>
+<rect x="1280" y="834" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="877" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Shell 与系统能力</text>
+<text x="1299" y="914" font-size="23" font-weight="400" fill="#657181" text-anchor="start">按授权调用</text>
+<rect x="1845" y="330" width="455" height="650" rx="26" fill="#f4f6f8" stroke="#d7dde4" stroke-width="2"/>
+<text x="1870" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">虚拟空间</text>
+<text x="1870" y="435" font-size="24" font-weight="400" fill="#657181" text-anchor="start">后台运行</text>
+<rect x="1870" y="465" width="405" height="231" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1890" y="570" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">已安装的 App</text>
+<text x="1890" y="611" font-size="23" font-weight="400" fill="#657181" text-anchor="start">沿用你的账号数据</text>
+<rect x="1870" y="711" width="405" height="231" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1890" y="816" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">主屏不受影响</text>
+<text x="1890" y="857" font-size="23" font-weight="400" fill="#657181" text-anchor="start">你继续使用手机</text>
+<text x="602" y="663" font-size="47" font-weight="400" fill="#6c7786" text-anchor="middle">⇄</text>
+<text x="1212" y="663" font-size="47" font-weight="400" fill="#6c7786" text-anchor="middle">→</text>
+<text x="1212" y="706" font-size="20" font-weight="400" fill="#657181" text-anchor="middle">启动</text>
+<text x="1795" y="663" font-size="47" font-weight="400" fill="#6c7786" text-anchor="middle">⇄</text>
+<text x="1795" y="706" font-size="19" font-weight="400" fill="#657181" text-anchor="middle">显示与输入</text>
+<line x1="60" y1="1055" x2="420" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="62" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">纯视觉感知</text>
+<text x="62" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">不读 UI 树，不用 OCR</text>
+<line x1="442" y1="1055" x2="802" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="444" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">后台执行</text>
+<text x="444" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">任务不占用主屏</text>
+<line x1="824" y1="1055" x2="1184" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="826" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">断连不漂移</text>
+<text x="826" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">绑定丢失即失败关闭</text>
+<line x1="1206" y1="1055" x2="1566" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="1208" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">人在回路</text>
+<text x="1208" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">按需确认与接管</text>
+<line x1="1588" y1="1055" x2="1948" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="1590" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">配置驱动</text>
+<text x="1590" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">策略在 Markdown 中</text>
+<line x1="1970" y1="1055" x2="2330" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="1972" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">来源可验证</text>
+<text x="1972" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">libadb 哈希校验</text>
+</svg>

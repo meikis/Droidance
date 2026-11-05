@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1223" viewBox="0 0 2400 1223" role="img" aria-label="Droidance architecture: wireless debugging or Root starts a shared shell Sidecar for virtual-space control">
+<rect width="2400" height="1223" fill="#ffffff"/>
+<style>text{font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;}</style>
+<rect x="60" y="60" width="360" height="130" rx="20" fill="#f4f6f8" stroke="#d7dde4" stroke-width="2"/>
+<text x="92" y="112" font-size="32" font-weight="700" fill="#161c24" text-anchor="start">You</text>
+<text x="92" y="156" font-size="24" font-weight="400" fill="#657181" text-anchor="start">Instruct · stay in control</text>
+<rect x="1980" y="60" width="360" height="130" rx="20" fill="#ecf2ff" stroke="#377bf2" stroke-width="2"/>
+<text x="2012" y="112" font-size="32" font-weight="700" fill="#161c24" text-anchor="start">Multimodal model</text>
+<text x="2012" y="156" font-size="24" font-weight="400" fill="#657181" text-anchor="start">Your key · your provider</text>
+<text x="1390" y="135" font-size="28" font-weight="650" fill="#377bf2" text-anchor="middle">Screenshots &amp; context  ⇄  next action (HTTPS)</text>
+<rect x="60" y="220" width="2280" height="800" rx="40" fill="#ffffff" stroke="#161c24" stroke-width="3"/>
+<text x="100" y="290" font-size="34" font-weight="700" fill="#161c24" text-anchor="start">Your Android phone</text>
+<text x="485" y="290" font-size="27" font-weight="650" fill="#13a970" text-anchor="start">No computer · Root optional · No accessibility service</text>
+<rect x="100" y="330" width="455" height="650" rx="26" fill="#f4f6f8" stroke="#d7dde4" stroke-width="2"/>
+<text x="125" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">Droidance App</text>
+<text x="125" y="435" font-size="24" font-weight="400" fill="#657181" text-anchor="start">Regular app identity</text>
+<rect x="125" y="465" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="508" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Single-agent loop</text>
+<text x="144" y="545" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Observe → reason → act</text>
+<rect x="125" y="588" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="631" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Tools &amp; skills</text>
+<text x="144" y="668" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Markdown rules · skills</text>
+<rect x="125" y="711" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="754" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Isolated scripts</text>
+<text x="144" y="791" font-size="23" font-weight="400" fill="#657181" text-anchor="start">JS in isolatedProcess</text>
+<rect x="125" y="834" width="405" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="144" y="877" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Local event log</text>
+<text x="144" y="914" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Trace each step</text>
+<rect x="650" y="330" width="520" height="650" rx="26" fill="#eaf8f1" stroke="#13a970" stroke-width="2"/>
+<text x="675" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">Device connection</text>
+<text x="675" y="435" font-size="24" font-weight="400" fill="#657181" text-anchor="start">Choose one way to start</text>
+<rect x="675" y="465" width="470" height="140" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="696" y="507" font-size="28" font-weight="700" fill="#161c24" text-anchor="start">Wireless debugging</text>
+<text x="696" y="543" font-size="23" font-weight="400" fill="#657181" text-anchor="start">mDNS · SPAKE2 · TLS ADB</text>
+<text x="696" y="579" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Pair and start without Root</text>
+<rect x="675" y="620" width="470" height="140" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="696" y="662" font-size="28" font-weight="700" fill="#161c24" text-anchor="start">Root</text>
+<text x="696" y="698" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Grant access on a rooted device</text>
+<text x="696" y="734" font-size="23" font-weight="400" fill="#657181" text-anchor="start">No wireless debugging required</text>
+<rect x="675" y="775" width="470" height="140" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="696" y="817" font-size="28" font-weight="700" fill="#161c24" text-anchor="start">Start the same Sidecar</text>
+<text x="696" y="853" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Shared device capabilities</text>
+<text x="696" y="889" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Runs as Shell</text>
+<rect x="1255" y="330" width="490" height="650" rx="26" fill="#eaf8f1" stroke="#13a970" stroke-width="2"/>
+<text x="1280" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">Sidecar</text>
+<text x="1280" y="435" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Resident Shell process · Binder to app</text>
+<rect x="1280" y="465" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="508" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Create a virtual display</text>
+<text x="1299" y="545" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Separate from the main screen</text>
+<rect x="1280" y="588" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="631" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Clean screenshots</text>
+<text x="1299" y="668" font-size="23" font-weight="400" fill="#657181" text-anchor="start">What the model sees</text>
+<rect x="1280" y="711" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="754" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Input injection</text>
+<text x="1299" y="791" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Tap · swipe · text</text>
+<rect x="1280" y="834" width="440" height="108" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1299" y="877" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Shell &amp; system access</text>
+<text x="1299" y="914" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Subject to authorization</text>
+<rect x="1845" y="330" width="455" height="650" rx="26" fill="#f4f6f8" stroke="#d7dde4" stroke-width="2"/>
+<text x="1870" y="390" font-size="33" font-weight="700" fill="#161c24" text-anchor="start">Virtual space</text>
+<text x="1870" y="435" font-size="24" font-weight="400" fill="#657181" text-anchor="start">Runs in the background</text>
+<rect x="1870" y="465" width="405" height="231" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1890" y="570" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Installed apps</text>
+<text x="1890" y="611" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Use your existing app data</text>
+<rect x="1870" y="711" width="405" height="231" rx="17" fill="#ffffff" stroke="#d7dde4" stroke-width="1.5"/>
+<text x="1890" y="816" font-size="28" font-weight="650" fill="#161c24" text-anchor="start">Main screen stays free</text>
+<text x="1890" y="857" font-size="23" font-weight="400" fill="#657181" text-anchor="start">Keep using your phone</text>
+<text x="602" y="663" font-size="47" font-weight="400" fill="#6c7786" text-anchor="middle">⇄</text>
+<text x="1212" y="663" font-size="47" font-weight="400" fill="#6c7786" text-anchor="middle">→</text>
+<text x="1212" y="706" font-size="20" font-weight="400" fill="#657181" text-anchor="middle">start</text>
+<text x="1795" y="663" font-size="47" font-weight="400" fill="#6c7786" text-anchor="middle">⇄</text>
+<text x="1795" y="699" font-size="19" font-weight="400" fill="#657181" text-anchor="middle">display</text>
+<text x="1795" y="723" font-size="19" font-weight="400" fill="#657181" text-anchor="middle">&amp; input</text>
+<line x1="60" y1="1055" x2="420" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="62" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">Vision only</text>
+<text x="62" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">No UI tree or OCR</text>
+<line x1="442" y1="1055" x2="802" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="444" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">Background</text>
+<text x="444" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">Main screen stays free</text>
+<line x1="824" y1="1055" x2="1184" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="826" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">No drifting</text>
+<text x="826" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">Fail closed on disconnect</text>
+<line x1="1206" y1="1055" x2="1566" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="1208" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">Human in the loop</text>
+<text x="1208" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">Confirm or take over</text>
+<line x1="1588" y1="1055" x2="1948" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="1590" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">Config driven</text>
+<text x="1590" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">Policies in Markdown</text>
+<line x1="1970" y1="1055" x2="2330" y2="1055" stroke="#13a970" stroke-width="4"/>
+<text x="1972" y="1102" font-size="27" font-weight="700" fill="#161c24" text-anchor="start">Verifiable source</text>
+<text x="1972" y="1144" font-size="22" font-weight="400" fill="#657181" text-anchor="start">libadb hash checks</text>
+</svg>
