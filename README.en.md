@@ -83,7 +83,7 @@ No XML hierarchy dumps and no accessibility service. Custom-drawn controls and W
 That's it. Tasks run in the background, and the runtime island at the top of the screen lets you check progress, pause or take control.
 
 > [!NOTE]
-> Root connection is currently in the unreleased source on this branch. The latest released APK, v0.1.8, does not include it; build the current source to try Root. Droidance is a preview release (0.x); see the [CHANGELOG](CHANGELOG.md). Each release includes a `.sha256` file for the APK.
+> Root connection is available from v0.1.9. Droidance is a preview release (0.x); see the [CHANGELOG](CHANGELOG.md). Each release includes a `.sha256` file for the APK.
 
 > [!CAUTION]
 > This project is for learning and research. Automation may violate some apps' terms of service and put accounts at risk. Read the [disclaimer](#disclaimer) before use.
