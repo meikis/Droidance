@@ -42,7 +42,7 @@ Droidance **needs only a multimodal model API key**. It does not require root, a
 
 ### 🔑 One key to start
 
-No computer, cable or extra hardware. Pair wireless debugging, or choose Root on a rooted device, and enter a multimodal model API key.
+No root, computer, cable or extra hardware. Install the app, pair wireless debugging and enter a multimodal model API key. On a rooted device, you can also choose a Root connection.
 
 </td>
 <td width="33%" valign="top">
@@ -69,7 +69,7 @@ No XML hierarchy dumps and no accessibility service. Custom-drawn controls and W
 **Requirements**
 
 - An Android 11 or later phone. Low-memory and Android Go devices are not supported.
-- Wireless debugging needs Wi‑Fi; Root requires a rooted device and Root access granted to Droidance. The model provider still needs network access.
+- Wireless debugging needs no root and requires Wi‑Fi for pairing; Root requires a rooted device and Root access granted to Droidance. The model provider still needs network access.
 - Android 11–13 support is experimental: without per-display focus, key and text input briefly take focus from the main screen, and on Android 11 and 12 tasks cannot continue while the phone is locked.
 - If the Agent reports that the system blocked input, enable "USB debugging (Security settings)" on Xiaomi-family phones, or disable permission monitoring on OPPO, OnePlus and realme phones, then reconnect the device.
 - An API key for a multimodal model that supports image input and tool calling.
@@ -77,7 +77,7 @@ No XML hierarchy dumps and no accessibility service. Custom-drawn controls and W
 | Step | Action |
 | :---: | :--- |
 | **1** | Download and install the latest APK from [Releases](https://github.com/YbbLab/Droidance/releases/latest) |
-| **2** | Under **Connect device**, choose wireless debugging and follow the pairing guide, or choose Root and grant access on a rooted device. **No computer is needed.** |
+| **2** | Under **Connect device**, choose wireless debugging, follow the guide to enable **Developer options → Wireless debugging**, and enter the pairing code. On a rooted device, you can instead choose Root and grant access. **No computer is needed.** |
 | **3** | Add a provider endpoint, API key and model, then describe your task |
 
 That's it. Tasks run in the background, and the runtime island at the top of the screen lets you check progress, pause or take control.
@@ -159,7 +159,7 @@ See [CONTRIBUTING](CONTRIBUTING.md) for development conventions and validation.
 
 ### How it runs on an Android phone
 
-1. **Choose a connection**: Wireless debugging discovers the local port with mDNS, pairs using `libadb.so` (BoringSSL) and SPAKE2, then connects to `adbd` through a TLS ADB client. Rooted devices can instead grant Root access to start the service. Both paths use the same resident shell-identity process, the Sidecar.
+1. **Built-in ADB: the phone connects to itself**: The app ships a complete wireless debugging client. It finds the local port with mDNS, pairs over SPAKE2 with `libadb.so` (BoringSSL), then connects to the system `adbd` with a Kotlin TLS ADB client and a local RSA key to start a resident shell-identity process, the Sidecar. No root or computer is needed. On a rooted device, you can instead grant Root access to start the same Sidecar without wireless debugging.
 2. **Virtual space**: the sidecar creates a separate virtual display. Apps open on it with the apps and signed-in accounts already on your phone, not a copy of their data.
 3. **Vision-only perception**: the agent reads only screenshots of the virtual display, zooming into regions when needed. It does not read the UI hierarchy, use an accessibility service or rely on a local OCR model.
 4. **Single-agent decisions**: one agent decides from the screen and context whether to answer directly, use a system capability (calendar, SMS, contacts and so on), run an isolated script or operate the interface. There is no separate intent classifier or planner.
