@@ -7,8 +7,7 @@ import com.droidance.core.agent.tools.*
 
 import com.droidance.core.device.tools.*
 
-import com.droidance.core.device.air.AirModePairingManager
-import dagger.Lazy
+import com.droidance.core.device.agent.device.PrivilegedShellRunner
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,7 +15,7 @@ import javax.inject.Singleton
 @Singleton
 class AdbShellExecutor @Inject constructor(
     private val latencyTracker: com.droidance.core.agent.debug.TaskLatencyTracker,
-    private val airManager: Lazy<AirModePairingManager>
+    private val shellRunner: PrivilegedShellRunner
 ) {
     data class Result(val stdout: String, val stderr: String, val exitCode: Int,
         val executionStatus: com.droidance.core.agent.event.ToolExecutionStatus = if (exitCode == 0)
@@ -28,7 +27,7 @@ class AdbShellExecutor @Inject constructor(
         val success: Boolean get() = executionStatus == com.droidance.core.agent.event.ToolExecutionStatus.SUCCEEDED
         val output: String get() = stdout.ifBlank { stderr }
     }
-    fun isAvailable(): Boolean = com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner || airManager.get().isShellReady
+    fun isAvailable(): Boolean = shellRunner.isAvailable()
     fun escapeForShell(text: String): String = "'" + text.replace("'", "'\\''") + "'"
 
     fun exec(command: String, timeoutMs: Long = 15_000): Result {
@@ -47,10 +46,8 @@ class AdbShellExecutor @Inject constructor(
         latencyTracker.airShellCommands.incrementAndGet()
         val marker = "__DROIDANCE_EXIT_${System.nanoTime()}__"
         val script = "$command\nrc=\$?\necho $marker\$rc"
-        val output = airManager.get().shell("sh -c ${escapeForShell(script)}", timeoutMs)
-        val failed = output.startsWith("[AIR_DISCONNECTED]") ||
-            output.startsWith("[AIR_ERROR]") ||
-            output.startsWith("[AIR_TIMEOUT]")
+        val output = shellRunner.shell("sh -c ${escapeForShell(script)}", timeoutMs)
+        val failed = shellRunner.isFailure(output)
         if (failed) return Result("", output, -1)
 
         val lines = output.lineSequence().toList()

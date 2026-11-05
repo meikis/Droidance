@@ -9,7 +9,7 @@ import android.os.Bundle
 internal object RuntimeConfigurationSync {
     private val preferences = mapOf(
         "droidance_providers" to setOf("provider_configs", "provider_config_schema_version"),
-        "droidance_settings" to setOf("task_wall_minutes", "enable_deeplink"),
+        "droidance_settings" to setOf("task_wall_minutes", "enable_deeplink", "device_connection_method"),
         "skill-authoring" to setOf("auto_draft")
     )
     fun snapshot(context: Context): Bundle = Bundle().apply {

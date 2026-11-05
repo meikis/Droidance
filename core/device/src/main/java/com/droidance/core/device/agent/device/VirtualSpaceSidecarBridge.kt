@@ -15,7 +15,6 @@ import android.graphics.BitmapFactory
 import android.os.IBinder
 import android.os.RemoteException
 import android.view.SurfaceControl
-import com.droidance.core.device.air.AirModePairingManager
 import com.droidance.core.device.tools.AdbShellExecutor
 import com.droidance.core.agent.tools.TextInputEvidence
 import com.droidance.core.agent.event.ToolExecutionResult
@@ -38,8 +37,8 @@ import javax.inject.Singleton
 @Singleton
 class VirtualSpaceSidecarBridge @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val airModePairingManager: AirModePairingManager,
     private val shellRunner: PrivilegedShellRunner,
+    private val rootConnection: RootConnectionManager,
     private val adbShell: AdbShellExecutor,
     private val frameInspector: VirtualSpaceFrameInspector
 ) {
@@ -270,13 +269,13 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             val ok = when (selectedMode) {
                 RuntimeMode.STANDARD -> {
                     if (!shellRunner.isAvailable(ShellIdentity.SHELL)) {
-                        lastSidecarStartDiagnostic = "AIR shell unavailable: ${shellRunner.describeShellUnavailable()}"
+                        lastSidecarStartDiagnostic = "Device shell unavailable: ${shellRunner.describeShellUnavailable()}"
                         return@synchronized false
                     }
                     // sidecar 启动必须用 shell,v2(无 PTY)：旧 shell: 协议分配 PTY 会让 app_process 卡死在 main 之前。
-                    val launch = airModePairingManager.shell(cmd, ADB_START_TIMEOUT_MS, "shell,v2")
-                    if (launch.startsWith("[AIR_")) {
-                        lastSidecarStartDiagnostic = "AIR shell launch failed: ${launch.take(160)}"
+                    val launch = shellRunner.shell(cmd, ADB_START_TIMEOUT_MS, "shell,v2")
+                    if (shellRunner.isFailure(launch)) {
+                        lastSidecarStartDiagnostic = "Device shell launch failed: ${launch.take(160)}"
                         false
                     } else {
                         awaitBinder(RuntimeMode.STANDARD)
@@ -331,8 +330,8 @@ class VirtualSpaceSidecarBridge @Inject constructor(
 
     /** A live supervisor owns crash recovery; launching another during its backoff duplicates it. */
     private fun awaitSupervisorRestart(mode: RuntimeMode): Boolean? {
-        fun supervisorAlive(): Boolean = airModePairingManager.isShellReady &&
-            ResidentSidecarProcessCommands.parsePids(airModePairingManager.shell(
+        fun supervisorAlive(): Boolean = shellRunner.isAvailable(ShellIdentity.SHELL) &&
+            ResidentSidecarProcessCommands.parsePids(shellRunner.shell(
                 ResidentSidecarProcessCommands.listSupervisorPidsCommand(), PROCESS_PROBE_TIMEOUT_MS, "shell,v2"
             )).isNotEmpty()
         if (!supervisorAlive()) return null
@@ -393,8 +392,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         val accepted = when (mode) {
             RuntimeMode.STANDARD -> {
                 if (!shellRunner.isAvailable(ShellIdentity.SHELL)) return false
-                !airModePairingManager.shell(command, PROCESS_PROBE_TIMEOUT_MS, "shell,v2")
-                    .startsWith("[AIR_")
+                !shellRunner.isFailure(shellRunner.shell(command, PROCESS_PROBE_TIMEOUT_MS, "shell,v2"))
             }
             else -> return false
         }
@@ -421,11 +419,11 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         val output = when (mode) {
             RuntimeMode.STANDARD -> {
                 if (!shellRunner.isAvailable(ShellIdentity.SHELL)) return null
-                airModePairingManager.shell(command, PROCESS_PROBE_TIMEOUT_MS, "shell,v2")
+                shellRunner.shell(command, PROCESS_PROBE_TIMEOUT_MS, "shell,v2")
             }
             else -> return null
         }
-        if (output.startsWith("[AIR_")) return null
+        if (shellRunner.isFailure(output)) return null
         return ResidentSidecarProcessCommands.parsePids(output)
     }
 
@@ -1803,8 +1801,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         val commandAccepted = when (mode) {
             RuntimeMode.STANDARD -> {
                 if (!shellRunner.isAvailable(ShellIdentity.SHELL)) return false
-                !airModePairingManager.shell(command, PROCESS_PROBE_TIMEOUT_MS, "shell,v2")
-                    .startsWith("[AIR_")
+                !shellRunner.isFailure(shellRunner.shell(command, PROCESS_PROBE_TIMEOUT_MS, "shell,v2"))
             }
             else -> return false
         }
@@ -1858,12 +1855,12 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         if (!shellRunner.isAvailable(ShellIdentity.SHELL)) {
             return invalid(shellRunner.describeShellUnavailable())
         }
-        val launch = airModePairingManager.shell(
+        val launch = shellRunner.shell(
             buildAppProcessCommand(width, height, densityDpi),
             ADB_START_TIMEOUT_MS,
             "shell,v2"
         )
-        if (launch.startsWith("[AIR_")) {
+        if (shellRunner.isFailure(launch)) {
             return invalid("adb shell app_process start failed: ${launch.take(160)}")
         }
         repeat(ADB_BIND_RETRIES) {
@@ -1910,6 +1907,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             densityDpi = densityDpi,
             packageName = context.packageName,
             protocolVersion = SIDECAR_PROTOCOL_VERSION,
+            stopWhenDeveloperOptionsDisabled = !rootConnection.useRoot,
             escape = adbShell::escapeForShell
         )
     }
@@ -1923,7 +1921,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
                 "echo LOGSTAT=[\$(ls -la /data/local/tmp/droidance_vspace.log 2>&1)]; " +
                 "echo ---LOG---; cat /data/local/tmp/droidance_vspace.log 2>/dev/null | tail -25"
             val out = if (shellRunner.isAvailable(ShellIdentity.SHELL)) {
-                airModePairingManager.shell(probe, 4_000L)
+                shellRunner.shell(probe, 4_000L)
             } else {
                 adbShell.exec(probe, 4_000L).output
             }

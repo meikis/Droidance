@@ -18,13 +18,22 @@ enum class ShellIdentity {
 
 @Singleton
 class PrivilegedShellRunner @Inject constructor(
-    private val airModePairingManager: AirModePairingManager
+    private val airModePairingManager: AirModePairingManager,
+    private val root: RootConnectionManager
 ) {
     fun isAvailable(identity: ShellIdentity = ShellIdentity.SHELL): Boolean =
+        if (RuntimeProcessRole.isOwner) true else
         when (identity) {
             ShellIdentity.DEFAULT,
-            ShellIdentity.SHELL -> isAdbShellReady()
+            ShellIdentity.SHELL -> if (root.useRoot) true else if (root.currentMethod == DeviceConnectionMethod.ROOT) false else isAdbShellReady()
         }
+
+    fun shell(command: String, timeoutMs: Long, service: String = "shell"): String =
+        if (root.useRoot) root.shell(command, timeoutMs)
+        else if (root.currentMethod == DeviceConnectionMethod.ROOT) "[ROOT_DISCONNECTED]"
+        else airModePairingManager.shell(command, timeoutMs, service)
+
+    fun isFailure(output: String): Boolean = output.startsWith("[AIR_") || output.startsWith("[ROOT_")
 
     fun currentAdbShellUid(): Int? {
         if (RuntimeProcessRole.isOwner) return ADB_SHELL_UID
@@ -43,6 +52,7 @@ class PrivilegedShellRunner @Inject constructor(
         RuntimeProcessRole.isOwner || (airModePairingManager.isConnected && isAdbShellUid())
 
     fun describeShellUnavailable(): String {
+        if (root.currentMethod == DeviceConnectionMethod.ROOT) return "Root authorization or shell is unavailable"
         val uid = currentAdbShellUid()
         return when {
             !airModePairingManager.isConnected ->

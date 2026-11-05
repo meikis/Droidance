@@ -7,11 +7,14 @@ object RuntimePlatformDriver {
     @Synchronized fun connect(): INativeInputDriver {
         check(RuntimeProcessRole.isOwner)
         val sidecar = IVirtualSpaceSidecar.Stub.asInterface(requireNotNull(SidecarBinderRegistry.get(2000)))
-        sidecar.platformDriver?.let { return INativeInputDriver.Stub.asInterface(it) }
+        fun availableDriver(): INativeInputDriver? = sidecar.platformDriver
+            ?.takeIf { it.isBinderAlive && it.pingBinder() }
+            ?.let(INativeInputDriver.Stub::asInterface)
+        availableDriver()?.let { return it }
         check(sidecar.requestPlatformDriver())
         val deadline = android.os.SystemClock.uptimeMillis() + 5000L
         while (android.os.SystemClock.uptimeMillis() < deadline) {
-            sidecar.platformDriver?.let { return INativeInputDriver.Stub.asInterface(it) }
+            availableDriver()?.let { return it }
             android.os.SystemClock.sleep(20)
         }
         error("The Android platform driver did not connect")

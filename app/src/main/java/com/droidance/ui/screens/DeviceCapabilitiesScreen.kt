@@ -33,6 +33,7 @@ import com.droidance.R
 import com.droidance.ui.theme.Neutral0
 import com.droidance.ui.theme.Neutral300
 import com.droidance.core.device.air.AirModePairingManager
+import com.droidance.core.device.agent.device.DeviceConnectionMethod
 import com.droidance.ui.viewmodel.SettingsUiState
 
 internal data class DeviceCapabilityActions(
@@ -105,10 +106,13 @@ private fun ReadinessSection(
         SettingsCardGroup {
             SettingsNavItem(
                 title = stringResource(R.string.air_pairing_title),
-                subtitle = when (state.airBridgeState) {
+                subtitle = if (state.connectionMethod == DeviceConnectionMethod.ROOT) {
+                    stringResource(if (state.deviceConnected) R.string.connection_method_connected else R.string.connection_method_disconnected,
+                        stringResource(R.string.connection_method_root))
+                } else when (state.airBridgeState) {
                     AirModePairingManager.PairingState.IDLE ->
                         when {
-                            state.airDeviceConnected -> stringResource(R.string.settings_air_state_connected)
+                            state.airDeviceConnected -> stringResource(R.string.connection_method_connected, stringResource(R.string.connection_method_wireless))
                             state.airPairingRequired -> stringResource(R.string.settings_air_state_pairing_required)
                             state.airPreviouslyPaired -> stringResource(R.string.settings_air_state_paired)
                             else -> stringResource(R.string.settings_air_state_unpaired)
@@ -117,9 +121,9 @@ private fun ReadinessSection(
                     AirModePairingManager.PairingState.AWAITING_CODE -> stringResource(R.string.settings_air_state_awaiting_code)
                     AirModePairingManager.PairingState.PAIRING -> stringResource(R.string.settings_air_state_pairing)
                     AirModePairingManager.PairingState.CONNECTING -> stringResource(R.string.settings_air_state_reconnecting)
-                    AirModePairingManager.PairingState.CONNECTED -> stringResource(R.string.settings_air_state_connected)
+                    AirModePairingManager.PairingState.CONNECTED -> stringResource(R.string.connection_method_connected, stringResource(R.string.connection_method_wireless))
                 },
-                icon = DroidanceIcons.Wifi,
+                icon = DroidanceIcons.Link,
                 onClick = actions.onOpenAirPairing
             )
         }

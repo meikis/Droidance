@@ -71,6 +71,7 @@ object SubRoutes {
     const val AGENTS = "settings/agents"
     const val SETTINGS_DEVICE_CAPABILITIES = "settings/device-capabilities"
     const val AIR_PAIRING = "device/air-pairing"
+    const val DEVICE_CONNECTION = "device/connection"
     const val SETTINGS_PERMISSIONS = "settings/permissions"
     const val SETTINGS_THEME = "settings/theme"
     const val SETTINGS_LANGUAGE = "settings/language"
@@ -171,7 +172,7 @@ fun AppNavigation(
     val currentRoute = navBackStackEntry?.destination?.route ?: ""
     val isChatRoute = currentRoute.startsWith("home/chat") || currentRoute.startsWith("home/new-chat")
     val showConnectionFeedback = onboardingFinished &&
-        currentRoute != SubRoutes.AIR_PAIRING && lifecycle == Lifecycle.State.RESUMED
+        currentRoute != SubRoutes.AIR_PAIRING && currentRoute != SubRoutes.DEVICE_CONNECTION && lifecycle == Lifecycle.State.RESUMED
     LaunchedEffect(connectionViewModel, context, showConnectionFeedback) {
         connectionViewModel.events.collect { message ->
             // Pairing has its own status; do not replay old recovery messages after leaving it.
@@ -283,7 +284,7 @@ fun AppNavigation(
                         navController.navigateToNewConversation()
                     },
                     onNavigateToProviders = { navController.navigate(SubRoutes.PROVIDER_LIST) },
-                    onNavigateToAirPairing = { navController.navigate(SubRoutes.AIR_PAIRING) },
+                    onNavigateToAirPairing = { navController.navigate(SubRoutes.DEVICE_CONNECTION) },
                 )
             }
 
@@ -357,7 +358,13 @@ fun AppNavigation(
             composable(SubRoutes.SETTINGS_DEVICE_CAPABILITIES) {
                 SettingsDeviceCapabilitiesScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenAirPairing = { navController.navigate(SubRoutes.AIR_PAIRING) }
+                    onOpenAirPairing = { navController.navigate(SubRoutes.DEVICE_CONNECTION) }
+                )
+            }
+            composable(SubRoutes.DEVICE_CONNECTION) {
+                DeviceConnectionSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenWireless = { navController.navigate(SubRoutes.AIR_PAIRING) }
                 )
             }
             composable(SubRoutes.AIR_PAIRING) {
@@ -500,7 +507,7 @@ fun AppNavigation(
                 onDismiss = connectionViewModel::dismiss,
                 onConfirm = {
                     connectionViewModel.resolve {
-                        navController.navigate(SubRoutes.AIR_PAIRING) { launchSingleTop = true }
+                        navController.navigate(SubRoutes.DEVICE_CONNECTION) { launchSingleTop = true }
                     }
                 }
             )

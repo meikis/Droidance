@@ -69,6 +69,9 @@ private data class ConnectionPresentation(
 )
 
 private fun presentation(status: DeviceConnectionStatus): ConnectionPresentation = when (status) {
+    DeviceConnectionStatus.ROOT_UNAVAILABLE -> ConnectionPresentation(
+        R.string.connection_root_unavailable_title, R.string.connection_root_unavailable_description,
+        R.string.air_pairing_title, DroidanceIcons.Link)
     DeviceConnectionStatus.UNPAIRED -> ConnectionPresentation(
         R.string.connection_unpaired_title, R.string.connection_unpaired_description,
         R.string.air_pairing_start, DroidanceIcons.Link)

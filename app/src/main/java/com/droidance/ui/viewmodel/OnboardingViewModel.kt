@@ -12,6 +12,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.droidance.core.device.config.InstalledAppsManager
 import com.droidance.core.device.air.AirModePairingManager
+import com.droidance.core.device.agent.device.DeviceConnectionMethod
+import com.droidance.core.device.agent.device.RootConnectionManager
+import com.droidance.core.device.agent.device.VirtualSpaceSidecarBridge
 import com.droidance.settings.ProviderConfigManager
 import com.droidance.core.knowledge.agent.device.DeviceProfileStore
 import com.droidance.core.device.tools.AdbShellExecutor
@@ -34,6 +37,8 @@ class OnboardingViewModel @Inject constructor(
     private val installedAppsManager: InstalledAppsManager,
     private val providerConfigManager: ProviderConfigManager,
     private val airModePairingManager: AirModePairingManager,
+    private val rootConnection: RootConnectionManager,
+    private val sidecarBridge: VirtualSpaceSidecarBridge,
     private val generalSettings: com.droidance.settings.GeneralSettingsRepository
 ) : ViewModel() {
 
@@ -97,14 +102,15 @@ class OnboardingViewModel @Inject constructor(
             config.defaultModel.isNotBlank() || config.models.isNotEmpty()
         }
         val visionReady = providerReady
-        val airReady = airModePairingManager.isConnected
+        val deviceReady = deviceConnected()
 
         return ScanResult(
             deviceInfo  = deviceInfo,
             notifStatus = notifStatus,
             userApps    = userApps,
             providerReady = providerReady,
-            airReady = airReady,
+            deviceReady = deviceReady,
+            connectionMethod = rootConnection.currentMethod,
             visionReady = visionReady
         )
     }
@@ -130,10 +136,15 @@ class OnboardingViewModel @Inject constructor(
         _scanResult.value = current.copy(
             notifStatus = if (notifGranted) "granted" else "not granted",
             providerReady = providerReady,
-            airReady = airModePairingManager.isConnected,
+            deviceReady = deviceConnected(),
+            connectionMethod = rootConnection.currentMethod,
             visionReady = visionReady
         )
     }
+
+    private fun deviceConnected(): Boolean =
+        if (rootConnection.currentMethod == DeviceConnectionMethod.ROOT) sidecarBridge.isResidentBinderAlive()
+        else airModePairingManager.isConnected
 
     // ====== 完成引导，写入 DEVICE.md ======
 
@@ -169,6 +180,7 @@ data class ScanResult(
     val notifStatus: String,
     val userApps: List<String>,
     val providerReady: Boolean,
-    val airReady: Boolean,
+    val deviceReady: Boolean,
+    val connectionMethod: DeviceConnectionMethod,
     val visionReady: Boolean
 )

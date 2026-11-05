@@ -46,6 +46,7 @@ import com.droidance.R
 import com.droidance.ui.theme.DroidancePrimary
 import com.droidance.ui.viewmodel.OnboardingViewModel
 import com.droidance.ui.viewmodel.ScanResult
+import com.droidance.core.device.agent.device.DeviceConnectionMethod
 
 /**
  * 首次启动引导页：品牌 Hero + 一份按依赖排序的极简清单。
@@ -73,7 +74,7 @@ fun OnboardingScreen(
         bottomBar = {
             if (!isScanning && scanResult != null) {
                 val isCoreReady = (scanResult?.providerReady == true) && (
-                    (scanResult?.airReady == true)
+                    (scanResult?.deviceReady == true)
                 )
                 Surface(
                     modifier = Modifier
@@ -293,10 +294,11 @@ private fun PermissionChecklist(
                 icon = DroidanceIcons.Link,
                 name = stringResource(R.string.onboarding_setup_air),
                 desc = stringResource(
-                    if (scan.airReady) R.string.onboarding_setup_air_ready
-                    else R.string.onboarding_setup_air_desc
+                    if (scan.deviceReady && scan.connectionMethod == DeviceConnectionMethod.ROOT) R.string.onboarding_setup_device_root_ready
+                    else if (scan.deviceReady) R.string.onboarding_setup_air_ready
+                    else R.string.onboarding_setup_device_desc
                 ),
-                granted = scan.airReady,
+                granted = scan.deviceReady,
                 onAction = onNavigateToAirPairing
             )
 

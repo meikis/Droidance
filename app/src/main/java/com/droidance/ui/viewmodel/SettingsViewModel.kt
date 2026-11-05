@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.droidance.R
 import com.droidance.core.device.air.AirModePairingManager
+import com.droidance.core.device.agent.device.DeviceConnectionMethod
+import com.droidance.core.device.agent.device.RootConnectionManager
 import com.droidance.core.device.air.AirPairingFailure
 import com.droidance.core.device.air.AirPairingNotificationAvailability
 import com.droidance.config.AppLanguage
@@ -45,6 +47,7 @@ class SettingsViewModel @Inject constructor(
     private val languageManager: LanguageManager,
     private val providerConfigManager: ProviderConfigManager,
     private val airModePairingManager: AirModePairingManager,
+    private val rootConnection: RootConnectionManager,
     private val virtualSpaceSidecarBridge: com.droidance.core.device.agent.device.VirtualSpaceSidecarBridge,
     private val diagnosticsCollector: com.droidance.core.device.debug.DiagnosticsCollector,
     private val debugLogManager: com.droidance.debug.DebugLogManager,
@@ -65,6 +68,9 @@ class SettingsViewModel @Inject constructor(
     init {
         loadSettings()
         checkServiceStatus()
+        viewModelScope.launch {
+            rootConnection.method.collect { method -> _uiState.update { it.copy(connectionMethod = method) } }
+        }
         viewModelScope.launch {
             tokenUsageRepository.records.collect { records ->
                 applyTokenStats(_uiState.value.usageRange, records)
@@ -547,6 +553,7 @@ data class SettingsUiState(
     val providerReady: Boolean = false,
 
     // AIR 无线调试
+    val connectionMethod: DeviceConnectionMethod = DeviceConnectionMethod.WIRELESS,
     val airBridgeState: AirModePairingManager.PairingState = AirModePairingManager.PairingState.IDLE,
     val airPreviouslyPaired: Boolean = false,
     val airPairingRequired: Boolean = false,
@@ -567,8 +574,11 @@ data class SettingsUiState(
     /** The resident sidecar keeps device control after Wi-Fi loss closes the live ADB connection. */
     val airDeviceConnected: Boolean
         get() = airBridgeState == AirModePairingManager.PairingState.CONNECTED ||
-            (airBridgeState == AirModePairingManager.PairingState.IDLE &&
+            (connectionMethod == DeviceConnectionMethod.WIRELESS && airBridgeState == AirModePairingManager.PairingState.IDLE &&
                 airPreviouslyPaired && !airPairingRequired && airResidentChannelAvailable)
+
+    val deviceConnected: Boolean
+        get() = if (connectionMethod == DeviceConnectionMethod.ROOT) airResidentChannelAvailable else airDeviceConnected
 }
 
 private const val AIR_RESIDENT_CHANNEL_REFRESH_MS = 2_000L

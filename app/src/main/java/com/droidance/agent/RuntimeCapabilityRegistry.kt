@@ -17,6 +17,8 @@ import com.droidance.core.agent.device.DeviceModeResolver
 import com.droidance.core.agent.device.ExecutionSpace
 import com.droidance.core.agent.device.RuntimeMode
 import com.droidance.core.device.agent.device.VirtualSpaceSidecarBridge
+import com.droidance.core.device.agent.device.DeviceConnectionMethod
+import com.droidance.core.device.agent.device.RootConnectionManager
 import com.droidance.core.device.air.AirModePairingManager
 import com.droidance.config.RuleConfigManager
 import com.droidance.debug.DebugLogManager
@@ -41,6 +43,7 @@ class RuntimeCapabilityRegistry @Inject constructor(
     @ApplicationContext private val context: Context,
     private val modelClient: com.droidance.core.model.llm.ModelClient,
     private val airModePairingManager: AirModePairingManager,
+    private val rootConnection: RootConnectionManager,
     private val channelNotifications: com.droidance.core.device.air.AirModeNotificationController,
     private val virtualSpaceSidecarBridge: VirtualSpaceSidecarBridge,
     private val ruleConfigManager: RuleConfigManager,
@@ -84,6 +87,12 @@ class RuntimeCapabilityRegistry @Inject constructor(
     @Volatile private var virtualSpaceHealthReason: String = ""
 
     init {
+        if (!com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner &&
+            rootConnection.currentMethod == DeviceConnectionMethod.ROOT) {
+            appScope.launch(Dispatchers.IO) {
+                if (rootConnection.authorize()) ensureResidentChannel()
+            }
+        }
         appScope.launch(Dispatchers.IO) {
             com.droidance.core.device.agent.device.SidecarBinderRegistry.deaths.collect {
                 debugLogManager.appendPersistentEvent("air-pairing", "resident sidecar Binder died; probing local ADB immediately")
@@ -127,7 +136,7 @@ class RuntimeCapabilityRegistry @Inject constructor(
                     if (modeChanged || ready) {
                         channelNotifications.cancelRuntimeChannelLost()
                     } else if (lost) {
-                        channelNotifications.showRuntimeChannelLost()
+                        channelNotifications.showRuntimeChannelLost(rootConnection.currentMethod == DeviceConnectionMethod.ROOT)
                     }
                 }.onFailure { debugLogManager.appendEvent("channel availability check failed: ${it.javaClass.simpleName}") }
                 delay(15_000)
@@ -156,6 +165,10 @@ class RuntimeCapabilityRegistry @Inject constructor(
     }
 
     private fun recoverResidentChannel() {
+        if (rootConnection.currentMethod == DeviceConnectionMethod.ROOT) {
+            if (rootConnection.rootReady) ensureResidentChannel()
+            return
+        }
         if (!airModePairingManager.shouldMaintainResidentChannel) return
         airModePairingManager.probeConnection()
         airModePairingManager.ensureConnectedIfPaired()
@@ -165,7 +178,9 @@ class RuntimeCapabilityRegistry @Inject constructor(
     /** 全能力常驻 sidecar：ensureResidentChannel 幂等，重复触发安全。 */
     private fun ensureResidentChannel() {
         appScope.launch(Dispatchers.IO) {
-            if (!airModePairingManager.shouldMaintainResidentChannel || !airModePairingManager.isShellReady) return@launch
+            if (rootConnection.currentMethod == DeviceConnectionMethod.ROOT) {
+                if (!rootConnection.rootReady) return@launch
+            } else if (!airModePairingManager.shouldMaintainResidentChannel || !airModePairingManager.isShellReady) return@launch
             val mode = runCatching { currentStrategy().selection.effectiveMode }.getOrNull() ?: return@launch
             val metrics = android.content.res.Resources.getSystem().displayMetrics
             val ok = runCatching {
@@ -194,11 +209,11 @@ class RuntimeCapabilityRegistry @Inject constructor(
             virtualBridgeAvailable
 
         val refreshed = Snapshot(
-            screenCaptureAvailable = virtualBridgeAvailable || airModePairingManager.isConnected,
+            screenCaptureAvailable = virtualBridgeAvailable || (rootConnection.currentMethod == DeviceConnectionMethod.WIRELESS && airModePairingManager.isConnected),
             inputInjectionReady = virtualBridgeAvailable,
             humanizedTouchAvailable = false,
             visionProviderAvailable = modelClient.canSendVisionMessages(),
-            adbBridgeAvailable = airModePairingManager.isConnected,
+            adbBridgeAvailable = rootConnection.currentMethod == DeviceConnectionMethod.WIRELESS && airModePairingManager.isConnected,
             virtualSpaceBridgeAvailable = virtualBridgeAvailable,
             virtualSpaceHealthReady = virtualHealthReady,
             virtualSpaceHealthReason = virtualSpaceHealthReason,
@@ -294,7 +309,7 @@ class RuntimeCapabilityRegistry @Inject constructor(
 
     private fun couldBecomeReady(strategy: DeviceExecutionStrategy): Boolean {
         return when (strategy.selection.requestedMode ?: RuntimeMode.STANDARD) {
-            RuntimeMode.STANDARD -> airModePairingManager.isPreviouslyPaired ||
+            RuntimeMode.STANDARD -> rootConnection.rootReady || airModePairingManager.isPreviouslyPaired ||
                 snapshot.adbBridgeAvailable || snapshot.virtualSpaceBridgeAvailable
             else -> false
         }

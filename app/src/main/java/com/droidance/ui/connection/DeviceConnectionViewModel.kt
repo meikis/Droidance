@@ -10,6 +10,9 @@ import com.droidance.R
 import com.droidance.agent.RuntimeCapabilityRegistry
 import com.droidance.core.device.air.AirModePairingManager
 import com.droidance.core.device.air.AirModePairingManager.PairingState
+import com.droidance.core.device.agent.device.DeviceConnectionMethod
+import com.droidance.core.device.agent.device.RootConnectionManager
+import com.droidance.core.device.agent.device.VirtualSpaceSidecarBridge
 import com.droidance.settings.SystemSettingsNavigator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -29,6 +32,8 @@ import kotlinx.coroutines.withContext
 internal class DeviceConnectionViewModel @Inject constructor(
     private val air: AirModePairingManager,
     private val capabilities: RuntimeCapabilityRegistry,
+    private val root: RootConnectionManager,
+    private val bridge: VirtualSpaceSidecarBridge,
     private val settings: SystemSettingsNavigator
 ) : ViewModel() {
     private val _state = MutableStateFlow(DeviceConnectionUiState())
@@ -55,6 +60,10 @@ internal class DeviceConnectionViewModel @Inject constructor(
         val next = withContext(Dispatchers.IO) {
             runCatching {
                 val device = capabilities.refresh(force = true)
+                if (root.currentMethod == DeviceConnectionMethod.ROOT) {
+                    return@runCatching if (bridge.isResidentBinderAlive()) DeviceConnectionStatus.READY
+                    else DeviceConnectionStatus.ROOT_UNAVAILABLE
+                }
                 val shell = air.shellHealthSnapshot()
                 DeviceConnectionSnapshot(
                     transportAvailable = device.adbBridgeAvailable || device.virtualSpaceBridgeAvailable || shell.ready,

@@ -16,6 +16,7 @@ internal enum class DeviceConnectionStatus(
     RECONNECTING,
     PAIRING(DeviceConnectionAction.PAIR),
     UNPAIRED(DeviceConnectionAction.PAIR, true),
+    ROOT_UNAVAILABLE(DeviceConnectionAction.PAIR, true),
     PAIRING_REQUIRED(DeviceConnectionAction.PAIR, true),
     WIFI_UNAVAILABLE(DeviceConnectionAction.WIFI_SETTINGS, true),
     USB_DISABLED(DeviceConnectionAction.DEVELOPER_SETTINGS, true),

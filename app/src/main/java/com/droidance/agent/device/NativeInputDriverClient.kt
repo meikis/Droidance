@@ -10,6 +10,14 @@ import javax.inject.Singleton
 
 @Singleton
 class NativeInputDriverClient @Inject constructor() {
-    fun command(operation: String, arguments: Bundle = Bundle()): Bundle =
-        RuntimeWire.read(RuntimePlatformDriver.connect().command(operation, arguments))
+    fun command(operation: String, arguments: Bundle = Bundle()): Bundle {
+        return try {
+            RuntimeWire.read(RuntimePlatformDriver.connect().command(operation, arguments))
+        } catch (error: android.os.DeadObjectException) {
+            // A restarted app may have left a dead driver during an idempotent readiness probe.
+            // Never replay input or other operations whose delivery may already have occurred.
+            if (operation !in setOf("probeReset", "probeState")) throw error
+            RuntimeWire.read(RuntimePlatformDriver.connect().command(operation, arguments))
+        }
+    }
 }

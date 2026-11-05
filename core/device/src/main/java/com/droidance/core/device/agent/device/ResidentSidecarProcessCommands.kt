@@ -48,6 +48,7 @@ internal object ResidentSidecarProcessCommands {
         densityDpi: Int,
         packageName: String,
         protocolVersion: Int,
+        stopWhenDeveloperOptionsDisabled: Boolean = true,
         escape: (String) -> String
     ): String {
         val supervisor = "while :; do " +
@@ -57,7 +58,7 @@ internal object ResidentSidecarProcessCommands {
             "[ \$rc -eq 0 ] && break; " +
             "sleep $RESTART_DELAY_SECONDS; " +
             "[ -f \"\$CLASSPATH\" ] || break; " +
-            "[ \"\$(settings get global development_settings_enabled 2>/dev/null)\" != 0 ] || break; " +
+            (if (stopWhenDeveloperOptionsDisabled) "[ \"\$(settings get global development_settings_enabled 2>/dev/null)\" != 0 ] || break; " else "") +
             "done"
         return buildString {
             // 不能在同一条 sh -c 里按 mainClass 清进程，否则会匹配当前命令文本并杀掉启动过程。

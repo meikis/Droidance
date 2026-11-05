@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Added
+
+- Connect a rooted device without wireless debugging, with a shared connection selector in setup and settings.
+
 ## [0.1.8] - 2026-11-05
 
 ### Fixed
