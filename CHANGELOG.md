@@ -14,6 +14,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Prevent obsolete device-service broadcasts from crashing the app after an update.
 - Keep provider and wireless-pairing credentials out of persistent runtime storage and remove old copies for the current installation.
 
 ## [0.1.8] - 2026-11-05

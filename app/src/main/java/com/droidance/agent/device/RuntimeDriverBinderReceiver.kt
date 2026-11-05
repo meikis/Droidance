@@ -16,14 +16,19 @@ import java.util.concurrent.TimeUnit
 /** System input driver only. No model, task queue or application graph runs in this process. */
 class RuntimeDriverBinderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.getIntExtra(com.droidance.core.device.agent.device.SidecarBinderReceiver.EXTRA_SIDECAR_PROTOCOL_VERSION, -1) !=
-            com.droidance.core.device.agent.device.VirtualSpaceSidecarService.SIDECAR_PROTOCOL_VERSION) return
-        @Suppress("DEPRECATION") val container = intent.getParcelableExtra<com.droidance.core.device.agent.device.SidecarBinderContainer>(
-            com.droidance.core.device.agent.device.SidecarBinderReceiver.EXTRA_BINDER_CONTAINER) ?: return
-        val sidecar = com.droidance.core.device.agent.device.IVirtualSpaceSidecar.Stub.asInterface(container.binder)
+        val binder = com.droidance.core.device.agent.device.SidecarBinderHandoff.receive(context, intent) ?: return
+        val sidecar = com.droidance.core.device.agent.device.IVirtualSpaceSidecar.Stub.asInterface(binder)
         val driver = NativePlatformDriver(context.applicationContext)
-        sidecar.setPlatformDriver(driver.binder)
-        container.binder.linkToDeath({ driver.close() }, 0)
+        try {
+            binder.linkToDeath({ driver.close() }, 0)
+            sidecar.setPlatformDriver(driver.binder)
+        } catch (error: android.os.RemoteException) {
+            driver.close()
+            android.util.Log.w("DroidanceVSpace", "Sidecar disconnected before the input driver was registered")
+        } catch (error: RuntimeException) {
+            driver.close()
+            android.util.Log.w("DroidanceVSpace", "Input driver registration failed: ${error.javaClass.simpleName}")
+        }
     }
 }
 

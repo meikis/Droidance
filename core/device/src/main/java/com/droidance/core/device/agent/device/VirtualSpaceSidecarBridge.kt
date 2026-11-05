@@ -332,7 +332,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     private fun awaitSupervisorRestart(mode: RuntimeMode): Boolean? {
         fun supervisorAlive(): Boolean = shellRunner.isAvailable(ShellIdentity.SHELL) &&
             ResidentSidecarProcessCommands.parsePids(shellRunner.shell(
-                ResidentSidecarProcessCommands.listSupervisorPidsCommand(), PROCESS_PROBE_TIMEOUT_MS, "shell,v2"
+                ResidentSidecarProcessCommands.listSupervisorPidsCommand(context.packageName), PROCESS_PROBE_TIMEOUT_MS, "shell,v2"
             )).isNotEmpty()
         if (!supervisorAlive()) return null
         if (awaitBinder(mode, RESIDENT_REBIND_RETRIES)) return true
@@ -387,7 +387,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
     ): Boolean {
         val distinctPids = pids.filter { it > 1 }.distinct()
         if (distinctPids.isEmpty()) return true
-        val command = ResidentSidecarProcessCommands.stopCommand(distinctPids, force = true)
+        val command = ResidentSidecarProcessCommands.stopCommand(distinctPids, force = true, packageName = context.packageName)
             ?: return true
         val accepted = when (mode) {
             RuntimeMode.STANDARD -> {
@@ -414,6 +414,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
         if (mode != RuntimeMode.STANDARD) return null
         val command = ResidentSidecarProcessCommands.listPidsCommand(
             uid = shellUid,
+            packageName = context.packageName,
             protocolVersion = SIDECAR_PROTOCOL_VERSION.takeIf { currentProtocolOnly }
         )
         val output = when (mode) {
@@ -1797,7 +1798,7 @@ class VirtualSpaceSidecarBridge @Inject constructor(
             mode = mode,
             currentProtocolOnly = currentProtocolOnly,
         ) ?: return false
-        val command = ResidentSidecarProcessCommands.stopCommand(pids, force) ?: return true
+        val command = ResidentSidecarProcessCommands.stopCommand(pids, force, context.packageName) ?: return true
         val commandAccepted = when (mode) {
             RuntimeMode.STANDARD -> {
                 if (!shellRunner.isAvailable(ShellIdentity.SHELL)) return false

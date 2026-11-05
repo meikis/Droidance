@@ -58,12 +58,16 @@ public final class VirtualSpaceSidecarMain {
             int height = parseInt(args[1], 1);
             int densityDpi = parseInt(args[2], 160);
             String targetPackage = args[3];
-            if (!acquireProcessLease()) {
+            if (!targetPackage.matches("[A-Za-z0-9_.]+")) {
+                reportFailure("invalid sidecar package", null);
+                return;
+            }
+            if (!acquireProcessLease(targetPackage)) {
                 int protocolVersion = parseProtocolVersion(args);
                 java.util.List<Integer> stalePids = replaceStaleSidecarProcesses(
-                        protocolVersion, codeSource
+                        targetPackage, protocolVersion, codeSource
                 );
-                if (!stalePids.isEmpty() && acquireProcessLeaseWithRetry()) {
+                if (!stalePids.isEmpty() && acquireProcessLeaseWithRetry(targetPackage)) {
                     reportInfo(
                             "replaced stale sidecar pids=" + stalePids +
                                     " protocol=" + protocolVersion +
@@ -78,7 +82,13 @@ public final class VirtualSpaceSidecarMain {
             writeLog("INFO looper prepared", null);
             Context sidecarContext = SidecarShellContext.create();
             writeLog("INFO sidecar context created pkg=" + sidecarContext.getPackageName(), null);
-            VirtualSpaceSidecarService service = new VirtualSpaceSidecarService(sidecarContext);
+            SidecarPackageIdentity packageIdentity = SidecarPackageIdentity.capture(sidecarContext, targetPackage);
+            if (!codeSource.equals(packageIdentity.sourcePath)) {
+                reportInfo("sidecar APK no longer matches installed package");
+                System.exit(0);
+                return;
+            }
+            VirtualSpaceSidecarService service = new VirtualSpaceSidecarService(sidecarContext, packageIdentity);
             writeLog("INFO service created", null);
             startScreenLifecycle(sidecarContext, service, targetPackage);
             boolean broadcastOk = service.broadcastBinder(sidecarContext, targetPackage);
@@ -90,7 +100,7 @@ public final class VirtualSpaceSidecarMain {
             reportInfo("sidecar binder broadcast sent");
             // 持续重发 binder 广播：防 app receiver 第一次未就绪而丢失 binder，
             // 让 app 在轮询窗口内总能收到一个存活的 binder。
-            startRebroadcast(service, sidecarContext, targetPackage);
+            startRebroadcast(service, sidecarContext, targetPackage, packageIdentity);
             Looper.loop();
         } catch (Throwable t) {
             reportFailure(t.getClass().getSimpleName() + ": " + safeMessage(t), t);
@@ -173,14 +183,14 @@ public final class VirtualSpaceSidecarMain {
     }
 
     /**
-     * Keep one long-lived app_process for the shell UID. The Android app can be
+     * Keep one long-lived app_process per app installation for the shell UID. The Android app can be
      * restarted while a resident sidecar deliberately survives; without a process-level lease
      * the restarted app starts another broadcaster whenever the old Binder is not yet in its
      * registry. File locks are released by the kernel when the sidecar exits, so no stale cleanup
      * job or app-specific process lookup is needed.
      */
-    private static boolean acquireProcessLease() {
-        String role = "virtual";
+    private static boolean acquireProcessLease(String targetPackage) {
+        String role = "virtual_" + targetPackage;
         String path = "/data/local/tmp/droidance_vspace_" + Process.myUid() + "_" + role + ".lock";
         try {
             leaseFile = new java.io.RandomAccessFile(path, "rw");
@@ -206,7 +216,7 @@ public final class VirtualSpaceSidecarMain {
      * safely terminate its stale sibling without relying on the app Binder registry.
      */
     private static java.util.List<Integer> replaceStaleSidecarProcesses(
-            int protocolVersion, String codeSource
+            String targetPackage, int protocolVersion, String codeSource
     ) {
         java.util.List<Integer> stalePids = new java.util.ArrayList<>();
         java.lang.Process probe = null;
@@ -227,13 +237,14 @@ public final class VirtualSpaceSidecarMain {
             );
             for (String line : output.split("\\r?\\n")) {
                 String[] fields = line.trim().split("\\s+");
-                if (fields.length < 5 || !isSameSidecarIdentity(fields[0])) continue;
+                if (fields.length < 11 || !isSameSidecarIdentity(fields[0])) continue;
                 int pid = parsePositiveInt(fields[1]);
                 if (pid <= 1 || pid == android.os.Process.myPid()) continue;
                 if (!MAIN_CLASS_NAME.equals(fields[4])) continue;
+                if (!targetPackage.equals(fields[8])) continue;
                 if (isCurrentBuildCommand(line, protocolVersion, codeSource)) continue;
                 if (android.os.Process.myUid() == SHELL_UID) {
-                    killProcessGroup(pid);
+                    killProcessGroup(pid, targetPackage);
                     stalePids.add(pid);
                 }
             }
@@ -252,14 +263,27 @@ public final class VirtualSpaceSidecarMain {
     }
 
     /** A stale supervisor must stop with its sidecar, or it would relaunch the previous build. */
-    private static void killProcessGroup(int pid) {
+    private static void killProcessGroup(int pid, String targetPackage) {
         try {
             int group = processGroupOf(Integer.toString(pid));
-            if (group > 1 && group != processGroupOf("self")) Os.kill(-group, OsConstants.SIGKILL);
+            if (group > 1 && group != processGroupOf("self") && processHasPackage(group, targetPackage)) {
+                Os.kill(-group, OsConstants.SIGKILL);
+            }
         } catch (ErrnoException | java.io.IOException | RuntimeException e) {
             writeLog("WARN stale sidecar group kill failed: " + safeMessage(e), null);
         }
         android.os.Process.killProcess(pid);
+    }
+
+    private static boolean processHasPackage(int pid, String targetPackage) throws java.io.IOException {
+        String environment = new String(
+                java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("/proc/" + pid + "/environ")),
+                java.nio.charset.StandardCharsets.UTF_8
+        );
+        for (String value : environment.split("\u0000")) {
+            if (value.equals("DROIDANCE_SIDECAR_PACKAGE=" + targetPackage)) return true;
+        }
+        return false;
     }
 
     private static int processGroupOf(String process) throws java.io.IOException {
@@ -279,9 +303,9 @@ public final class VirtualSpaceSidecarMain {
         return false;
     }
 
-    private static boolean acquireProcessLeaseWithRetry() {
+    private static boolean acquireProcessLeaseWithRetry(String targetPackage) {
         for (int i = 0; i < STALE_PROCESS_EXIT_RETRIES; i++) {
-            if (acquireProcessLease()) return true;
+            if (acquireProcessLease(targetPackage)) return true;
             try {
                 Thread.sleep(STALE_PROCESS_EXIT_WAIT_MS);
             } catch (InterruptedException e) {
@@ -360,7 +384,8 @@ public final class VirtualSpaceSidecarMain {
     private static void startRebroadcast(
             VirtualSpaceSidecarService service,
             Context ctx,
-            String targetPackage
+            String targetPackage,
+            SidecarPackageIdentity packageIdentity
     ) {
         Thread t = new Thread(() -> {
             // 前 15 秒快频(1s)吸收 app receiver 首次未就绪，之后转慢频(5s)长驻。
@@ -377,6 +402,13 @@ public final class VirtualSpaceSidecarMain {
                 } catch (InterruptedException e) {
                     return;
                 }
+                SidecarPackageIdentity.State packageState = packageIdentity.state(ctx);
+                if (packageState == SidecarPackageIdentity.State.CHANGED) {
+                    writeLog("INFO installed package changed; retiring old sidecar", null);
+                    service.destroy();
+                    return;
+                }
+                if (packageState == SidecarPackageIdentity.State.UNAVAILABLE) continue;
                 // 熄屏时不向挂起的目标应用发送周期广播，防止 OEM 功耗冻结管理器代理队列打满(如 ColorOS bcMax)强制唤醒
                 // 但无 ADB 时重启后的 app 只能等这里：熄屏时 app 进程号变化才补发一次，不走周期广播。
                 if (powerManager != null && !powerManager.isInteractive()) {

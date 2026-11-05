@@ -203,7 +203,7 @@ Agent rules and policies live in Markdown configuration (`app/src/main/assets/ru
 | Exact alarms, start at boot, battery optimization exemption | Run and restore scheduled tasks on time |
 | Install unknown apps | Install updates downloaded in the app |
 
-Runtime permissions can be revoked in system settings at any time. After wireless pairing, the sidecar does not depend on Wi‑Fi and restarts itself if killed. Reset pairing or restart the phone to stop it; it no longer restarts once developer options are off. Root mode uses Root access to start and recover the channel; new starts or recovery fail after access is revoked. Report security issues privately according to [SECURITY](SECURITY.md).
+Runtime permissions can be revoked in system settings at any time. After wireless pairing, the sidecar does not depend on Wi‑Fi and restarts itself if killed. Reset pairing or restart the phone to stop it; it no longer restarts once developer options are off. After an app update, the sidecar must be replaced; if it cannot reconnect automatically, turn on wireless debugging or use Root on a rooted device. Root mode uses Root access to start and recover the channel; new starts or recovery fail after access is revoked. Report security issues privately according to [SECURITY](SECURITY.md).
 
 **Limits**
 

@@ -83,13 +83,14 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     private static final int INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH = 2;
     private static final int PREVIEW_MAX_WIDTH = 720;
     private static final int PREVIEW_JPEG_QUALITY = 72;
-    public static final int SIDECAR_PROTOCOL_VERSION = 74;
+    public static final int SIDECAR_PROTOCOL_VERSION = 75;
     private static final long MAIN_DIRECT_CAPTURE_TIMEOUT_MS = 1_500L;
     private static final long SHELL_EXEC_TIMEOUT_MS = 8_000L;
     private static final long LIFECYCLE_FRAME_TIMEOUT_MS = 1_500L;
     private static final long LIFECYCLE_FRAME_POLL_MS = 50L;
 
     private Context context;
+    private final SidecarPackageIdentity packageIdentity;
     private volatile SidecarDisplayInsets displayInsets;
     private VirtualDisplay display;
     private ImageReader reader;
@@ -128,7 +129,12 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     }
 
     public VirtualSpaceSidecarService(Context context) {
+        this(context, null);
+    }
+
+    VirtualSpaceSidecarService(Context context, SidecarPackageIdentity packageIdentity) {
         this.context = context;
+        this.packageIdentity = packageIdentity;
     }
 
     @Override
@@ -1616,13 +1622,13 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
                 lastError = "broadcastBinder target package missing";
                 return false;
             }
+            if (packageIdentity == null || packageIdentity.state(broadcastContext) != SidecarPackageIdentity.State.CURRENT) {
+                lastError = "sidecar package changed or unavailable";
+                return false;
+            }
             Intent intent = new Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_READY);
-            intent.putExtra(SidecarBinderReceiver.EXTRA_BINDER_CONTAINER, new SidecarBinderContainer(this));
-            intent.putExtra(SidecarBinderReceiver.EXTRA_SIDECAR_UID, Process.myUid());
-            intent.putExtra(
-                    SidecarBinderReceiver.EXTRA_SIDECAR_PROTOCOL_VERSION,
-                    SIDECAR_PROTOCOL_VERSION
-            );
+            SidecarBinderHandoff.put(intent, this, Process.myUid(), SIDECAR_PROTOCOL_VERSION,
+                    packageIdentity.sourcePath, packageIdentity.updatedAt);
             intent.setPackage(targetPackage);
             broadcastContext.sendBroadcast(intent);
             return true;
@@ -1648,12 +1654,17 @@ public final class VirtualSpaceSidecarService extends IVirtualSpaceSidecar.Stub 
     }
     @Override public boolean requestPlatformDriver() {
         if (android.os.Binder.getCallingUid() != android.os.Process.myUid()) throw new SecurityException("Only the owner may start a platform driver");
-        Intent intent = new Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_READY);
-        intent.setClassName(runtimePackage, "com.droidance.agent.device.RuntimeDriverBinderReceiver");
-        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-        intent.putExtra(SidecarBinderReceiver.EXTRA_BINDER_CONTAINER, new SidecarBinderContainer(this));
-        intent.putExtra(SidecarBinderReceiver.EXTRA_SIDECAR_PROTOCOL_VERSION, SIDECAR_PROTOCOL_VERSION);
-        try { resolveContext().sendBroadcast(intent); return true; }
+        try {
+            Context broadcastContext = resolveContext();
+            if (packageIdentity == null || packageIdentity.state(broadcastContext) != SidecarPackageIdentity.State.CURRENT) return false;
+            Intent intent = new Intent(SidecarBinderReceiver.ACTION_SIDECAR_BINDER_READY);
+            intent.setClassName(runtimePackage, "com.droidance.agent.device.RuntimeDriverBinderReceiver");
+            intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            SidecarBinderHandoff.put(intent, this, Process.myUid(), SIDECAR_PROTOCOL_VERSION,
+                    packageIdentity.sourcePath, packageIdentity.updatedAt);
+            broadcastContext.sendBroadcast(intent);
+            return true;
+        }
         catch (Exception error) { throw new IllegalStateException(error); }
     }
 

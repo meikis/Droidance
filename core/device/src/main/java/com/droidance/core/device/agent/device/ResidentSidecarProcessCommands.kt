@@ -8,24 +8,34 @@ import com.droidance.core.agent.device.*
 import com.droidance.core.device.agent.device.*
 
 internal object ResidentSidecarProcessCommands {
-    fun listSupervisorPidsCommand(): String =
-        "ps -A -o UID,PID,ARGS | " +
-            "awk '(\$1 == \"shell\" || \$1 == \"2000\") && /[D]ROIDANCE_SIDECAR_MAIN/ { print \$2 }'"
+    private val packagePattern = Regex("[A-Za-z0-9_.]+")
+    private const val MAIN_CLASS = "com.droidance.core.device.agent.device.VirtualSpaceSidecarMain"
+
+    fun listSupervisorPidsCommand(packageName: String): String {
+        require(packagePattern.matches(packageName)) { "invalid sidecar package" }
+        return "ps -A -o UID,PID,ARGS | " +
+            "awk '(\$1 == \"shell\" || \$1 == \"2000\") && /[D]ROIDANCE_SIDECAR_MAIN/ { print \$2 }' | " +
+            "while IFS= read -r pid; do [ -r \"/proc/\$pid/environ\" ] || continue; " +
+            "tr '\\000' '\\n' <\"/proc/\$pid/environ\" | grep -Fqx 'DROIDANCE_SIDECAR_PACKAGE=$packageName' " +
+            "&& printf '%s\\n' \"\$pid\"; done"
+    }
 
     fun listPidsCommand(
         uid: Int,
+        packageName: String,
         protocolVersion: Int? = null
     ): String {
         require(uid == 2000) { "unsupported sidecar uid=$uid" }
+        require(packagePattern.matches(packageName)) { "invalid sidecar package" }
         val identity = "(${'$'}1 == \"shell\" || ${'$'}1 == \"2000\")"
         if (protocolVersion != null) {
             require(protocolVersion > 0) { "invalid sidecar protocol=$protocolVersion" }
         }
         val protocol = protocolVersion
-            ?.let { " && /[d]roidance-sidecar-protocol=$it/" }
+            ?.let { " && ${'$'}10 == \"droidance-sidecar-protocol=$it\"" }
             .orEmpty()
         return "ps -A -o UID,PID,ARGS | " +
-            "awk '$identity && /[V]irtualSpaceSidecarMain/$protocol { print ${'$'}2 }'"
+            "awk -v target='$packageName' '$identity && ${'$'}5 == \"$MAIN_CLASS\" && ${'$'}9 == target$protocol { print ${'$'}2 }'"
     }
 
     fun parsePids(output: String): List<Int> =
@@ -79,15 +89,20 @@ internal object ResidentSidecarProcessCommands {
     }
 
     /** Signals the whole process group, otherwise the supervisor would restart the sidecar. */
-    fun stopCommand(pids: Collection<Int>, force: Boolean): String? {
+    fun stopCommand(pids: Collection<Int>, force: Boolean, packageName: String): String? {
+        require(packagePattern.matches(packageName)) { "invalid sidecar package" }
         val signal = if (force) "-9 " else ""
         return pids.asSequence()
             .filter { pid -> pid > 1 }
             .distinct()
             .joinToString("; ") { pid ->
-                "g=\$(cut -d' ' -f5 /proc/$pid/stat 2>/dev/null); " +
-                    "[ \"\${g:-0}\" -gt 1 ] && kill ${signal}-- -\$g 2>/dev/null; " +
-                    "kill ${signal}${pid} 2>/dev/null"
+                "if ps -A -o UID,PID,ARGS | awk -v target='$packageName' -v pid='$pid' " +
+                    "'(\$1 == \"shell\" || \$1 == \"2000\") && \$2 == pid && " +
+                    "\$5 == \"$MAIN_CLASS\" && \$9 == target { found=1 } END { exit !found }'; then " +
+                    "g=\$(cut -d' ' -f5 /proc/$pid/stat 2>/dev/null); " +
+                    "if [ \"\${g:-0}\" -gt 1 ] && [ -r \"/proc/\$g/environ\" ] && " +
+                    "tr '\\000' '\\n' <\"/proc/\$g/environ\" | grep -Fqx 'DROIDANCE_SIDECAR_PACKAGE=$packageName'; " +
+                    "then kill ${signal}-- -\$g 2>/dev/null; fi; kill ${signal}${pid} 2>/dev/null; fi"
             }
             .ifBlank { null }
     }
