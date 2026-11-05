@@ -756,4 +756,7 @@
     <string name="air_connection_manual_action">Enter connection port</string>
     <string name="air_connection_manual_description">Enter the port shown on the main Wireless debugging page. This is different from the port in the pairing-code dialog.</string>
     <string name="air_connection_port">Connection port</string>
+    <string name="history_loading">Loading history</string>
+    <string name="history_unavailable">History is temporarily unavailable</string>
+    <string name="history_cached_unavailable">Showing saved history. Sync is temporarily unavailable.</string>
 </resources>

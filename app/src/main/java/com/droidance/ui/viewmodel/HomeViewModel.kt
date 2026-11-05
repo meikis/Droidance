@@ -89,9 +89,12 @@ class HomeViewModel @Inject constructor(
     tokenUsageRepository: TokenUsageRepository,
     runtimeClient: com.droidance.runtime.RuntimeProcessClient,
     @ApplicationContext private val context: Context,
+    private val history: ConversationHistoryRepository,
+    private val displayCache: ConversationDisplayCache,
     private val navigationPresentation: com.droidance.ui.navigation.StartupNavigationStore,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+    private val displayGeneration = displayCache.generation()
     val runtimeConnection = runtimeClient.connectionState
 
     /** 当前对话 ID —— 持久化到 SavedStateHandle，跨 ViewModel 重建（屏幕旋转/低内存）保持稳定 */
@@ -167,6 +170,8 @@ class HomeViewModel @Inject constructor(
         savedStateHandle.get<Boolean>("screenInitialized") != true
     private val _conversationLoaded = MutableStateFlow(initiallyEmpty)
     val conversationLoaded: StateFlow<Boolean> = _conversationLoaded
+    private val _historyStatus = MutableStateFlow(HistoryLoadStatus.LOADING)
+    val historyStatus: StateFlow<HistoryLoadStatus> = _historyStatus
 
     /** 消息列表 */
     private val _messages = MutableStateFlow<List<UIMessage>>(emptyList())
@@ -272,7 +277,9 @@ class HomeViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             combine(
-                eventStore.observeThreadProjectionResult(conversationId).transform { projection ->
+                history.thread(conversationId).transform { snapshot ->
+                    _historyStatus.value = snapshot.status
+                    val projection = snapshot.value ?: return@transform
                     val thread = (projection as? AgentThreadProjectionResult.Projected)?.thread
                     if (!_conversationLoaded.value && thread != null && !thread.metadata.tombstoned) {
                         // Publish readable history before fetching any attachment bytes.
@@ -283,7 +290,14 @@ class HomeViewModel @Inject constructor(
                         projectConversationMessages(it.conversation.entries,
                             conversationExecutionSegments(it.conversation.entries, it.completeRecord.events)) { attachment ->
                             if (attachment.sizeBytes !in 1..MAX_TIMELINE_IMAGE_BYTES) null
-                            else runCatching { blobStore.read(attachment.contentRef, MAX_TIMELINE_IMAGE_BYTES) }.getOrNull()
+                            else displayCache.image(conversationId, attachment.contentRef)
+                                ?: if (snapshot.status != HistoryLoadStatus.READY) null else {
+                                    runCatching { blobStore.read(attachment.contentRef, MAX_TIMELINE_IMAGE_BYTES) }.getOrNull()?.also { bytes ->
+                                        runCatching { displayCache.saveIfCurrent(displayGeneration) {
+                                            displayCache.saveImage(conversationId, attachment.contentRef, bytes)
+                                        } }
+                                    }
+                                }
                         }
                     }.orEmpty()
                     emit(projection to projected)
@@ -316,7 +330,9 @@ class HomeViewModel @Inject constructor(
                         reconcileConversationMessages(current, projected, terminalTurns, active)
                     }
                 }
-                navigationPresentation.recordConversationEmpty(conversationId, _messages.value.isEmpty())
+                if (_historyStatus.value == HistoryLoadStatus.READY) {
+                    navigationPresentation.recordConversationEmpty(conversationId, _messages.value.isEmpty())
+                }
                 _conversationLoaded.value = true
             }
         }

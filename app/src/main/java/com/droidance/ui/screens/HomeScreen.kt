@@ -105,8 +105,8 @@ internal fun HomeScreen(
     var hasDraft by remember { mutableStateOf(false) }
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val tokenUsage by viewModel.tokenUsage.collectAsStateWithLifecycle()
+    val historyStatus by viewModel.historyStatus.collectAsStateWithLifecycle()
     val conversationLoaded by viewModel.conversationLoaded.collectAsStateWithLifecycle()
-    val runtimeConnection by viewModel.runtimeConnection.collectAsStateWithLifecycle()
     val turnPresentations by viewModel.turnPresentations.collectAsStateWithLifecycle()
     val threadProjectionFailure by viewModel.threadProjectionFailure.collectAsStateWithLifecycle()
     val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
@@ -257,6 +257,12 @@ internal fun HomeScreen(
                 }
             }
 
+            if (messages.isNotEmpty() && historyStatus == com.droidance.ui.viewmodel.HistoryLoadStatus.UNAVAILABLE) {
+                TextButton(onClick = onConnectDevice, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.history_cached_unavailable), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
             // ====== 消息列表（正常顺序：最新消息在底部） ======
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(
@@ -272,7 +278,7 @@ internal fun HomeScreen(
                         item(key = "conversation_empty_state") {
                             if (conversationLoaded) {
                                 WelcomeMessage(hasDraft)
-                            } else if (runtimeConnection == com.droidance.runtime.RuntimeConnectionState.UNAVAILABLE) {
+                            } else if (historyStatus == com.droidance.ui.viewmodel.HistoryLoadStatus.UNAVAILABLE) {
                                 TextButton(onClick = onConnectDevice) {
                                     Text(stringResource(R.string.home_conversation_reconnect))
                                 }

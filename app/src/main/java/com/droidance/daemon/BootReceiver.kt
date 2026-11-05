@@ -7,7 +7,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import dagger.hilt.android.EntryPointAccessors
 
 /**
  * 开机广播接收器
@@ -19,24 +18,8 @@ class BootReceiver : BroadcastReceiver() {
         Log.i("BootReceiver", "Device boot detected; restoring Droidance background work")
         // HeartbeatManager 使用 WorkManager，系统会自动恢复
         KeepAliveJobService.schedule(context)
-        TaskExecutionService.startStandby(context)
-        // Device reconnection can block; keep it off the main thread so the
-        // receiver cannot ANR. goAsync() holds the broadcast open until restore finishes.
-        val pending = goAsync()
-        val appContext = context.applicationContext
-        Thread({
-            try {
-                runCatching {
-                    val ep = EntryPointAccessors.fromApplication(appContext, KeepAliveEntryPoint::class.java)
-                    ep.airModePairingManager().ensureConnectedIfPaired()
-                    ep.automationManager().restoreSchedules()
-                }.onFailure {
-                    Log.w("BootReceiver", "Failed to restore background work: ${it.message}")
-                }
-            } finally {
-                pending.finish()
-            }
-        }, "droidance-boot-restore").start()
+        // Returning releases the broadcast queue needed by the runtime's Binder handoff.
+        TaskExecutionService.startStandby(context, restoreSchedules = true)
     }
 
     private companion object {

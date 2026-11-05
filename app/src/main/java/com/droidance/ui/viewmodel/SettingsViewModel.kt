@@ -50,6 +50,7 @@ class SettingsViewModel @Inject constructor(
     private val debugLogManager: com.droidance.debug.DebugLogManager,
     private val markdownFileManager: com.droidance.memory.MarkdownFileManager,
     private val heartbeatManager: HeartbeatManager,
+    private val displayCache: ConversationDisplayCache,
     private val historyDeletion: com.droidance.agent.ConversationHistoryDeletion,
     private val agentRuntime: com.droidance.agent.AgentRuntime,
     @com.droidance.core.agent.di.ApplicationScope private val appScope: kotlinx.coroutines.CoroutineScope
@@ -441,7 +442,7 @@ class SettingsViewModel @Inject constructor(
         if (_uiState.value.dataClearing != null || _uiState.value.debugExporting) return
         _uiState.update { it.copy(dataClearing = DataClearTarget.CONVERSATIONS, dataActionMessage = "") }
         appScope.launch(Dispatchers.IO) {
-            val result = try { Result.success(historyDeletion.delete()) }
+            val result = try { Result.success(historyDeletion.delete().also { displayCache.invalidate(null) }) }
                 catch (cancelled: kotlinx.coroutines.CancellationException) {
                     _uiState.update { it.copy(dataClearing = null) }
                     throw cancelled

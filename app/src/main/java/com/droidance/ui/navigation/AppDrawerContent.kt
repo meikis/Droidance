@@ -60,8 +60,9 @@ internal fun AppDrawerContent(
     val context = androidx.compose.ui.platform.LocalContext.current
     val availableRelease by updateVm.availableRelease.collectAsStateWithLifecycle()
     // A closed drawer must not replay all retained conversations during chat restoration.
-    val conversations by if (visible) vm.conversations.collectAsStateWithLifecycle()
-        else remember(vm) { mutableStateOf(vm.conversations.value) }
+    val historySnapshot by if (visible) vm.historySnapshot.collectAsStateWithLifecycle()
+        else remember(vm) { mutableStateOf(vm.historySnapshot.value) }
+    val conversations = historySnapshot.value.orEmpty()
     val runningConversationId by vm.runningConversationId.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
@@ -212,10 +213,23 @@ internal fun AppDrawerContent(
                     }
                 )
             }
+            if (visibleConversations.isNotEmpty() && historySnapshot.status == com.droidance.ui.viewmodel.HistoryLoadStatus.UNAVAILABLE) {
+                item(key = "history_sync_notice") {
+                    Text(stringResource(R.string.history_cached_unavailable),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+                }
+            }
             if (visibleConversations.isEmpty()) {
                 item {
                     Text(
-                        stringResource(if (query.isBlank()) R.string.drawer_no_conversations else R.string.drawer_search_empty),
+                        stringResource(when {
+                            historySnapshot.status == com.droidance.ui.viewmodel.HistoryLoadStatus.UNAVAILABLE -> R.string.history_unavailable
+                            historySnapshot.status != com.droidance.ui.viewmodel.HistoryLoadStatus.READY -> R.string.history_loading
+                            query.isNotBlank() -> R.string.drawer_search_empty
+                            else -> R.string.drawer_no_conversations
+                        }),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)

@@ -30,19 +30,20 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ConversationListViewModel @Inject constructor(
-    private val eventStore: AgentEventStore,
+    private val history: ConversationHistoryRepository,
+    private val displayCache: ConversationDisplayCache,
     private val agentRuntime: AgentRuntime,
     private val historyDeletion: com.droidance.agent.ConversationHistoryDeletion,
     @ApplicationScope private val appScope: CoroutineScope
 ) : ViewModel() {
 
-    /** 对话列表只从 EventStore 的 canonical Thread projection 派生。 */
-    val conversations: StateFlow<List<ConversationListItem>> =
-        eventStore.observeActiveThreadReadModels()
-            .map { threads -> threads.filterNot { it.metadata.threadId == com.droidance.agent.INTERNAL_SKILL_THREAD_ID }
-                .map(AgentThreadReadModel::toConversationListItem) }
-            .flowOn(Dispatchers.Default)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val historySnapshot = history.threads()
+        .map { snapshot -> HistorySnapshot(snapshot.value?.filterNot {
+            it.metadata.threadId == com.droidance.agent.INTERNAL_SKILL_THREAD_ID
+        }?.map(AgentThreadReadModel::toConversationListItem), snapshot.status) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000),
+            HistorySnapshot<List<ConversationListItem>>(null, HistoryLoadStatus.LOADING))
 
     /** 当前正在跑任务的会话 ID（用于抽屉显示绿色脉冲点） */
     val runningConversationId: StateFlow<String?> = combine(
@@ -56,6 +57,7 @@ class ConversationListViewModel @Inject constructor(
         appScope.launch(Dispatchers.IO) {
             val deleted = try {
                 historyDeletion.delete(setOf(id))
+                displayCache.invalidate(setOf(id))
                 true
             } catch (cancelled: CancellationException) {
                 throw cancelled

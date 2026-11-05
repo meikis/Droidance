@@ -753,4 +753,7 @@
     <string name="air_connection_manual_action">填写连接端口</string>
     <string name="air_connection_manual_description">请填写系统“无线调试”主页显示的端口，它与配对码弹窗中的端口不同。</string>
     <string name="air_connection_port">连接端口</string>
+    <string name="history_loading">正在读取历史</string>
+    <string name="history_unavailable">暂时无法读取历史</string>
+    <string name="history_cached_unavailable">暂时无法同步，已显示本地历史</string>
 </resources>

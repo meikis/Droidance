@@ -22,6 +22,8 @@ import com.droidance.R
 import com.droidance.core.device.air.AirModePairingManager
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import javax.inject.Inject
 
 /**
@@ -41,6 +43,7 @@ class TaskExecutionService : Service() {
 
         /** Intent action：切换到待命模式 */
         const val ACTION_STANDBY = "com.droidance.STANDBY"
+        const val ACTION_RESTORE = "com.droidance.RESTORE"
 
         /** Intent action：开始执行任务（进入前台服务） */
         const val ACTION_START_EXECUTION = "com.droidance.START_EXECUTION"
@@ -54,12 +57,12 @@ class TaskExecutionService : Service() {
             private set
 
         /** 便捷方法：启动常驻服务（待命模式） */
-        fun startStandby(context: Context) {
+        fun startStandby(context: Context, restoreSchedules: Boolean = false) {
             if (com.droidance.core.device.agent.device.RuntimeProcessRole.isOwner) return
             val appContext = context.applicationContext
             KeepAliveJobService.schedule(appContext)
             val intent = Intent(appContext, TaskExecutionService::class.java).apply {
-                action = ACTION_STANDBY
+                action = if (restoreSchedules) ACTION_RESTORE else ACTION_STANDBY
             }
             try {
                 appContext.startForegroundService(intent)
@@ -466,6 +469,9 @@ class TaskExecutionService : Service() {
 
     @Inject lateinit var airModePairingManager: AirModePairingManager
 
+    private val restoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val restoreRequests = Channel<Unit>(Channel.CONFLATED)
+
     private val keepAliveWakeLock by lazy {
         (getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
@@ -488,7 +494,17 @@ class TaskExecutionService : Service() {
         instance = this
         createNotificationChannel()
         KeepAliveJobService.schedule(this)
-        airModePairingManager.ensureConnectedIfPaired()
+        restoreScope.launch { airModePairingManager.ensureConnectedIfPaired() }
+        restoreScope.launch {
+            for (request in restoreRequests) {
+                try {
+                    airModePairingManager.ensureConnectedIfPaired()
+                    EntryPointAccessors.fromApplication(applicationContext, KeepAliveEntryPoint::class.java)
+                        .automationManager().restoreSchedules()
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) { Log.w("TaskExecutionService", "Background restore failed", error) }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -532,7 +548,7 @@ class TaskExecutionService : Service() {
                 acquireKeepAliveWifiLock()
                 return START_NOT_STICKY
             }
-            ACTION_STANDBY -> {
+            ACTION_STANDBY, ACTION_RESTORE -> {
                 isStandby = true
                 val notification = buildNotification(l10n, R.string.task_service_standby_status)
                 try {
@@ -542,6 +558,7 @@ class TaskExecutionService : Service() {
                 }
                 acquireKeepAliveWakeLock()
                 acquireKeepAliveWifiLock()
+                if (intent.action == ACTION_RESTORE) restoreRequests.trySend(Unit)
                 return START_STICKY
             }
             else -> {
@@ -551,6 +568,8 @@ class TaskExecutionService : Service() {
     }
 
     override fun onDestroy() {
+        restoreScope.cancel()
+        restoreRequests.close()
         instance = null
         if (isStandby) {
             scheduleRestart(0)
