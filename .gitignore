@@ -27,6 +27,13 @@ local.properties
 __pycache__/
 *.pyc
 
+# Temporary working files
+tmp/
+cache/
+*.tmp
+*.bak
+.open-source-verification-*/
+
 # Debug exports and captures
 *.hprof
 captures/
