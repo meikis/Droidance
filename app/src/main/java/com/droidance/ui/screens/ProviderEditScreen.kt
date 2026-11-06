@@ -54,7 +54,10 @@ fun ProviderEditScreen(
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val modelCatalog by viewModel.modelCatalog.collectAsStateWithLifecycle()
+    val customModels by viewModel.customModels.collectAsStateWithLifecycle()
     val isNew = providerId == null
+    var showModelPicker by remember(providerId) { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     val close: () -> Unit = { if (viewModel.hasUnsavedChanges()) confirmDiscard = true else onNavigateBack() }
     BackHandler(onBack = close)
@@ -68,6 +71,17 @@ fun ProviderEditScreen(
             onConfirm = { confirmDiscard = false; onNavigateBack() },
             onDismiss = { confirmDiscard = false },
             onDismissRequest = { confirmDiscard = false }
+        )
+    }
+    if (showModelPicker) {
+        ProviderModelPicker(
+            selectedModels = uiState.models,
+            customModels = customModels,
+            catalog = modelCatalog,
+            onAddCustom = viewModel::addCustomModel,
+            onRefresh = viewModel::refreshModels,
+            onConfirm = { models -> viewModel.setSelectedModels(models); showModelPicker = false },
+            onDismiss = { showModelPicker = false }
         )
     }
 
@@ -301,37 +315,8 @@ fun ProviderEditScreen(
             }
 
             // ====== 模型 ======
-            // 添加按钮收进输入框尾部：高度天然一致，未输入时只是淡灰 + 号，不再有灰色大按钮
             SectionField(label = stringResource(R.string.provider_model)) {
-                val canAdd = uiState.modelInput.isNotBlank()
-                OutlinedTextField(
-                    value = uiState.modelInput,
-                    onValueChange = { viewModel.updateModelInput(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.provider_custom_model_hint)) },
-                    singleLine = false,
-                    minLines = 1,
-                    maxLines = 3,
-                    trailingIcon = {
-                        IconButton(onClick = { viewModel.addModel() }, enabled = canAdd) {
-                            Icon(
-                                DroidanceIcons.Add,
-                                contentDescription = stringResource(R.string.provider_add_model),
-                                tint = if (canAdd) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                },
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    },
-                    shape = AppShapes.Control,
-                    colors = droidanceFieldColors()
-                )
-
                 if (uiState.models.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         uiState.models.forEach { model ->
                             ModelListItem(
@@ -342,6 +327,17 @@ fun ProviderEditScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+                OutlinedButton(
+                    onClick = { showModelPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = AppShapes.Control,
+                    border = BorderStroke(1.dp, settingsHairline())
+                ) {
+                    Icon(DroidanceIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.provider_models_manage))
                 }
             }
 

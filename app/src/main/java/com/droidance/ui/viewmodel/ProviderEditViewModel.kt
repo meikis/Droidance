@@ -4,8 +4,13 @@
 package com.droidance.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.droidance.settings.ProviderConfigManager
+import com.droidance.settings.ProviderPreset
+import com.droidance.core.model.llm.ModelDiscoveryResult
 import com.droidance.core.model.llm.ProviderEndpoint
+import com.droidance.core.model.llm.ProviderModelDiscovery
+import com.droidance.core.model.llm.ProviderModelList
 import com.droidance.core.model.llm.models.ApiType
 import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.core.model.llm.models.ReasoningEffort
@@ -14,6 +19,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import java.net.URI
 import java.util.UUID
 import javax.inject.Inject
 
@@ -22,12 +34,21 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ProviderEditViewModel @Inject constructor(
-    private val configManager: ProviderConfigManager
+    private val configManager: ProviderConfigManager,
+    httpClient: OkHttpClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProviderEditUiState())
     val uiState: StateFlow<ProviderEditUiState> = _uiState
     val presets get() = configManager.presets
+    private val discovery = ProviderModelDiscovery(httpClient)
+    private val _modelCatalog = MutableStateFlow(ProviderModelCatalogState())
+    val modelCatalog: StateFlow<ProviderModelCatalogState> = _modelCatalog
+    private val _customModels = MutableStateFlow<List<String>>(emptyList())
+    val customModels: StateFlow<List<String>> = _customModels
+    private var discoveryJob: Job? = null
+    private var sourceGeneration = 0L
+    private var keyOrigin: String? = null
 
     private var loaded = false
     private var initialState = ProviderEditUiState()
@@ -52,6 +73,9 @@ class ProviderEditViewModel @Inject constructor(
         }
         initialState = _uiState.value
         loaded = true
+        keyOrigin = urlOrigin(_uiState.value.baseUrl).takeIf { _uiState.value.apiKey.isNotBlank() }
+        _customModels.value = emptyList()
+        updateModelSource()
     }
 
     // ====== 字段更新 ======
@@ -67,6 +91,9 @@ class ProviderEditViewModel @Inject constructor(
             apiType = preset.apiType,
             transportKind = preset.transportKind
         )
+        keyOrigin = null
+        _customModels.value = emptyList()
+        updateModelSource()
     }
 
     fun updateName(name: String) {
@@ -74,7 +101,15 @@ class ProviderEditViewModel @Inject constructor(
     }
 
     fun updateBaseUrl(url: String) {
-        _uiState.update { it.copy(baseUrl = url) }
+        val newOrigin = urlOrigin(url)
+        _uiState.update { state ->
+            val clearKey = state.apiKey.isNotBlank() && keyOrigin != null &&
+                newOrigin != null && newOrigin != keyOrigin
+            state.copy(baseUrl = url, apiKey = if (clearKey) "" else state.apiKey)
+        }
+        if (_uiState.value.apiKey.isBlank()) keyOrigin = null
+        _customModels.value = emptyList()
+        updateModelSource()
     }
 
     fun selectProtocol(transport: ModelTransport) {
@@ -83,27 +118,79 @@ class ProviderEditViewModel @Inject constructor(
 
     fun updateApiKey(key: String) {
         _uiState.update { it.copy(apiKey = key) }
-    }
-
-    fun updateModelInput(model: String) {
-        _uiState.update { it.copy(modelInput = model) }
+        keyOrigin = urlOrigin(_uiState.value.baseUrl).takeIf { key.isNotBlank() }
+        updateModelSource()
     }
 
     fun updateReasoningPreference(effort: ReasoningEffort?) {
         _uiState.update { it.copy(reasoningPreference = effort) }
     }
 
-    fun addModel() {
+    fun addCustomModel(model: String): List<String> {
+        val added = parseModelInput(model).distinct()
+        _customModels.update { (added + it).distinct() }
+        return added
+    }
+
+    fun setSelectedModels(models: List<String>) {
         _uiState.update { state ->
-            val inputModels = parseModelInput(state.modelInput)
-            if (inputModels.isEmpty()) return@update state
-            val models = mergeModels(state.models, inputModels)
+            val selected = reconcileSelectedModels(state.models, models)
             state.copy(
-                models = models,
-                defaultModel = state.defaultModel.ifBlank { inputModels.first() },
-                modelInput = ""
+                models = selected,
+                defaultModel = state.defaultModel.takeIf { it in selected }
+                    ?: selected.firstOrNull().orEmpty()
             )
         }
+    }
+
+    fun refreshModels() = fetchModels(delayMillis = 0, force = true)
+
+    private fun updateModelSource() {
+        discoveryJob?.cancel()
+        sourceGeneration++
+        val state = _uiState.value
+        val preset = presetForAddress(state.baseUrl)
+        _modelCatalog.value = ProviderModelCatalogState(candidates = preset?.suggestedModels.orEmpty())
+        if (state.baseUrl.isBlank() || state.apiKey.isBlank()) return
+        fetchModels(delayMillis = 700)
+    }
+
+    private fun fetchModels(delayMillis: Long, force: Boolean = false) {
+        discoveryJob?.cancel()
+        val generation = ++sourceGeneration
+        val state = _uiState.value
+        val preset = presetForAddress(state.baseUrl)
+        if (state.baseUrl.isBlank() || state.apiKey.isBlank()) {
+            _modelCatalog.update { it.copy(loading = false, error = ModelCatalogError.MISSING_CONNECTION) }
+            return
+        }
+        if (preset?.modelListSupported == false && !force) {
+            _modelCatalog.update { it.copy(loading = false, error = ModelCatalogError.UNSUPPORTED) }
+            return
+        }
+        _modelCatalog.update { it.copy(loading = true, error = null) }
+        discoveryJob = viewModelScope.launch {
+            if (delayMillis > 0) delay(delayMillis)
+            val result = discovery.fetch(state.baseUrl, state.apiKey)
+            if (generation != sourceGeneration) return@launch
+            val models = withContext(Dispatchers.Default) {
+                (result as? ModelDiscoveryResult.Success)?.body?.let(ProviderModelList::parse)
+            }
+            if (generation != sourceGeneration) return@launch
+            _modelCatalog.update { current ->
+                when {
+                    models == null -> current.copy(loading = false, error = if (preset?.modelListSupported == false)
+                        ModelCatalogError.UNSUPPORTED else ModelCatalogError.FETCH_FAILED)
+                    models.isEmpty() -> current.copy(loading = false, error = ModelCatalogError.EMPTY)
+                    else -> current.copy(candidates = models, loading = false, error = null)
+                }
+            }
+        }
+    }
+
+    private fun presetForAddress(baseUrl: String): ProviderPreset? {
+        val root = ProviderEndpoint.apiRoot(baseUrl)
+        return presets.firstOrNull { ProviderEndpoint.apiRoot(it.baseUrl).equals(root, ignoreCase = true) }
     }
 
     fun removeModel(model: String) {
@@ -128,7 +215,7 @@ class ProviderEditViewModel @Inject constructor(
     fun saveProvider(): Boolean {
         val state = _uiState.value
         if (state.validationError != null) return false
-        val models = mergeModels(state.models, parseModelInput(state.modelInput))
+        val models = mergeModels(emptyList(), state.models)
         if (state.name.isBlank() || state.baseUrl.isBlank() || state.apiKey.isBlank() || models.isEmpty()) return false
         val config = state.toConfig(
             id = editingId ?: UUID.randomUUID().toString(),
@@ -166,7 +253,6 @@ data class ProviderEditUiState(
     val apiKey: String = "",
     val models: List<String> = emptyList(),
     val defaultModel: String = "",
-    val modelInput: String = "",
     val isEnabled: Boolean = true,
     val reasoningPreference: ReasoningEffort? = null,
     val saveFailed: Boolean = false
@@ -187,7 +273,7 @@ data class ProviderEditUiState(
             !hasSupportedUrl -> ProviderFormError.INVALID_URL
             transportKind == null -> ProviderFormError.PROTOCOL_REQUIRED
             apiKey.isBlank() -> ProviderFormError.KEY_REQUIRED
-            models.all { it.isBlank() } && modelInput.split(',', '，', ';', '；', '、', '\n', '\r', '\t').all { it.isBlank() } -> ProviderFormError.MODEL_REQUIRED
+            models.all { it.isBlank() } -> ProviderFormError.MODEL_REQUIRED
             else -> null
         }
 
@@ -236,3 +322,20 @@ internal fun ProviderConfig.toEditState(): ProviderEditUiState {
 enum class ProviderFormError {
     NAME_REQUIRED, URL_REQUIRED, INVALID_URL, PROTOCOL_REQUIRED, KEY_REQUIRED, MODEL_REQUIRED
 }
+
+data class ProviderModelCatalogState(
+    val candidates: List<String> = emptyList(),
+    val loading: Boolean = false,
+    val error: ModelCatalogError? = null
+)
+
+enum class ModelCatalogError { MISSING_CONNECTION, UNSUPPORTED, FETCH_FAILED, EMPTY }
+
+private fun urlOrigin(value: String): String? = runCatching {
+    val uri = URI(value.trim())
+    val scheme = uri.scheme?.lowercase(java.util.Locale.ROOT) ?: return null
+    val host = uri.host?.lowercase(java.util.Locale.ROOT) ?: return null
+    if (scheme !in setOf("http", "https") || uri.userInfo != null) return null
+    val port = if (uri.port >= 0) uri.port else if (scheme == "https") 443 else 80
+    "$scheme://$host:$port"
+}.getOrNull()

@@ -4,7 +4,8 @@
 package com.droidance.settings
 
 import android.content.Context
-import com.droidance.core.model.llm.ReasoningModelDiscovery
+import com.droidance.core.model.llm.ModelDiscoveryResult
+import com.droidance.core.model.llm.ProviderModelDiscovery
 import com.droidance.core.model.llm.models.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +34,7 @@ class ReasoningCapabilityRepository @Inject constructor(
     private val cache = ReasoningCapabilityCache(catalog, runCatching {
         json.decodeFromString<ReasoningCacheSnapshot>(prefs.getString("cache", "{}").orEmpty())
     }.getOrDefault(ReasoningCacheSnapshot()))
-    private val discovery = ReasoningModelDiscovery(httpClient)
+    private val discovery = ProviderModelDiscovery(httpClient)
     private val locks = ConcurrentHashMap<String, Mutex>()
     private val _revision = MutableStateFlow(0L)
     val revision = _revision.asStateFlow()
@@ -49,7 +50,8 @@ class ReasoningCapabilityRepository @Inject constructor(
             if (!cache.shouldRefresh(config)) return@withContext
             cache.recordAttempt(config)
             persist()
-            val raw = discovery.fetch(config) ?: return@withContext
+            val raw = (discovery.fetch(config.baseUrl, config.apiKey) as? ModelDiscoveryResult.Success)?.body
+                ?: return@withContext
             (config.models + config.defaultModel).filter(String::isNotBlank).distinct().forEach { model ->
                 ReasoningMetadata.parse(raw, model, catalog.parameter(config.baseUrl))?.let {
                     cache.recordMetadata(config, model, it)

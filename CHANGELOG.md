@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Added
+
+- Discover and select provider models automatically, refresh suggestions, and keep custom model IDs; add subscription endpoint presets.
+
 ### Fixed
 
 - Reuse initialized runtime fonts, defer renderer construction, and rebind network security policy without duplicate providers.

@@ -17,7 +17,9 @@ data class ProviderPreset(
     val name: String,
     val baseUrl: String,
     val apiType: ApiType,
-    val transportKind: ModelTransport
+    val transportKind: ModelTransport,
+    val suggestedModels: List<String> = emptyList(),
+    val modelListSupported: Boolean = true
 ) {
     fun createConfig(id: String = "preset-${this.id}"): ProviderConfig = ProviderConfig(
         id = id,
@@ -57,6 +59,8 @@ object ProviderPresetCatalog {
             val uri = URI(preset.baseUrl)
             require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null)
             require(preset.createConfig().isTransportConfigured())
+            require(preset.suggestedModels.all { it.isNotBlank() && it == it.trim() })
+            require(preset.suggestedModels.distinct().size == preset.suggestedModels.size)
         }
     }
 }

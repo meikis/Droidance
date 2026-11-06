@@ -50,7 +50,7 @@
       "slug": "minimax",
       "drawable": "provider_minimax",
       "aliases": ["minimax", "稀宇科技"],
-      "domains": ["minimax.chat", "minimaxi.com", "minimax.io"]
+      "domains": ["minimax.chat", "minimaxi.com", "minimax.io", "minimax.cn"]
     },
     {
       "slug": "qwen",
@@ -62,13 +62,13 @@
       "slug": "kimi",
       "drawable": "provider_kimi",
       "aliases": ["kimi", "moonshot", "月之暗面"],
-      "domains": ["moonshot.cn", "moonshot.ai"]
+      "domains": ["moonshot.cn", "moonshot.ai", "kimi.com", "kimi.ai"]
     },
     {
       "slug": "zhipu",
       "drawable": "provider_zhipu",
       "aliases": ["zhipu", "bigmodel", "智谱", "智谱清言"],
-      "domains": ["bigmodel.cn", "zhipuai.cn"]
+      "domains": ["bigmodel.cn", "zhipuai.cn", "z.ai"]
     },
     {
       "slug": "siliconcloud",
@@ -110,7 +110,7 @@
       "slug": "alibabacloud",
       "drawable": "provider_alibabacloud",
       "aliases": ["alibaba cloud", "aliyun", "阿里云", "阿里云百炼"],
-      "domains": ["dashscope.aliyuncs.com"]
+      "domains": ["dashscope.aliyuncs.com", "maas.aliyuncs.com"]
     }
   ]
 }
