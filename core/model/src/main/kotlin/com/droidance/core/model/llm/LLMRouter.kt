@@ -731,6 +731,7 @@ class LLMRouter(
             var finalUsageDeadlineSet = false
             var finishReason: String? = null
             var doneReceived = false
+            val toolCallIndices = StreamingToolCallIndices()
             streamLoop@ while (true) {
                 coroutineContext.ensureActive()
                 val currentLine = try {
@@ -793,8 +794,8 @@ class LLMRouter(
                         if (toolCalls != null) {
                             for (tcJson in toolCalls) {
                                 val tcObj = tcJson as? JsonObject ?: continue
-                                val index = (tcObj["index"] as? JsonPrimitive)?.intOrNull ?: 0
                                 val id = (tcObj["id"] as? JsonPrimitive)?.contentOrNull
+                                val index = toolCallIndices.resolve((tcObj["index"] as? JsonPrimitive)?.intOrNull, id)
                                 val function = tcObj["function"] as? JsonObject
                                 val name = (function?.get("name") as? JsonPrimitive)?.contentOrNull
                                 val arguments = (function?.get("arguments") as? JsonPrimitive)?.contentOrNull ?: ""
