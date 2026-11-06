@@ -8,7 +8,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-11-06
+## [0.2.0] - 2026-11-07
 
 - Back up and restore conversations, screenshots, memory, skills, and settings in a password-encrypted file.
 - Export redacted diagnostics, with optional task content.
