@@ -47,7 +47,10 @@ internal object RuntimeApplicationContext {
             .apply { isAccessible = true }.set(context.contentResolver, "com.android.shell")
         com.droidance.core.device.agent.device.RuntimeContentProviders.acquire("settings")
         // app_process does not receive ActivityThread.bindApplication's font initialization.
-        if (Build.VERSION.SDK_INT >= 31) {
+        val fontsReady = Build.VERSION.SDK_INT >= 31 &&
+            (android.graphics.Typeface::class.java.getDeclaredMethod("getSystemFontMap")
+                .invoke(null) as Map<*, *>).isNotEmpty()
+        if (Build.VERSION.SDK_INT >= 31 && !fontsReady) {
             val manager = requireNotNull(shell.getSystemService("font"))
             val config = manager.javaClass.getMethod("getFontConfig").invoke(manager)
             val systemFonts = Class.forName("android.graphics.fonts.SystemFonts")
@@ -66,8 +69,13 @@ internal object RuntimeApplicationContext {
             .apply { isAccessible = true }.set(null, windows)
         threadClass.getDeclaredField("mInstrumentation").apply { isAccessible = true }
             .set(thread, android.app.Instrumentation())
-        Class.forName("android.security.net.config.NetworkSecurityConfigProvider")
-            .getMethod("install", Context::class.java).invoke(null, context)
+        // Rebind this application's policy before constructing any TLS clients. A previously
+        // registered provider may belong to the shell context rather than this application.
+        synchronized(java.security.Security::class.java) {
+            java.security.Security.removeProvider("AndroidNSSP")
+            Class.forName("android.security.net.config.NetworkSecurityConfigProvider")
+                .getMethod("install", Context::class.java).invoke(null, context)
+        }
         val application = com.droidance.DroidanceApp()
         Application::class.java.getDeclaredMethod("attach", Context::class.java)
             .apply { isAccessible = true }.invoke(application, context)

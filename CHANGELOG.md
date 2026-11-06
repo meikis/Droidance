@@ -10,10 +10,9 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Reuse initialized runtime fonts, defer renderer construction, and rebind network security policy without duplicate providers.
 - Allow local HTTP services while enforcing local destinations on requests and redirects.
-
 - Keep streamed tool calls separate when providers omit or mix call indices.
-
 - Recover active wireless-pairing notification requests after app process recreation and show a retry prompt when notification input is missing.
 
 ## [0.1.9] - 2026-11-05

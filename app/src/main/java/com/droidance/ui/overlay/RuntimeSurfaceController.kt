@@ -73,12 +73,13 @@ class RuntimeSurfaceController @Inject constructor(
     private val executionContextStore: ExecutionContextStore,
     private val virtualSpaceManager: VirtualSpaceManager,
     private val bridge: VirtualSpaceSidecarBridge,
-    private val bitmapRenderer: RuntimeSurfaceBitmapRenderer,
+    private val bitmapRendererProvider: dagger.Lazy<RuntimeSurfaceBitmapRenderer>,
     private val debugLogManager: DebugLogManager,
     private val inputActionLifecycle: com.droidance.core.device.tools.InputActionLifecycle,
     private val processClient: com.droidance.runtime.RuntimeProcessClient,
     @ApplicationScope private val appScope: CoroutineScope
 ) {
+    private val bitmapRenderer get() = bitmapRendererProvider.get()
     private var screenWidthPx = appContext.resources.displayMetrics.widthPixels
     private var screenHeightPx = appContext.resources.displayMetrics.heightPixels
     private sealed interface Command {
