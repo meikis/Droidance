@@ -45,7 +45,7 @@ class LLMRouter(
     private val switchEvents = kotlinx.coroutines.flow.MutableSharedFlow<ModelSwitchEvent>(extraBufferCapacity = 16)
     override val modelSwitches: kotlinx.coroutines.flow.SharedFlow<ModelSwitchEvent> = switchEvents
 
-    private val streamingHttpClient = httpClient.newBuilder()
+    private val streamingHttpClient = CleartextNetworkPolicy.configure(httpClient.newBuilder())
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()

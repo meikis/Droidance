@@ -170,7 +170,7 @@ object AppModule {
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
         // Keep provider credentials and request contents out of logcat.
-        return OkHttpClient.Builder()
+        return com.droidance.core.model.llm.CleartextNetworkPolicy.configure(OkHttpClient.Builder())
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)     // LLM 响应可能较慢
             .writeTimeout(30, TimeUnit.SECONDS)
