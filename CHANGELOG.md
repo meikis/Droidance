@@ -8,25 +8,12 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
-### Added
+## [0.1.10] - 2026-11-06
 
-- Discover and select provider models automatically, refresh suggestions, and keep custom model IDs; add subscription endpoint presets.
-- Add brand icons for every bundled provider and a generic icon for custom providers.
-
-### Changed
-
-- Group each provider's API and subscription addresses in one selector, retaining saved credentials and models for each address.
-- Refresh bundled model suggestions using current provider documentation.
-- Put popular providers and newer model suggestions first while preserving the selected default.
-
-### Fixed
-
-- Open the API address selector reliably when tapped.
-- Keep wireless pairing code entry in notifications and remove manual pairing-port input.
-- Reuse initialized runtime fonts, defer renderer construction, and rebind network security policy without duplicate providers.
-- Allow local HTTP services while enforcing local destinations on requests and redirects.
-- Keep streamed tool calls separate when providers omit or mix call indices.
-- Recover active wireless-pairing notification requests after app process recreation and show a retry prompt when notification input is missing.
+- Discover and manage provider models while keeping custom selections.
+- Group provider and subscription endpoints, update model presets, and complete provider icons.
+- Fix API address selection and wireless pairing notification recovery.
+- Improve local-network access, streaming tool calls, and runtime stability.
 
 ## [0.1.9] - 2026-11-05
 
@@ -153,7 +140,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 First public release.
 
-[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/YbbLab/Droidance/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/YbbLab/Droidance/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/YbbLab/Droidance/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/YbbLab/Droidance/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/YbbLab/Droidance/compare/v0.1.6...v0.1.7
