@@ -14,6 +14,8 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Start with the built-in rules when saved rule overrides no longer match the installed version, instead of failing to start.
+- Apply updated default persona text unless the persona was customized.
 - Stop the background service after the app is uninstalled.
 
 ## [0.1.10] - 2026-11-06
