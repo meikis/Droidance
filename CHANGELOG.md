@@ -14,6 +14,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Keep wireless pairing code entry in notifications and remove manual pairing-port input.
 - Reuse initialized runtime fonts, defer renderer construction, and rebind network security policy without duplicate providers.
 - Allow local HTTP services while enforcing local destinations on requests and redirects.
 - Keep streamed tool calls separate when providers omit or mix call indices.

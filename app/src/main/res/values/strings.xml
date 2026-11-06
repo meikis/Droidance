@@ -278,12 +278,8 @@
     <string name="settings_air_discovering_hint">Open Wireless debugging › Pair device with pairing code; keep that dialog open after the 6-digit code appears</string>
     <string name="settings_air_reconnecting_hint">Restoring the existing pairing automatically. No pairing code is needed.</string>
     <string name="common_confirm">Confirm</string>
-    <string name="air_pairing_dialog_title">Enter pairing code</string>
-    <string name="air_pairing_dialog_desc">Enter the 6-digit wireless debugging pairing code shown in the system dialog.</string>
-    <string name="air_pairing_code_placeholder">6-digit code</string>
-    <string name="air_pairing_enter_code_action">Enter code</string>
     <string name="settings_air_notification_code_title">Enter the pairing code from the notification</string>
-    <string name="settings_air_code_hint">Pairing service found. Enter the 6-digit code in the pop-up dialog or notification.</string>
+    <string name="settings_air_code_hint">Pairing service found. Keep the system pairing dialog open and enter its 6-digit code in the notification.</string>
     <string name="settings_air_notification_keep_dialog">Keep the system pairing dialog open until pairing completes.</string>
     <string name="settings_air_pairing_hint">Pairing with the device. Please wait...</string>
     <string name="settings_theme">Theme</string>
@@ -788,8 +784,6 @@
     <string name="air_adb_persistence_usb_required">Enable USB debugging in Developer options to keep local reconnection available.</string>
     <string name="connection_local_unavailable_title">Local debugging connection interrupted</string>
     <string name="runtime_island_expand">Expand task controls</string>
-    <string name="air_pairing_manual_description">Keep the system pairing dialog open in split screen and enter its port and code here. You can also enter the port and code in the pairing notification. Use the pairing dialog port, not the connection port.</string>
-    <string name="air_pairing_port">Pairing port</string>
     <string name="air_connection_manual_action">Enter connection port</string>
     <string name="air_connection_manual_description">Enter the port shown on the main Wireless debugging page. This is different from the port in the pairing-code dialog.</string>
     <string name="air_connection_port">Connection port</string>

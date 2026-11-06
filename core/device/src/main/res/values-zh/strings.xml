@@ -24,10 +24,10 @@
     <string name="settings_air_notifications_disabled">Droidance 通知已关闭，请先在系统设置中开启。</string>
     <string name="settings_air_notification_channel_disabled">“无线调试配对”通知类别未允许弹出，请先在系统设置中开启提醒。</string>
     <string name="settings_air_notification_post_failed">配对通知发送失败，请检查系统通知设置后重试。</string>
-    <string name="settings_air_notification_input_missing">未收到配对输入，请重新填写；也可在应用内选择“使用端口配对”。</string>
+    <string name="settings_air_notification_input_missing">未收到配对输入。请保持系统配对弹窗开启，在通知栏重新填写配对码。</string>
     <string name="settings_air_pairing_required_detail">系统已拒绝当前 ADB 配对密钥。请重新进入“无线调试 › 使用配对码配对设备”完成配对。</string>
     <string name="settings_air_wifi_unavailable_detail">当前没有可用的 Wi-Fi；配对仍然有效，连接会在 Wi-Fi 恢复后自动重试。</string>
-    <string name="settings_air_pairing_service_not_found">未发现配对服务。请允许应用在后台运行并保持系统配对弹窗打开，或选择“使用端口配对”。</string>
+    <string name="settings_air_pairing_service_not_found">未发现配对服务。请允许应用在后台运行，重新打开系统配对弹窗，并在通知栏输入新配对码。</string>
     <string name="settings_air_pairing_timeout">配对已超时。请重新打开系统配对弹窗，获取新的配对码。</string>
     <string name="settings_air_pairing_rejected">系统拒绝了配对。请获取新的配对码后重试。</string>
     <string name="settings_air_pairing_connection_failed">无法连接系统配对服务。请获取新的配对码后重试。</string>
@@ -43,8 +43,5 @@
     <string name="runtime_root_channel_lost_text">请打开 Droidance 检查 Root 授权并重新连接设备。</string>
     <string name="settings_air_local_port_close_failed">无法确认调试端口已关闭，已保留配对和端口记录；请连接 Wi-Fi 后重试。</string>
     <string name="settings_air_local_adb_connection_failed">无法连接本机调试端口。请确认 USB 调试已开启，并允许系统弹出的调试授权。</string>
-    <string name="settings_air_manual_pairing_action">使用端口配对</string>
-    <string name="settings_air_manual_pairing_input">输入配对端口和配对码，例如 37123 123456</string>
-    <string name="settings_air_manual_pairing_invalid">请输入系统配对弹窗中的端口、一个空格和六位配对码，并保持弹窗打开。</string>
     <string name="settings_air_debug_port_invalid">请输入 1 到 65535 之间的端口。</string>
 </resources>

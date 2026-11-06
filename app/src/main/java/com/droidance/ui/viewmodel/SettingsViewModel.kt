@@ -114,11 +114,6 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(airBridgeFailure = failure) }
             }
         }
-        viewModelScope.launch {
-            airModePairingManager.manualPairingAvailable.collect { available ->
-                _uiState.update { it.copy(airManualPairingAvailable = available) }
-            }
-        }
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 val alive = virtualSpaceSidecarBridge.isResidentBinderAlive()
@@ -154,9 +149,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun reconnectAirPairing() { airModePairingManager.reconnect() }
-    fun submitAirPairingCode(code: String, pairingPort: Int? = null) {
-        airModePairingManager.requestPairing(code, pairingPort)
-    }
     fun connectAirPairingPort(port: Int) { airModePairingManager.reconnect(port) }
     fun openWirelessDebuggingAndStartAirPairing() {
         startWirelessDebuggingAndAirPairing()
@@ -560,7 +552,6 @@ data class SettingsUiState(
     val airPairingNotificationAvailability: AirPairingNotificationAvailability =
         AirPairingNotificationAvailability.AVAILABLE,
     val airBridgeFailure: AirPairingFailure? = null,
-    val airManualPairingAvailable: Boolean = false,
     val airResidentChannelAvailable: Boolean = false,
     val airPersistenceEnabled: Boolean = false,
     val airPersistenceChanging: Boolean = false,

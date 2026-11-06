@@ -278,12 +278,8 @@
     <string name="settings_air_discovering_hint">请打开「无线调试 › 使用配对码配对设备」；出现 6 位码后保持该弹窗</string>
     <string name="settings_air_reconnecting_hint">正在使用已有配对自动恢复连接，无需重新输入配对码</string>
     <string name="common_confirm">确定</string>
-    <string name="air_pairing_dialog_title">输入配对码</string>
-    <string name="air_pairing_dialog_desc">请输入系统配对弹窗中显示的 6 位无线调试配对码。</string>
-    <string name="air_pairing_code_placeholder">6 位配对码</string>
-    <string name="air_pairing_enter_code_action">输入配对码</string>
     <string name="settings_air_notification_code_title">从通知栏输入配对码</string>
-    <string name="settings_air_code_hint">已发现配对服务。可在弹窗或通知栏中输入 6 位配对码。</string>
+    <string name="settings_air_code_hint">已发现配对服务。请保持系统配对弹窗开启，在通知栏输入其中的六位配对码。</string>
     <string name="settings_air_notification_keep_dialog">请保持系统配对弹窗开启，直至配对完成。</string>
     <string name="settings_air_pairing_hint">正在与设备配对，请稍候...</string>
     <string name="settings_theme">主题</string>
@@ -785,8 +781,6 @@
     <string name="air_adb_persistence_usb_required">请到开发者选项开启 USB 调试，以保持本机端口重连可用。</string>
     <string name="connection_local_unavailable_title">本机调试连接中断</string>
     <string name="runtime_island_expand">展开任务控制</string>
-    <string name="air_pairing_manual_description">请通过分屏保持系统配对弹窗打开，在这里填写弹窗中的端口和配对码；也可从配对通知输入。请使用配对弹窗中的端口，而非连接端口。</string>
-    <string name="air_pairing_port">配对端口</string>
     <string name="air_connection_manual_action">填写连接端口</string>
     <string name="air_connection_manual_description">请填写系统“无线调试”主页显示的端口，它与配对码弹窗中的端口不同。</string>
     <string name="air_connection_port">连接端口</string>

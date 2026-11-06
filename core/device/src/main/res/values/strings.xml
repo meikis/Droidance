@@ -24,10 +24,10 @@
     <string name="settings_air_notifications_disabled">Droidance notifications are disabled. Enable them in system settings first.</string>
     <string name="settings_air_notification_channel_disabled">The Wireless debugging pairing notification category cannot pop up. Enable alerts for it in system settings first.</string>
     <string name="settings_air_notification_post_failed">The pairing notification could not be posted. Check system notification settings and try again.</string>
-    <string name="settings_air_notification_input_missing">The pairing input was not received. Enter it again, or use Pair using port in Droidance.</string>
+    <string name="settings_air_notification_input_missing">The pairing input was not received. Keep the system pairing dialog open and enter the code again in the notification.</string>
     <string name="settings_air_pairing_required_detail">Android rejected the current ADB pairing key. Open Wireless debugging › Pair device with pairing code and pair again.</string>
     <string name="settings_air_wifi_unavailable_detail">No Wi-Fi transport is available. Pairing is still valid, and Droidance will retry when Wi-Fi returns.</string>
-    <string name="settings_air_pairing_service_not_found">No pairing service was found. Allow Droidance to run in the background and keep the system pairing dialog open, or use Pair using port.</string>
+    <string name="settings_air_pairing_service_not_found">No pairing service was found. Allow Droidance to run in the background, reopen the system pairing dialog, and enter the new code in the notification.</string>
     <string name="settings_air_pairing_timeout">Pairing timed out. Reopen the system pairing dialog to get a new code.</string>
     <string name="settings_air_pairing_rejected">Android rejected the pairing. Get a new pairing code and try again.</string>
     <string name="settings_air_pairing_connection_failed">Could not connect to the system pairing service. Get a new pairing code and try again.</string>
@@ -43,8 +43,5 @@
     <string name="runtime_root_channel_lost_text">Open Droidance to check Root access and reconnect the device.</string>
     <string name="settings_air_local_port_close_failed">Could not confirm that the debugging port is closed. Pairing and port records were kept; reconnect with Wi-Fi and try again.</string>
     <string name="settings_air_local_adb_connection_failed">Could not connect to the local debugging port. Keep USB debugging enabled and approve the system debugging authorization prompt.</string>
-    <string name="settings_air_manual_pairing_action">Pair using port</string>
-    <string name="settings_air_manual_pairing_input">Pairing port and code, e.g. 37123 123456</string>
-    <string name="settings_air_manual_pairing_invalid">Enter the port from the system pairing dialog, a space, and its 6-digit code. Keep that dialog open.</string>
     <string name="settings_air_debug_port_invalid">Enter a port from 1 to 65535.</string>
 </resources>

@@ -16,16 +16,11 @@ class AirModePairingReceiver : BroadcastReceiver() {
     @Inject lateinit var pairingManager: AirModePairingManager
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != AirModeNotificationController.ACTION_SUBMIT_CODE &&
-            intent.action != AirModeNotificationController.ACTION_SUBMIT_MANUAL_PAIRING) return
+        if (intent.action != AirModeNotificationController.ACTION_SUBMIT_CODE) return
         val results = RemoteInput.getResultsFromIntent(intent)
-        val manualEntry = intent.action == AirModeNotificationController.ACTION_SUBMIT_MANUAL_PAIRING
-        val key = if (manualEntry) AirModeNotificationController.KEY_MANUAL_PAIRING
-            else AirModeNotificationController.KEY_PAIRING_CODE
         pairingManager.requestPairingFromNotification(
             session = intent.data?.lastPathSegment,
-            input = results?.getCharSequence(key)?.toString(),
-            manualEntry = manualEntry,
+            input = results?.getCharSequence(AirModeNotificationController.KEY_PAIRING_CODE)?.toString(),
             hasResults = results != null
         )
     }
