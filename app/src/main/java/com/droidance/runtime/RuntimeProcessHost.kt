@@ -49,11 +49,14 @@ internal interface RuntimeOwnerEntryPoint {
     fun virtualSpace(): VirtualSpaceManager
     fun preparation(): com.droidance.daemon.DeviceExecutionGuard
     fun blobs(): com.droidance.core.agent.blob.BlobStore
+    fun memoryDatabase(): com.droidance.core.persistence.memory.MemoryCandidateDatabase
+    fun skills(): com.droidance.core.knowledge.skill.SkillEngine
 }
 
 /** Instantiates the existing single Agent graph in the resident shell process. */
 object RuntimeProcessHost {
     private var instance: Owner? = null
+    private const val RESTART_AFTER_RESTORE_MS = 500L
 
     @JvmStatic
     @Synchronized
@@ -71,12 +74,16 @@ object RuntimeProcessHost {
         }
         check(RuntimeProcessRole.isOwner)
         val identity = java.util.UUID.fromString(installationId).toString()
+        RuntimeBackup.recover(storageDirectory)
         RuntimeStorageRoot.prepare(storageDirectory, clientUid, identity)
         // Persistent data is transferred once; each new owner receives current credentials in memory.
         val initialized = RuntimeStorageRoot.isInitialized(root)
         val provider = RuntimeStorageSnapshot.restore(root, storage, restoreFiles = !initialized)
         if (!initialized) {
             File(root, RuntimeStorageRoot.INITIALIZED).writeText("1")
+        }
+        RuntimeBackup.applyStaged(storageDirectory)?.let { error ->
+            android.util.Log.e("DroidanceRuntime", "Restore failed; keeping the previous store", error)
         }
         RuntimeDataFormat().prepare(root)
         RuntimeStorageRoot.removeLegacyStores(shell.packageManager, clientUid)
@@ -96,7 +103,7 @@ object RuntimeProcessHost {
                 .getMethod("asInterface", IBinder::class.java).invoke(null, session)
             Class.forName("android.view.WindowManagerGlobal").getDeclaredField("sWindowSession")
                 .apply { isAccessible = true }.set(null, proxy)
-            Owner(application, clientUid)
+            Owner(application, clientUid, File(storageDirectory))
         }
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) initialize.run()
         else android.os.Handler(android.os.Looper.getMainLooper()).post(initialize)
@@ -139,7 +146,8 @@ object RuntimeProcessHost {
             }
     }
 
-    private class Owner(private val application: Application, private val clientUid: Int) : IAgentRuntimeOwner.Stub() {
+    private class Owner(private val application: Application, private val clientUid: Int,
+        private val storageDirectory: File) : IAgentRuntimeOwner.Stub() {
         private val entry = EntryPointAccessors.fromApplication(application, RuntimeOwnerEntryPoint::class.java)
         private val runtime = entry.runtime()
         private val events = RuntimeEventServer(entry.events())
@@ -247,6 +255,8 @@ object RuntimeProcessHost {
                     } }
                     Bundle()
                 }
+                "backupExport" -> backupExport(values)
+                "backupRestore" -> backupRestore(values)
                 "file" -> managedFile(values)
                 "events" -> runBlocking { events.exchange(values.getString("operation")!!, values) }
                 "conversation", "automation", "takeover" -> submit(operation, values)
@@ -274,6 +284,76 @@ object RuntimeProcessHost {
                 else -> error("Unsupported runtime command: $operation")
             }
             RuntimeWire.write(application.cacheDir, result)
+        }
+
+        /** A backup or restore waits for no Turn: it refuses while one runs so the user is never left waiting. */
+        private fun requireIdle() {
+            if (runtime.state.value in setOf(AgentState.THINKING, AgentState.EXECUTING_TOOL, AgentState.WAITING_PERMISSION)) {
+                throw IllegalStateException("BACKUP_BUSY")
+            }
+        }
+
+        private fun backupExport(values: Bundle): Bundle = backupFailures {
+            requireIdle()
+            val target = requireNotNull(values.getParcelable<ParcelFileDescriptor>("target"))
+            val password = requireNotNull(values.getString("password")).toCharArray()
+            val manifest = runBlocking { runtime.withStorageMaintenance {
+                ParcelFileDescriptor.AutoCloseOutputStream(target).use { output ->
+                    RuntimeBackup.export(
+                        root = RuntimeStorageRoot.root(storageDirectory.path),
+                        databases = listOf(
+                            RuntimeBackup.Database("droidance-agent-events.db", entry.database().openHelper.writableDatabase),
+                            RuntimeBackup.Database("droidance-memory-candidates.db", entry.memoryDatabase().openHelper.writableDatabase)
+                        ),
+                        conversations = ::conversationCount,
+                        skills = entry.skills().loadAllSkills().count { !it.isReadOnly },
+                        settings = requireNotNull(values.getByteArray("settings")),
+                        settingsCount = values.getInt("settingsCount"),
+                        appVersion = values.getString("appVersion").orEmpty(),
+                        target = output,
+                        password = password
+                    )
+                }
+            } }
+            password.fill('\u0000')
+            Bundle().apply { putString("contents", Json.encodeToString(manifest.contents)) }
+        }
+
+        private fun conversationCount(database: androidx.sqlite.db.SupportSQLiteDatabase): Int = database.query(
+            "SELECT COUNT(DISTINCT thread_id) FROM agent_events WHERE event_kind = 'THREAD_CREATED' AND thread_id != ? " +
+                "AND thread_id NOT IN (SELECT thread_id FROM agent_events WHERE event_kind = 'THREAD_TOMBSTONED')",
+            arrayOf(com.droidance.agent.INTERNAL_SKILL_THREAD_ID)
+        ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+
+        /** Stages the backup, then restarts this owner so the swap happens before any store opens. */
+        private fun backupRestore(values: Bundle): Bundle = backupFailures {
+            requireIdle()
+            val source = requireNotNull(values.getParcelable<ParcelFileDescriptor>("source"))
+            val password = requireNotNull(values.getString("password")).toCharArray()
+            val (manifest, settings) = runBlocking { runtime.withStorageMaintenance {
+                ParcelFileDescriptor.AutoCloseInputStream(source).use { input ->
+                    RuntimeBackup.stage(storageDirectory, input.buffered(), password)
+                }
+            } }
+            password.fill('\u0000')
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }, RESTART_AFTER_RESTORE_MS)
+            Bundle().apply {
+                putByteArray("settings", settings)
+                putString("contents", Json.encodeToString(manifest.contents))
+            }
+        }
+
+        /** Binder carries only runtime exceptions; failures surface as stable codes. */
+        private inline fun backupFailures(action: () -> Bundle): Bundle = try { action() } catch (error: Exception) {
+            android.util.Log.w("DroidanceRuntime", "Backup operation failed", error)
+            throw when (error) {
+                is com.droidance.backup.BackupCipher.WrongPasswordException -> IllegalStateException("BACKUP_WRONG_PASSWORD")
+                is com.droidance.backup.BackupCipher.InvalidBackupException -> IllegalStateException(error.message)
+                is IllegalStateException -> if (error.message?.startsWith("BACKUP_") == true) error else IllegalStateException("BACKUP_FAILED")
+                else -> IllegalStateException("BACKUP_FAILED")
+            }
         }
 
         private fun automationAdmin(values: Bundle): Bundle {

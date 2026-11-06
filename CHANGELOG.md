@@ -8,6 +8,11 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Added
+
+- Back up all data to one password-encrypted file and restore it, including conversations, screenshots, memory, skills, settings and model keys. Each backup and restore shows what it contains.
+- Export redacted diagnostics for developers, with task steps, error codes and connection status but no conversations, screenshots or keys. Task content can be added when needed.
+
 ### Changed
 
 - Keep all app data in the app's own storage, so uninstalling or clearing data removes it. Existing data moves there on first start, and leftovers from earlier installs are removed.
