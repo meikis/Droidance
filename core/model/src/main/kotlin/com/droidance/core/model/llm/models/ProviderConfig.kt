@@ -24,7 +24,9 @@ data class ProviderConfig(
     val isEnabled: Boolean = true,           // 是否启用
     val contextWindowTokens: Int = 128_000,  // 该模型上下文窗口（token）；自动压缩阈值按此设定，按模型不同（如 1M 模型设 1_000_000）
     /** Null lets the same Agent select effort; DEFAULT explicitly keeps provider defaults. */
-    val reasoningPreference: ReasoningEffort? = null
+    val reasoningPreference: ReasoningEffort? = null,
+    /** Links an address, including a custom address, to its provider preset group. */
+    val providerGroupId: String? = null
 ) {
     /**
      * 仅在 protocol 与 Adapter 选择完全一致时返回可执行 transport。

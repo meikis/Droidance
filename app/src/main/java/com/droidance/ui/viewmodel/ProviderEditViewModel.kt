@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.droidance.settings.ProviderConfigManager
 import com.droidance.settings.ProviderPreset
+import com.droidance.settings.endpointsFor
+import com.droidance.settings.providerAddressKey
+import com.droidance.settings.providerGroups
 import com.droidance.core.model.llm.ModelDiscoveryResult
 import com.droidance.core.model.llm.ProviderEndpoint
 import com.droidance.core.model.llm.ProviderModelDiscovery
@@ -41,6 +44,8 @@ class ProviderEditViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ProviderEditUiState())
     val uiState: StateFlow<ProviderEditUiState> = _uiState
     val presets get() = configManager.presets
+    val providerPresets get() = presets.filter { it.groupId == null }
+    val addressPresets get() = _uiState.value.presetId?.let { presets.endpointsFor(it) }.orEmpty()
     private val discovery = ProviderModelDiscovery(httpClient)
     private val _modelCatalog = MutableStateFlow(ProviderModelCatalogState())
     val modelCatalog: StateFlow<ProviderModelCatalogState> = _modelCatalog
@@ -53,25 +58,56 @@ class ProviderEditViewModel @Inject constructor(
     private var loaded = false
     private var initialState = ProviderEditUiState()
     fun hasUnsavedChanges(): Boolean = _uiState.value.copy(saveFailed = false) !=
-        initialState.copy(saveFailed = false)
+        initialState.copy(saveFailed = false) || drafts.any { (key, draft) ->
+        draft.state.copy(saveFailed = false) != baselineStates[key]?.copy(saveFailed = false)
+    }
 
     private var editingId: String? = null
     private var editingConfig: ProviderConfig? = null
+    private var originalGroupConfigs: List<ProviderConfig> = emptyList()
+    private val drafts = mutableMapOf<String, AddressDraft>()
+    private val baselineStates = mutableMapOf<String, ProviderEditUiState>()
+
+    private data class AddressDraft(
+        val config: ProviderConfig?,
+        val state: ProviderEditUiState,
+        val customModels: List<String>
+    )
+
+    private fun draftKey(state: ProviderEditUiState = _uiState.value): String = state.addressPresetId ?: "custom"
+
+    private fun saveDraft() {
+        drafts[draftKey()] = AddressDraft(editingConfig, _uiState.value, _customModels.value)
+    }
 
     /** 加载已有 Provider 配置（编辑模式） */
     fun loadProvider(id: String?) {
         if (loaded && editingId == id) return
+        drafts.clear()
+        baselineStates.clear()
         if (id != null) {
             editingId = id
             val config = configManager.getConfig(id) ?: return
+            val group = configManager.getAllConfigs().providerGroups(presets)
+                .firstOrNull { candidate -> candidate.configs.any { it.id == id } }
+            originalGroupConfigs = group?.configs.orEmpty()
             editingConfig = config
-            _uiState.value = config.toEditState()
+            val groupId = group?.preset?.id
+            val endpoint = groupId?.let { presets.endpointsFor(it) }
+                ?.firstOrNull { providerAddressKey(it.baseUrl) == providerAddressKey(config.baseUrl) }
+            _uiState.value = config.toEditState().copy(
+                name = group?.displayName ?: config.name,
+                presetId = groupId,
+                addressPresetId = endpoint?.id
+            )
         } else {
             editingId = null
             editingConfig = null
+            originalGroupConfigs = emptyList()
             _uiState.value = ProviderEditUiState()
         }
         initialState = _uiState.value
+        baselineStates[draftKey()] = _uiState.value
         loaded = true
         keyOrigin = urlOrigin(_uiState.value.baseUrl).takeIf { _uiState.value.apiKey.isNotBlank() }
         _customModels.value = emptyList()
@@ -84,8 +120,13 @@ class ProviderEditViewModel @Inject constructor(
         if (editingId != null) return
         val preset = id?.let { selected -> presets.firstOrNull { it.id == selected } ?: return }
         // A key belongs to its endpoint; selecting another template always clears it.
+        drafts.clear()
+        baselineStates.clear()
+        editingConfig = null
+        originalGroupConfigs = emptyList()
         _uiState.value = if (preset == null) ProviderEditUiState() else ProviderEditUiState(
             presetId = preset.id,
+            addressPresetId = preset.id,
             name = preset.name,
             baseUrl = preset.baseUrl,
             apiType = preset.apiType,
@@ -93,6 +134,48 @@ class ProviderEditViewModel @Inject constructor(
         )
         keyOrigin = null
         _customModels.value = emptyList()
+        updateModelSource()
+    }
+
+    /** Switch the editing form without sending one endpoint's key to another endpoint. */
+    fun selectAddress(id: String?) {
+        val groupId = _uiState.value.presetId ?: return
+        val endpoint = id?.let { chosen -> presets.endpointsFor(groupId).firstOrNull { it.id == chosen } ?: return }
+        if (id == _uiState.value.addressPresetId) return
+        saveDraft()
+        val nextKey = id ?: "custom"
+        val cached = drafts[nextKey]
+        if (cached != null) {
+            editingConfig = cached.config
+            _uiState.value = cached.state
+            _customModels.value = cached.customModels
+        } else {
+            val matches = originalGroupConfigs.filter { config ->
+                val match = presets.endpointsFor(groupId).firstOrNull {
+                    providerAddressKey(it.baseUrl) == providerAddressKey(config.baseUrl)
+                }
+                if (endpoint == null) match == null else match?.id == endpoint.id
+            }
+            val existing = matches.firstOrNull { it.id == editingId }
+                ?: matches.firstOrNull { it.apiKey.isNotBlank() || it.models.isNotEmpty() }
+                ?: matches.firstOrNull()
+            editingConfig = existing
+            val currentName = _uiState.value.name
+            _uiState.value = (existing?.toEditState() ?: ProviderEditUiState(
+                name = currentName,
+                baseUrl = endpoint?.baseUrl.orEmpty(),
+                apiType = endpoint?.apiType ?: ApiType.OPENAI_COMPATIBLE,
+                transportKind = endpoint?.transportKind ?: ModelTransport.GENERIC_CHAT_COMPLETIONS
+            )).copy(
+                name = currentName,
+                presetId = groupId,
+                addressPresetId = id,
+                isEnabled = initialState.isEnabled
+            )
+            _customModels.value = emptyList()
+            baselineStates[nextKey] = _uiState.value
+        }
+        keyOrigin = urlOrigin(_uiState.value.baseUrl).takeIf { _uiState.value.apiKey.isNotBlank() }
         updateModelSource()
     }
 
@@ -189,8 +272,8 @@ class ProviderEditViewModel @Inject constructor(
     }
 
     private fun presetForAddress(baseUrl: String): ProviderPreset? {
-        val root = ProviderEndpoint.apiRoot(baseUrl)
-        return presets.firstOrNull { ProviderEndpoint.apiRoot(it.baseUrl).equals(root, ignoreCase = true) }
+        val root = providerAddressKey(baseUrl)
+        return presets.firstOrNull { providerAddressKey(it.baseUrl) == root }
     }
 
     fun removeModel(model: String) {
@@ -217,14 +300,45 @@ class ProviderEditViewModel @Inject constructor(
         if (state.validationError != null) return false
         val models = mergeModels(emptyList(), state.models)
         if (state.name.isBlank() || state.baseUrl.isBlank() || state.apiKey.isBlank() || models.isEmpty()) return false
-        val config = state.toConfig(
-            id = editingId ?: UUID.randomUUID().toString(),
-            models = models,
-            contextWindowTokens = editingConfig?.contextWindowTokens ?: 128_000
-        )
-        val saved = runCatching { configManager.updateConfig(config) }.isSuccess
+        saveDraft()
+        val selectedKey = draftKey()
+        val selectedId = editingConfig?.id ?: UUID.randomUUID().toString()
+        val updates = drafts.mapNotNull { (key, draft) ->
+            val selected = key == selectedKey
+            if (!selected && draft.state.copy(saveFailed = false) == baselineStates[key]?.copy(saveFailed = false)) return@mapNotNull null
+            if (!selected && draft.config == null && draft.state.apiKey.isBlank() && draft.state.models.isEmpty()) return@mapNotNull null
+            val draftModels = mergeModels(emptyList(), draft.state.models)
+            val group = presets.firstOrNull { it.id == draft.state.presetId }
+            val originalName = draft.config?.name?.takeIf { name ->
+                group != null && draft.state.name == group.name &&
+                    presets.endpointsFor(group.id).any { it.name == name }
+            }
+            draft.state.toConfig(
+                id = if (selected) selectedId else draft.config?.id ?: UUID.randomUUID().toString(),
+                models = draftModels,
+                contextWindowTokens = draft.config?.contextWindowTokens ?: 128_000
+            ).copy(
+                name = originalName ?: draft.state.name.trim(),
+                isEnabled = if (selected) state.isEnabled else draft.config?.isEnabled ?: false
+            )
+        }
+        val saved = runCatching {
+            configManager.saveProviderGroup(
+                updates = updates,
+                selectedId = selectedId,
+                previousIds = originalGroupConfigs.mapTo(mutableSetOf()) { it.id },
+                switchAddress = editingId != null && selectedId != editingId
+            )
+        }.isSuccess
         _uiState.update { it.copy(saveFailed = !saved) }
-        if (saved) initialState = _uiState.value
+        if (saved) {
+            editingId = selectedId
+            editingConfig = configManager.getConfig(selectedId)
+            initialState = _uiState.value
+            drafts.clear()
+            baselineStates.clear()
+            baselineStates[draftKey()] = _uiState.value
+        }
         return saved
     }
 
@@ -246,6 +360,7 @@ class ProviderEditViewModel @Inject constructor(
  */
 data class ProviderEditUiState(
     val presetId: String? = null,
+    val addressPresetId: String? = null,
     val name: String = "",
     val apiType: ApiType = ApiType.OPENAI_COMPATIBLE,
     val transportKind: ModelTransport? = ModelTransport.GENERIC_CHAT_COMPLETIONS,
@@ -296,10 +411,11 @@ data class ProviderEditUiState(
         baseUrl = baseUrl.trim(),
         apiKey = apiKey.trim(),
         models = models,
-        defaultModel = defaultModel.takeIf { it in models } ?: models.first(),
+        defaultModel = defaultModel.takeIf { it in models } ?: models.firstOrNull().orEmpty(),
         isEnabled = isEnabled,
         contextWindowTokens = contextWindowTokens,
-        reasoningPreference = reasoningPreference
+        reasoningPreference = reasoningPreference,
+        providerGroupId = presetId
     )
 }
 

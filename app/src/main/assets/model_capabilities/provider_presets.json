@@ -4,21 +4,37 @@
     "name": "OpenRouter",
     "baseUrl": "https://openrouter.ai/api/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "openai/gpt-6.1-terra",
+      "openai/gpt-6.1-sol",
+      "google/gemini-3.1-pro-preview",
+      "deepseek/deepseek-v4-pro"
+    ]
   },
   {
     "id": "openai",
     "name": "OpenAI",
     "baseUrl": "https://api.openai.com/v1",
     "apiType": "OPENAI_RESPONSES",
-    "transportKind": "OPENAI_RESPONSES"
+    "transportKind": "OPENAI_RESPONSES",
+    "suggestedModels": [
+      "gpt-6.1-terra",
+      "gpt-6.1-sol",
+      "gpt-6-luna",
+      "gpt-6-astra"
+    ]
   },
   {
     "id": "gemini",
     "name": "Google Gemini",
     "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "gemini-3.1-flash-lite",
+      "gemini-3.1-pro-preview"
+    ]
   },
   {
     "id": "deepseek",
@@ -27,8 +43,8 @@
     "apiType": "OPENAI_COMPATIBLE",
     "transportKind": "GENERIC_CHAT_COMPLETIONS",
     "suggestedModels": [
-      "deepseek-chat",
-      "deepseek-reasoner"
+      "deepseek-v4-pro",
+      "deepseek-v4-flash"
     ]
   },
   {
@@ -44,6 +60,19 @@
     ]
   },
   {
+    "id": "alibaba-intl-api",
+    "name": "Alibaba Cloud API",
+    "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "groupId": "alibabacloud",
+    "addressLabel": "API",
+    "suggestedModels": [
+      "qwen3.8-max",
+      "qwen3.7-plus"
+    ]
+  },
+  {
     "id": "alibaba-coding",
     "name": "Alibaba Cloud Coding Plan",
     "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
@@ -55,13 +84,11 @@
       "kimi-k2.5",
       "glm-5",
       "MiniMax-M2.5",
-      "qwen3.5-plus",
-      "qwen3-max-2026-01-23",
-      "qwen3-coder-next",
-      "qwen3-coder-plus",
-      "glm-4.7"
+      "qwen3.5-plus"
     ],
-    "modelListSupported": false
+    "modelListSupported": false,
+    "groupId": "alibabacloud",
+    "addressLabel": "CODING_PLAN"
   },
   {
     "id": "alibaba-coding-intl",
@@ -74,7 +101,9 @@
       "qwen3.7-plus",
       "qwen3.6-plus",
       "qwen3.5-plus"
-    ]
+    ],
+    "groupId": "alibabacloud",
+    "addressLabel": "CODING_PLAN"
   },
   {
     "id": "alibaba-token",
@@ -85,22 +114,54 @@
     "suggestedModels": [
       "qwen3.8-max",
       "qwen3.8-flash",
-      "qwen3.7-plus"
-    ]
+      "qwen3.7-max",
+      "qwen3.7-plus",
+      "qwen3.6-flash",
+      "deepseek-v4-pro",
+      "deepseek-v4-pro-0813",
+      "deepseek-v4-flash-0731",
+      "glm-5.2"
+    ],
+    "groupId": "alibabacloud",
+    "addressLabel": "TOKEN_PLAN"
   },
   {
     "id": "siliconflow",
     "name": "SiliconFlow",
     "baseUrl": "https://api.siliconflow.cn/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "deepseek-ai/DeepSeek-V4-Flash",
+      "deepseek-ai/DeepSeek-V3.2",
+      "Qwen/Qwen3.6-27B"
+    ]
   },
   {
     "id": "kimi",
     "name": "Kimi",
     "baseUrl": "https://api.moonshot.ai/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "kimi-k3",
+      "kimi-k2.6",
+      "kimi-k2.5"
+    ]
+  },
+  {
+    "id": "kimi-cn-api",
+    "name": "Kimi API",
+    "baseUrl": "https://api.moonshot.cn/v1",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "kimi-k3",
+      "kimi-k2.6",
+      "kimi-k2.5"
+    ],
+    "groupId": "kimi",
+    "addressLabel": "API"
   },
   {
     "id": "kimi-code",
@@ -109,11 +170,15 @@
     "apiType": "OPENAI_COMPATIBLE",
     "transportKind": "GENERIC_CHAT_COMPLETIONS",
     "suggestedModels": [
+      "k3.1-pro",
+      "k3.1-pro-highspeed",
       "k3",
       "k3-256k",
       "kimi-for-coding",
       "kimi-for-coding-highspeed"
-    ]
+    ],
+    "groupId": "kimi",
+    "addressLabel": "KIMI_CODE"
   },
   {
     "id": "kimi-code-global",
@@ -122,18 +187,26 @@
     "apiType": "OPENAI_COMPATIBLE",
     "transportKind": "GENERIC_CHAT_COMPLETIONS",
     "suggestedModels": [
+      "k3.1-pro",
+      "k3.1-pro-highspeed",
       "k3",
       "k3-256k",
       "kimi-for-coding",
       "kimi-for-coding-highspeed"
-    ]
+    ],
+    "groupId": "kimi",
+    "addressLabel": "KIMI_CODE"
   },
   {
     "id": "zhipu",
     "name": "Zhipu AI",
     "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "glm-5.3",
+      "glm-5.3-flash"
+    ]
   },
   {
     "id": "zhipu-coding",
@@ -144,7 +217,9 @@
     "suggestedModels": [
       "glm-5.3",
       "glm-5.3-flash"
-    ]
+    ],
+    "groupId": "zhipu",
+    "addressLabel": "CODING_PLAN"
   },
   {
     "id": "zai-coding",
@@ -155,7 +230,9 @@
     "suggestedModels": [
       "glm-5.3",
       "glm-5.3-flash"
-    ]
+    ],
+    "groupId": "zhipu",
+    "addressLabel": "CODING_PLAN"
   },
   {
     "id": "minimax",
@@ -177,35 +254,49 @@
     "suggestedModels": [
       "MiniMax-M3.1-Flash",
       "MiniMax-M3"
-    ]
+    ],
+    "groupId": "minimax",
+    "addressLabel": "API"
   },
   {
     "id": "xai",
     "name": "xAI",
     "baseUrl": "https://api.x.ai/v1",
     "apiType": "OPENAI_RESPONSES",
-    "transportKind": "OPENAI_RESPONSES"
+    "transportKind": "OPENAI_RESPONSES",
+    "suggestedModels": [
+      "grok-4.7"
+    ]
   },
   {
     "id": "groq",
     "name": "Groq",
     "baseUrl": "https://api.groq.com/openai/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "llama-3.3-70b-versatile"
+    ]
   },
   {
     "id": "mistral",
     "name": "Mistral AI",
     "baseUrl": "https://api.mistral.ai/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "mistral-large-4"
+    ]
   },
   {
     "id": "volcengine",
     "name": "Volcengine",
     "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "doubao-seed-2-1-pro-260915"
+    ]
   },
   {
     "id": "volcengine-coding",
@@ -216,7 +307,45 @@
     "suggestedModels": [
       "ark-code-latest",
       "doubao-seed-evolving",
-      "glm-5.3-flash"
+      "doubao-seed-2.1-pro",
+      "doubao-seed-2.1-lite",
+      "doubao-seed-2.0-mini",
+      "glm-5.3",
+      "glm-5.3-flash",
+      "deepseek-v4.1-flash",
+      "deepseek-v4.1-flash-economy",
+      "deepseek-v4-flash",
+      "deepseek-v4-pro",
+      "kimi-k2.8-preview",
+      "kimi-k3",
+      "kimi-k3.1-pro"
+    ],
+    "groupId": "volcengine",
+    "addressLabel": "CODING_PLAN"
+  },
+  {
+    "id": "volcengine-agent",
+    "name": "Volcengine Agent Plan",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "groupId": "volcengine",
+    "addressLabel": "AGENT_PLAN",
+    "suggestedModels": [
+      "ark-code-latest",
+      "doubao-seed-evolving",
+      "doubao-seed-2.1-pro",
+      "doubao-seed-2.1-lite",
+      "doubao-seed-2.0-mini",
+      "glm-5.3",
+      "glm-5.3-flash",
+      "deepseek-v4.1-flash",
+      "deepseek-v4.1-flash-economy",
+      "deepseek-v4-flash",
+      "deepseek-v4-pro",
+      "kimi-k2.8-preview",
+      "kimi-k3",
+      "kimi-k3.1-pro"
     ]
   },
   {
@@ -224,14 +353,22 @@
     "name": "Tencent Hunyuan",
     "baseUrl": "https://api.hunyuan.cloud.tencent.com/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "hunyuan-turbos-latest"
+    ]
   },
   {
     "id": "tencent-coding",
     "name": "Tencent Cloud Coding Plan",
     "baseUrl": "https://api.lkeap.cloud.tencent.com/coding/v3",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "groupId": "hunyuan",
+    "addressLabel": "CODING_PLAN",
+    "suggestedModels": [
+      "tc-code-latest"
+    ]
   },
   {
     "id": "tencent-token",
@@ -240,8 +377,39 @@
     "apiType": "OPENAI_COMPATIBLE",
     "transportKind": "GENERIC_CHAT_COMPLETIONS",
     "suggestedModels": [
+      "tc-code-latest",
       "hy3",
-      "glm-5.3-flash"
+      "hy4-preview",
+      "kimi-k3",
+      "kimi-k2.7-code",
+      "minimax-m3",
+      "glm-5.3",
+      "glm-5.3-flash",
+      "deepseek-v4-flash-202605",
+      "deepseek-v4-pro-202606"
+    ],
+    "groupId": "hunyuan",
+    "addressLabel": "TOKEN_PLAN"
+  },
+  {
+    "id": "tencent-tokenhub",
+    "name": "Tencent Cloud Token Plan",
+    "baseUrl": "https://tokenhub.tencentmaas.com/plan/v3",
+    "apiType": "OPENAI_COMPATIBLE",
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "groupId": "hunyuan",
+    "addressLabel": "TOKEN_PLAN",
+    "suggestedModels": [
+      "tc-code-latest",
+      "hy3",
+      "hy4-preview",
+      "kimi-k3",
+      "kimi-k2.7-code",
+      "minimax-m3",
+      "glm-5.3",
+      "glm-5.3-flash",
+      "deepseek-v4-flash-202605",
+      "deepseek-v4-pro-202606"
     ]
   },
   {
@@ -249,7 +417,10 @@
     "name": "Baidu Qianfan",
     "baseUrl": "https://qianfan.baidubce.com/v2",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "ernie-4.0-turbo-128k"
+    ]
   },
   {
     "id": "baidu-token",
@@ -260,7 +431,9 @@
     "suggestedModels": [
       "deepseek-v4.1-flash",
       "glm-5.3"
-    ]
+    ],
+    "groupId": "baidu",
+    "addressLabel": "TOKEN_PLAN"
   },
   {
     "id": "baidu-coding",
@@ -270,55 +443,83 @@
     "transportKind": "GENERIC_CHAT_COMPLETIONS",
     "suggestedModels": [
       "qianfan-code-latest"
-    ]
+    ],
+    "groupId": "baidu",
+    "addressLabel": "CODING_PLAN"
   },
   {
     "id": "stepfun",
     "name": "StepFun",
     "baseUrl": "https://api.stepfun.com/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "step-5-preview"
+    ]
   },
   {
     "id": "nvidia",
     "name": "NVIDIA NIM",
     "baseUrl": "https://integrate.api.nvidia.com/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "meta/llama-3.3-70b-instruct"
+    ]
   },
   {
     "id": "together",
     "name": "Together AI",
     "baseUrl": "https://api.together.ai/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "Qwen/Qwen3.8-27B",
+      "Qwen/Qwen3.6-Plus",
+      "Qwen/Qwen3.5-9B"
+    ]
   },
   {
     "id": "fireworks",
     "name": "Fireworks AI",
     "baseUrl": "https://api.fireworks.ai/inference/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "accounts/fireworks/models/ember-1"
+    ]
   },
   {
     "id": "huggingface",
     "name": "Hugging Face",
     "baseUrl": "https://router.huggingface.co/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "openai/gpt-oss-120b"
+    ]
   },
   {
     "id": "modelscope",
     "name": "ModelScope",
     "baseUrl": "https://api-inference.modelscope.cn/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "Qwen/Qwen3.8-27B",
+      "Qwen/Qwen3.8-Flash-Next",
+      "Qwen/Qwen3.5-35B-A3B",
+      "MiniMax/MiniMax-M3"
+    ]
   },
   {
     "id": "novita",
     "name": "Novita AI",
     "baseUrl": "https://api.novita.ai/openai/v1",
     "apiType": "OPENAI_COMPATIBLE",
-    "transportKind": "GENERIC_CHAT_COMPLETIONS"
+    "transportKind": "GENERIC_CHAT_COMPLETIONS",
+    "suggestedModels": [
+      "deepseek/deepseek-v4.1-flash-1017"
+    ]
   }
 ]

@@ -5,7 +5,8 @@ package com.droidance.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import com.droidance.settings.ProviderConfigManager
-import com.droidance.settings.inDisplayOrder
+import com.droidance.settings.ProviderGroup
+import com.droidance.settings.providerGroups
 import com.droidance.core.model.llm.models.ProviderConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,15 +21,15 @@ class ProviderListViewModel @Inject constructor(
     private val configManager: ProviderConfigManager
 ) : ViewModel() {
 
-    private val _providers = MutableStateFlow<List<ProviderConfig>>(emptyList())
-    val providers: StateFlow<List<ProviderConfig>> = _providers
+    private val _providers = MutableStateFlow<List<ProviderGroup>>(emptyList())
+    internal val providers: StateFlow<List<ProviderGroup>> = _providers
 
     init {
         refreshList()
     }
 
     fun refreshList() {
-        _providers.value = configManager.getAllConfigs().inDisplayOrder(configManager.presets)
+        _providers.value = configManager.getAllConfigs().providerGroups(configManager.presets)
     }
 
     private val _actionFailed = MutableStateFlow(false)
@@ -44,7 +45,10 @@ class ProviderListViewModel @Inject constructor(
     /** 切换 Provider 启用/禁用 */
     fun toggleProvider(id: String) {
         val config = configManager.getConfig(id) ?: return
-        change { configManager.updateConfig(config.copy(isEnabled = !config.isEnabled)) }
+        val group = _providers.value.firstOrNull { it.configs.any { entry -> entry.id == id } } ?: return
+        val updated = if (config.isEnabled) group.configs.map { it.copy(isEnabled = false) }
+            else listOf(config.copy(isEnabled = true))
+        change { configManager.saveProviderGroup(updated, id, group.configs.mapTo(mutableSetOf()) { it.id }, false) }
     }
 
     val defaultProviderId: String? get() = configManager.getDefaultConfig()?.id
@@ -55,8 +59,8 @@ class ProviderListViewModel @Inject constructor(
 
     /** 删除 Provider */
     fun deleteProvider(id: String) {
-        configManager.deleteConfig(id)
-        refreshList()
+        val group = _providers.value.firstOrNull { it.configs.any { entry -> entry.id == id } } ?: return
+        change { configManager.deleteProviderGroup(group.configs.mapTo(mutableSetOf()) { it.id }) }
     }
 
     /** 手动切换当前生效模型（更新 defaultModel 并重置自动降级状态） */

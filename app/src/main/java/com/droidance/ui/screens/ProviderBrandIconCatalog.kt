@@ -50,7 +50,18 @@ internal object ProviderBrandIconCatalog {
         "provider_cohere" to R.drawable.provider_cohere,
         "provider_azureai" to R.drawable.provider_azureai,
         "provider_bedrock" to R.drawable.provider_bedrock,
-        "provider_alibabacloud" to R.drawable.provider_alibabacloud
+        "provider_alibabacloud" to R.drawable.provider_alibabacloud,
+        "provider_xai" to R.drawable.provider_xai,
+        "provider_tencentcloud" to R.drawable.provider_tencentcloud,
+        "provider_hunyuan" to R.drawable.provider_hunyuan,
+        "provider_baidu" to R.drawable.provider_baidu,
+        "provider_stepfun" to R.drawable.provider_stepfun,
+        "provider_nvidia" to R.drawable.provider_nvidia,
+        "provider_together" to R.drawable.provider_together,
+        "provider_fireworks" to R.drawable.provider_fireworks,
+        "provider_huggingface" to R.drawable.provider_huggingface,
+        "provider_modelscope" to R.drawable.provider_modelscope,
+        "provider_novita" to R.drawable.provider_novita
     )
 
     @Volatile

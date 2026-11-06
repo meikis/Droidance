@@ -34,6 +34,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.droidance.R
 import com.droidance.core.model.llm.models.ReasoningEffort
 import com.droidance.core.model.llm.session.ModelTransport
+import com.droidance.settings.ProviderAddressLabel
+import com.droidance.settings.ProviderPreset
 import com.droidance.ui.theme.*
 import com.droidance.ui.viewmodel.ProviderEditViewModel
 
@@ -205,7 +207,7 @@ fun ProviderEditScreen(
                             text = { Text(stringResource(R.string.provider_preset_custom)) },
                             onClick = { viewModel.selectPreset(null); expanded = false }
                         )
-                        viewModel.presets.forEach { preset ->
+                        viewModel.providerPresets.forEach { preset ->
                             DropdownMenuItem(
                                 text = { Text(preset.name) },
                                 onClick = { viewModel.selectPreset(preset.id); expanded = false }
@@ -229,19 +231,32 @@ fun ProviderEditScreen(
 
             // ====== API 地址 ======
             SectionField(label = stringResource(R.string.provider_api_address)) {
-                OutlinedTextField(
-                    value = uiState.baseUrl,
-                    isError = uiState.baseUrl.isNotBlank() && uiState.validationError == ProviderFormError.INVALID_URL,
-                    supportingText = if (uiState.validationError == ProviderFormError.INVALID_URL) {
-                        { Text(stringResource(R.string.provider_invalid_url)) }
-                    } else null,
-                    onValueChange = { viewModel.updateBaseUrl(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("https://api.example.com/v1") },
-                    singleLine = true,
-                    shape = AppShapes.Control,
-                    colors = droidanceFieldColors()
-                )
+                val addresses = viewModel.addressPresets
+                if (addresses.isNotEmpty()) {
+                    ProviderAddressMenu(
+                        addresses = addresses,
+                        groupName = viewModel.providerPresets.firstOrNull { it.id == uiState.presetId }?.name.orEmpty(),
+                        selectedId = uiState.addressPresetId,
+                        currentUrl = uiState.baseUrl,
+                        onSelect = viewModel::selectAddress
+                    )
+                    if (uiState.addressPresetId == null) Spacer(Modifier.height(8.dp))
+                }
+                if (addresses.isEmpty() || uiState.addressPresetId == null) {
+                    OutlinedTextField(
+                        value = uiState.baseUrl,
+                        isError = uiState.baseUrl.isNotBlank() && uiState.validationError == ProviderFormError.INVALID_URL,
+                        supportingText = if (uiState.validationError == ProviderFormError.INVALID_URL) {
+                            { Text(stringResource(R.string.provider_invalid_url)) }
+                        } else null,
+                        onValueChange = { viewModel.updateBaseUrl(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("https://api.example.com/v1") },
+                        singleLine = true,
+                        shape = AppShapes.Control,
+                        colors = droidanceFieldColors()
+                    )
+                }
             }
 
             // ====== API 协议 ======
@@ -446,6 +461,80 @@ private fun ModelListItem(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProviderAddressMenu(
+    addresses: List<ProviderPreset>,
+    groupName: String,
+    selectedId: String?,
+    currentUrl: String,
+    onSelect: (String?) -> Unit
+) {
+    var expanded by remember(addresses) { mutableStateOf(false) }
+    val selected = addresses.firstOrNull { it.id == selectedId }
+    val fieldColor = if (LocalAppIsDark.current) MaterialTheme.colorScheme.surface
+        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.045f)
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        Surface(
+            onClick = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            shape = AppShapes.Control,
+            color = fieldColor,
+            border = if (LocalAppIsDark.current) BorderStroke(1.dp, settingsHairline()) else null
+        ) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(selected?.let { addressLabel(it, groupName) } ?: stringResource(R.string.provider_address_custom),
+                        style = MaterialTheme.typography.bodyMedium)
+                    if (currentUrl.isNotBlank()) {
+                        Text(currentUrl, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+            }
+        }
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 360.dp)) {
+            addresses.forEach { endpoint ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(addressLabel(endpoint, groupName), style = MaterialTheme.typography.bodyMedium)
+                            Text(endpoint.baseUrl, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    trailingIcon = if (endpoint.id == selectedId) {
+                        { Icon(DroidanceIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else null,
+                    onClick = { onSelect(endpoint.id); expanded = false }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.provider_address_custom)) },
+                trailingIcon = if (selectedId == null) {
+                    { Icon(DroidanceIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                } else null,
+                onClick = { onSelect(null); expanded = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun addressLabel(endpoint: ProviderPreset, groupName: String): String = when (endpoint.addressLabel) {
+    ProviderAddressLabel.API -> stringResource(R.string.provider_address_api, groupName)
+    ProviderAddressLabel.CODING_PLAN -> stringResource(R.string.provider_address_coding_plan)
+    ProviderAddressLabel.AGENT_PLAN -> stringResource(R.string.provider_address_agent_plan)
+    ProviderAddressLabel.TOKEN_PLAN -> stringResource(R.string.provider_address_token_plan)
+    ProviderAddressLabel.KIMI_CODE -> stringResource(R.string.provider_address_kimi_code)
 }
 
 /**

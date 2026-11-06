@@ -1,13 +1,14 @@
 # Provider brand icons
 
-The bundled provider icons are sourced from Lobe Icons 1.93.0:
+The bundled provider icons are sourced from Lobe Icons 1.93.0 and its
+`@lobehub/icons-static-webp@1.93.0` package:
 
 - Source: https://github.com/lobehub/lobe-icons
 - License: MIT
 - License text: [Lobe Icons 1.93.0](../licenses/lobe-icons-MIT-1.93.0.txt),
   copied from the published `@lobehub/icons@1.93.0` package.
 
-The current catalog lists 18 providers. Their `provider_*.webp` resources
+The current catalog lists 29 providers. Their `provider_*.webp` resources
 are retained in `res/drawable-nodpi/` and `res/drawable-night-nodpi/`; the
 catalog is used to resolve the appropriate brand image in the settings UI.
 It identifies artwork, not native protocol support for every provider.

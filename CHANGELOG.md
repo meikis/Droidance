@@ -11,6 +11,12 @@ Record a notable change in `Unreleased` within the same pull request that implem
 ### Added
 
 - Discover and select provider models automatically, refresh suggestions, and keep custom model IDs; add subscription endpoint presets.
+- Add brand icons for every bundled provider and a generic icon for custom providers.
+
+### Changed
+
+- Group each provider's API and subscription addresses in one selector, retaining saved credentials and models for each address.
+- Refresh bundled model suggestions using current provider documentation.
 
 ### Fixed
 

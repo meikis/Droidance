@@ -71,7 +71,7 @@ class ProviderConfigManager @Inject constructor(
         check(RuntimeProcessRole.isOwner)
         val raw = snapshot.configs
         _configs = when {
-            raw == null -> presets.map { it.createConfig() }.toMutableList()
+            raw == null -> presets.filter { it.groupId == null }.map { it.createConfig() }.toMutableList()
             snapshot.schemaVersion != CURRENT_SCHEMA_VERSION -> {
                 android.util.Log.e("ProviderConfigManager", "Unknown runtime provider config schema rejected")
                 mutableListOf()
@@ -125,6 +125,60 @@ class ProviderConfigManager @Inject constructor(
             _configs = previous.toMutableList()
             throw error
         }
+    }
+
+    /** Save all edited addresses together, retaining the other addresses and their credentials. */
+    @Synchronized internal fun saveProviderGroup(
+        updates: List<ProviderConfig>,
+        selectedId: String,
+        previousIds: Set<String>,
+        switchAddress: Boolean
+    ) {
+        require(updates.isNotEmpty() && updates.map { it.id }.distinct().size == updates.size)
+        require(updates.any { it.id == selectedId })
+        require(updates.none { it.isEnabled && !it.isTransportConfigured() })
+        val previous = _configs.toList()
+        val wasDefault = previous.firstOrNull(ProviderConfig::isAvailableForRequests)?.id in previousIds
+        try {
+            updates.forEach { config ->
+                val index = _configs.indexOfFirst { it.id == config.id }
+                if (index < 0) _configs.add(config) else _configs[index] = config
+            }
+            if (switchAddress) {
+                val siblingIds = previousIds + updates.map { it.id }
+                _configs = _configs.map { config ->
+                    if (config.id in siblingIds && config.id != selectedId) config.copy(isEnabled = false) else config
+                }.toMutableList()
+                val selected = _configs.first { it.id == selectedId }
+                _configs.removeAll { it.id == selectedId }
+                val firstSibling = _configs.indexOfFirst { it.id in siblingIds }
+                val position = if (wasDefault && selected.isAvailableForRequests()) 0
+                    else if (firstSibling >= 0) firstSibling else _configs.size
+                _configs.add(position, selected)
+            }
+            saveConfigs()
+        } catch (error: Exception) {
+            _configs = previous.toMutableList()
+            throw error
+        }
+        updates.forEach { config ->
+            val old = previous.firstOrNull { it.id == config.id }
+            if (old != null && old.imageCapabilityIdentity() != config.imageCapabilityIdentity()) {
+                invalidateImageDetailCapability(config.id)
+            }
+        }
+    }
+
+    @Synchronized internal fun deleteProviderGroup(ids: Set<String>) {
+        val previous = _configs.toList()
+        try {
+            _configs.removeAll { it.id in ids }
+            saveConfigs()
+        } catch (error: Exception) {
+            _configs = previous.toMutableList()
+            throw error
+        }
+        ids.forEach(::invalidateImageDetailCapability)
     }
 
     /** 删除 Provider */
@@ -325,7 +379,7 @@ class ProviderConfigManager @Inject constructor(
     private fun loadConfigs() {
         val rawConfigs = prefs.getString(PROVIDER_CONFIGS_KEY, null)
         if (rawConfigs == null) {
-            _configs = presets.map { it.createConfig() }.toMutableList()
+            _configs = presets.filter { it.groupId == null }.map { it.createConfig() }.toMutableList()
             saveConfigs()
             return
         }

@@ -19,17 +19,25 @@ data class ProviderPreset(
     val apiType: ApiType,
     val transportKind: ModelTransport,
     val suggestedModels: List<String> = emptyList(),
-    val modelListSupported: Boolean = true
+    val modelListSupported: Boolean = true,
+    val groupId: String? = null,
+    val addressLabel: ProviderAddressLabel = ProviderAddressLabel.API
 ) {
+    val providerGroupId: String get() = groupId ?: id
+
     fun createConfig(id: String = "preset-${this.id}"): ProviderConfig = ProviderConfig(
         id = id,
         name = name,
         apiType = apiType,
         transportKind = transportKind,
         baseUrl = baseUrl,
-        isEnabled = false
+        isEnabled = false,
+        providerGroupId = providerGroupId
     )
 }
+
+@Serializable
+enum class ProviderAddressLabel { API, CODING_PLAN, AGENT_PLAN, TOKEN_PLAN, KIMI_CODE }
 
 /**
  * Default, then custom, enabled preset and disabled preset entries; an entry is custom when its
@@ -54,8 +62,11 @@ object ProviderPresetCatalog {
     fun decode(source: String): List<ProviderPreset> = Json.decodeFromString<List<ProviderPreset>>(source).also { presets ->
         require(presets.isNotEmpty())
         require(presets.map { it.id }.distinct().size == presets.size)
+        val groupIds = presets.mapTo(HashSet()) { it.id }
         presets.forEach { preset ->
             require(preset.id.isNotBlank() && preset.name.isNotBlank())
+            require(preset.groupId == null || (preset.groupId in groupIds && preset.groupId != preset.id))
+            require(preset.groupId == null || presets.first { it.id == preset.groupId }.groupId == null)
             val uri = URI(preset.baseUrl)
             require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null)
             require(preset.createConfig().isTransportConfigured())

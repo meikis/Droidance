@@ -111,6 +111,72 @@
       "drawable": "provider_alibabacloud",
       "aliases": ["alibaba cloud", "aliyun", "阿里云", "阿里云百炼"],
       "domains": ["dashscope.aliyuncs.com", "maas.aliyuncs.com"]
+    },
+    {
+      "slug": "xai",
+      "drawable": "provider_xai",
+      "aliases": ["xai", "grok"],
+      "domains": ["x.ai"]
+    },
+    {
+      "slug": "tencentcloud",
+      "drawable": "provider_tencentcloud",
+      "aliases": ["tencent cloud", "腾讯云", "tokenhub"],
+      "domains": ["lkeap.cloud.tencent.com", "tokenhub.tencentmaas.com"]
+    },
+    {
+      "slug": "hunyuan",
+      "drawable": "provider_hunyuan",
+      "aliases": ["hunyuan", "混元"],
+      "domains": ["hunyuan.cloud.tencent.com"]
+    },
+    {
+      "slug": "baidu",
+      "drawable": "provider_baidu",
+      "aliases": ["baidu", "qianfan", "百度", "千帆"],
+      "domains": ["baidubce.com"]
+    },
+    {
+      "slug": "stepfun",
+      "drawable": "provider_stepfun",
+      "aliases": ["stepfun", "阶跃星辰"],
+      "domains": ["stepfun.com"]
+    },
+    {
+      "slug": "nvidia",
+      "drawable": "provider_nvidia",
+      "aliases": ["nvidia"],
+      "domains": ["nvidia.com"]
+    },
+    {
+      "slug": "together",
+      "drawable": "provider_together",
+      "aliases": ["together ai", "together"],
+      "domains": ["together.ai"]
+    },
+    {
+      "slug": "fireworks",
+      "drawable": "provider_fireworks",
+      "aliases": ["fireworks"],
+      "domains": ["fireworks.ai"]
+    },
+    {
+      "slug": "huggingface",
+      "drawable": "provider_huggingface",
+      "aliases": ["hugging face", "huggingface"],
+      "domains": ["huggingface.co"]
+    },
+    {
+      "slug": "modelscope",
+      "drawable": "provider_modelscope",
+      "aliases": ["modelscope", "魔搭"],
+      "domains": ["modelscope.cn"]
+    },
+    {
+      "slug": "novita",
+      "drawable": "provider_novita",
+      "aliases": ["novita"],
+      "domains": ["novita.ai"]
     }
   ]
 }

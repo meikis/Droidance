@@ -132,9 +132,11 @@ fun ProviderListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(providers, key = { it.id }) { config ->
+                items(providers, key = { it.representative.id }) { group ->
+                    val config = group.representative.copy(name = group.displayName)
                     ProviderCard(
                         config = config,
+                        hasMultipleAddresses = group.configs.size > 1,
                         isDefault = config.id == viewModel.defaultProviderId,
                         onMakeDefault = { viewModel.makeDefault(config.id) },
                         onEdit = { onNavigateToEdit(config.id) },
@@ -155,13 +157,13 @@ fun ProviderListScreen(
         }
     }
 }
-
 /**
  * 单个 Provider 卡片
  */
 @Composable
 private fun ProviderCard(
     config: ProviderConfig,
+    hasMultipleAddresses: Boolean,
     isDefault: Boolean,
     onMakeDefault: () -> Unit,
     onEdit: () -> Unit,
@@ -198,13 +200,7 @@ private fun ProviderCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(AppShapes.Small)
-                        .background(
-                            if (brandIcon != null) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            }
-                        ),
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (brandIcon != null) {
@@ -215,11 +211,11 @@ private fun ProviderCard(
                             contentScale = ContentScale.Fit
                         )
                     } else {
-                        Text(
-                            text = providerInitial(config.name),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                        Icon(
+                            imageVector = DroidanceIcons.Cpu,
+                            contentDescription = config.name,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -409,7 +405,10 @@ private fun ProviderCard(
         GlassAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = stringResource(R.string.provider_delete_title),
-            text = stringResource(R.string.provider_delete_confirm, config.name),
+            text = stringResource(
+                if (hasMultipleAddresses) R.string.provider_delete_group_confirm else R.string.provider_delete_confirm,
+                config.name
+            ),
             confirmLabel = stringResource(R.string.common_delete),
             destructive = true,
             onConfirm = {
@@ -421,7 +420,3 @@ private fun ProviderCard(
         )
     }
 }
-
-/** 用 Provider 名称首字母做头像文字 */
-private fun providerInitial(name: String): String =
-    name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"

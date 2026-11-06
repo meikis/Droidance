@@ -8,6 +8,7 @@ import com.droidance.core.model.llm.ModelStreamPlan
 import com.droidance.core.model.llm.models.ProviderConfig
 import com.droidance.settings.ComposerSettings
 import com.droidance.settings.ProviderPreset
+import com.droidance.settings.displayNameFor
 import com.droidance.settings.inDisplayOrder
 
 data class ComposerModelOption(
@@ -40,7 +41,7 @@ internal fun composerModelOptions(
 ): List<ComposerModelOption> =
     providers.filter { it.isEnabled && it.isTransportConfigured() }.inDisplayOrder(presets).flatMap { provider ->
         (provider.models + provider.defaultModel).filter(String::isNotBlank).distinct().map { model ->
-            ComposerModelOption(provider.id, provider.name, model)
+            ComposerModelOption(provider.id, presets.displayNameFor(provider), model)
         }
     }
 
