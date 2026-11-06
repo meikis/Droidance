@@ -58,17 +58,28 @@ object RuntimeProcessHost {
     @JvmStatic
     @Synchronized
     fun start(shell: Context, sidecar: IBinder, packageName: String, clientUid: Int, installationId: String,
-        storage: ParcelFileDescriptor): IBinder {
-        instance?.let { storage.close(); return it }
+        storageDirectory: String, storage: ParcelFileDescriptor): IBinder {
+        val root = RuntimeStorageRoot.root(storageDirectory)
+        instance?.let {
+            storage.close()
+            // Clearing the application's data removes the store under this owner; restart on a fresh one.
+            if (!RuntimeStorageRoot.isInitialized(root)) {
+                android.util.Log.w("DroidanceRuntime", "Runtime store was removed; restarting the owner")
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+            return it
+        }
         check(RuntimeProcessRole.isOwner)
         val identity = java.util.UUID.fromString(installationId).toString()
-        val root = File("/data/local/tmp/droidance-runtime-$clientUid-$identity")
+        RuntimeStorageRoot.prepare(storageDirectory, clientUid, identity)
         // Persistent data is transferred once; each new owner receives current credentials in memory.
-        val initialized = File(root, "initialized").isFile
+        val initialized = RuntimeStorageRoot.isInitialized(root)
         val provider = RuntimeStorageSnapshot.restore(root, storage, restoreFiles = !initialized)
         if (!initialized) {
-            File(root, "initialized").writeText("1")
+            File(root, RuntimeStorageRoot.INITIALIZED).writeText("1")
         }
+        RuntimeDataFormat().prepare(root)
+        RuntimeStorageRoot.removeLegacyStores(shell.packageManager, clientUid)
         RuntimeProviderBootstrap.install(provider)
         SidecarBinderRegistry.set(2000, sidecar)
         isolatePlatformHelperFailures()

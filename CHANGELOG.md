@@ -8,6 +8,14 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Changed
+
+- Keep all app data in the app's own storage, so uninstalling or clearing data removes it. Existing data moves there on first start, and leftovers from earlier installs are removed.
+
+### Fixed
+
+- Stop the background service after the app is uninstalled.
+
 ## [0.1.10] - 2026-11-06
 
 - Discover and manage provider models while keeping custom selections.
