@@ -8,20 +8,14 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
-### Added
+## [0.2.0] - 2026-11-06
 
-- Back up all data to one password-encrypted file and restore it, including conversations, screenshots, memory, skills, settings and model keys. Each backup and restore shows what it contains.
-- Export redacted diagnostics for developers, with task steps, error codes and connection status but no conversations, screenshots or keys. Task content can be added when needed.
+- Back up and restore conversations, screenshots, memory, skills, and settings in a password-encrypted file.
+- Export redacted diagnostics, with optional task content.
+- Move existing data into app storage during upgrade; uninstalling or clearing data removes app data.
+- Fix startup with incompatible rule overrides, default persona updates, and provider list positioning.
 
-### Changed
-
-- Keep all app data in the app's own storage, so uninstalling or clearing data removes it. Existing data moves there on first start, and leftovers from earlier installs are removed.
-
-### Fixed
-
-- Start with the built-in rules when saved rule overrides no longer match the installed version, instead of failing to start.
-- Apply updated default persona text unless the persona was customized.
-- Stop the background service after the app is uninstalled.
+**Breaking:** Install over the existing app, then open Droidance and connect the device service to migrate your data. Downgrading to 0.1.x is not supported. Before uninstalling, save a backup outside the app's storage and keep its password safe.
 
 ## [0.1.10] - 2026-11-06
 
