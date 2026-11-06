@@ -44,16 +44,24 @@ enum class ProviderAddressLabel { API, CODING_PLAN, AGENT_PLAN, TOKEN_PLAN, KIMI
  * address is not in the catalog. Display only: the stored order selects the default Provider.
  */
 fun List<ProviderConfig>.inDisplayOrder(presets: List<ProviderPreset>): List<ProviderConfig> {
-    val presetRoots = presets.mapTo(HashSet()) { ProviderEndpoint.apiRoot(it.baseUrl).lowercase() }
+    val presetRanks = presets.mapIndexed { index, preset ->
+        ProviderEndpoint.apiRoot(preset.baseUrl).lowercase() to index
+    }.toMap()
     val defaultId = firstOrNull(ProviderConfig::isAvailableForRequests)?.id
-    return sortedBy { config ->
-        when {
-            config.id == defaultId -> 0
-            ProviderEndpoint.apiRoot(config.baseUrl).lowercase() !in presetRoots -> 1
-            config.isEnabled -> 2
-            else -> 3
+    return sortedWith(compareBy<ProviderConfig>(
+        { config ->
+            when {
+                config.id == defaultId -> 0
+                ProviderEndpoint.apiRoot(config.baseUrl).lowercase() !in presetRanks -> 1
+                config.isEnabled -> 2
+                else -> 3
+            }
+        },
+        { config ->
+            if (config.id == defaultId) 0
+            else presetRanks[ProviderEndpoint.apiRoot(config.baseUrl).lowercase()] ?: 0
         }
-    }
+    ))
 }
 
 object ProviderPresetCatalog {

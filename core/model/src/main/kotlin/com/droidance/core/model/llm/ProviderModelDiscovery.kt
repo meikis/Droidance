@@ -16,6 +16,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okio.Buffer
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
@@ -74,6 +75,8 @@ class ProviderModelDiscovery(httpClient: OkHttpClient) {
 
 /** Extract model IDs from OpenAI-compatible and simple array model lists. */
 object ProviderModelList {
+    private data class Candidate(val id: String, val createdAt: Long?)
+
     fun parse(raw: String): List<String>? = runCatching {
         val entries = when (val root = Json.parseToJsonElement(raw)) {
             is JsonArray -> root
@@ -86,8 +89,23 @@ object ProviderModelList {
                 is JsonPrimitive -> entry
                 else -> null
             } as? JsonPrimitive
-            value?.takeIf { it.isString }?.content?.trim()
+            val id = value?.takeIf { it.isString }?.content?.trim()
                 ?.takeIf { it.isNotEmpty() && it.length <= 512 && it.none(Char::isISOControl) }
-        }.distinct()
+                ?: return@mapNotNull null
+            Candidate(id, (entry as? JsonObject)?.let(::creationTime))
+        }.sortedByDescending { it.createdAt ?: Long.MIN_VALUE }
+            .map(Candidate::id).distinct()
     }.getOrNull()
+
+    private fun creationTime(entry: JsonObject): Long? = sequenceOf("created", "created_at", "createdAt")
+        .mapNotNull { key -> (entry[key] as? JsonPrimitive)?.content?.let(::parseCreationTime) }
+        .firstOrNull()
+
+    private fun parseCreationTime(value: String): Long? {
+        val numeric = value.toLongOrNull()
+        if (numeric != null) return numeric.takeIf { it > 0 }?.let {
+            if (it < 100_000_000_000L) it * 1_000 else it
+        }
+        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()?.takeIf { it > 0 }
+    }
 }

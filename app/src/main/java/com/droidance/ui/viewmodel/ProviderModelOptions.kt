@@ -10,7 +10,7 @@ internal fun providerModelOptions(
     discovered: List<String>,
     draft: List<String>,
     search: String
-): List<String> = (custom + selected + discovered + draft).distinct()
+): List<String> = (custom + discovered + selected + draft).distinct()
     .filter { it.contains(search.trim(), ignoreCase = true) }
 
 internal fun reconcileSelectedModels(previous: List<String>, requested: List<String>): List<String> {

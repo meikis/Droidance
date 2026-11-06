@@ -17,9 +17,11 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 - Group each provider's API and subscription addresses in one selector, retaining saved credentials and models for each address.
 - Refresh bundled model suggestions using current provider documentation.
+- Put popular providers and newer model suggestions first while preserving the selected default.
 
 ### Fixed
 
+- Open the API address selector reliably when tapped.
 - Keep wireless pairing code entry in notifications and remove manual pairing-port input.
 - Reuse initialized runtime fonts, defer renderer construction, and rebind network security policy without duplicate providers.
 - Allow local HTTP services while enforcing local destinations on requests and redirects.

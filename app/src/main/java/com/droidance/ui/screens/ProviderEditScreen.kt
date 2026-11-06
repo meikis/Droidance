@@ -478,7 +478,6 @@ private fun ProviderAddressMenu(
         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.045f)
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         Surface(
-            onClick = { expanded = !expanded },
             modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
             shape = AppShapes.Control,
             color = fieldColor,
