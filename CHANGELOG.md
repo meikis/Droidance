@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix runtime startup failures caused by system provider constructor differences.
+
 ## [0.2.0] - 2026-11-07
 
 - Back up and restore conversations, screenshots, memory, skills, and settings in a password-encrypted file.
