@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep Android 14+ background tasks from taking main-screen input focus, prevent task-driven keyboard switching, and return borrowed input focus after queries. Manual text entry remains available in the virtual-space viewer.
+
 ## [0.2.1] - 2026-11-08
 
 - Fix runtime startup failures that prevented tasks from starting on affected Android devices.
