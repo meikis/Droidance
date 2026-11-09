@@ -8,9 +8,14 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
-### Fixed
+## [0.2.2] - 2026-11-09
 
-- Keep Android 14+ background tasks from taking main-screen input focus, prevent task-driven keyboard switching, and return borrowed input focus after queries. Manual text entry remains available in the virtual-space viewer.
+- Prevent background tasks from taking main-screen input focus on Android 14+.
+- Return temporary input focus after queries and keep background tasks from switching the system keyboard.
+- Add text entry and Enter controls to the virtual-space viewer.
+- **Breaking:** Background `method=ime` and keyboard-show actions are disabled. Use `shortcut` or `paste_key`; use the viewer’s text control for manual entry on Android 14+.
+
+Known issue: Text replacement can intermittently retain previous text when editing two windows of the same app.
 
 ## [0.2.1] - 2026-11-08
 
