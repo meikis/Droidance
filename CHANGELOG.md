@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Fixed
+
+- Check updates directly from the release manifest instead of the GitHub API, retain known updates offline, and respect retry cooldowns.
+
 ## [0.2.2] - 2026-11-09
 
 - Prevent background tasks from taking main-screen input focus on Android 14+.

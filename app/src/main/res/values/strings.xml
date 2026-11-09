@@ -147,7 +147,10 @@
     <string name="update_status_latest">You\'re up to date</string>
     <string name="update_status_available">New version available: %1$s</string>
     <string name="update_status_error_network">Network connection failed. Please check network and retry.</string>
-    <string name="update_status_error_rate_limited">GitHub API rate limit exceeded. Please try again later.</string>
+    <string name="update_status_error_rate_limited">GitHub is temporarily limiting requests.</string>
+    <string name="update_status_error_access_denied">GitHub denied access to the update file.</string>
+    <string name="update_status_retry_after">Try again after %1$s.</string>
+    <string name="update_status_cached">Saved update information, checked %1$s.</string>
     <string name="update_status_error_generic">Failed to check for updates</string>
     <string name="update_action_check">Check</string>
     <string name="update_action_view">View</string>
