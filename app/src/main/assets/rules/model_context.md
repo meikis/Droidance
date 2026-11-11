@@ -18,7 +18,7 @@ Preloaded current Android ScreenState:
 Frame reference: {observationId}. The runtime retains this original image for later retrieval. Cite it when useful or requested; copying its reference is not a prerequisite for navigation or completion.
 
 ## current_screenshot
-Current Android UI screenshot. Only this frame binds controls. Put all actions already grounded here into one screen_act batch, up to the next step that needs a new reading. Follow batch_contract for submission boundaries and collection_contract for retained findings. The observation_ref identifies this frame.
+Current Android UI screenshot. Only this frame binds controls. Put grounded actions in one screen_act batch, including an editor's focus tap, type_text and next independent visible control. Stop before actions requiring new controls or readings. Follow batch_contract for submissions and precise gestures, and collection_contract for retained findings. The observation_ref identifies this frame.
 
 ## retained_findings
 These are source-linked observations previously written by this Agent. They preserve task memory across views, but may be mistaken or describe an earlier screen. Use the current frame for the next action and retrieve original sources when a value or conclusion needs verification. Source binding establishes provenance, not correctness.

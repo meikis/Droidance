@@ -12,6 +12,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 - Group screen actions that can run together, check form values before saving, and carry source-linked findings across screens.
 - Encourage larger groups of independent screen actions, skip routine waits, and retain overlapping views for list coverage.
+- Batch field entry with independent visible navigation and calibrate wheel drags from observed row spacing.
 
 ### Fixed
 
