@@ -38,7 +38,9 @@ data class MappedScreenAction(
     val targetX: Int? = null,
     val targetY: Int? = null,
     val actionIndex: Int = 0,
-    val focusFrom: Int? = null
+    val focusFrom: Int? = null,
+    /** Full control bounds in the decision frame's normalized coordinates, never a fresh frame. */
+    val gestureRegion: ModelCoordinateMapper.Bounds? = null
 ) {
     /**
      * A click executed right after another click in the same batch may first meet that click's
@@ -219,9 +221,24 @@ object ScreenActionBatchPlanner {
         } > 1) {
             return rejected("effect_key identifies one committing action; observe preparatory edits in an earlier call")
         }
+        val active = mapped.filter { it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT) }
+        val regionalDrags = active.takeIf { group ->
+            group.size in 2..policy.maxRegionalDrags && group.all {
+                it.operation == ScreenBatchOperation.DRAG && it.gestureRegion != null &&
+                    (Json.parseToJsonElement(it.argumentsJson).jsonObject.int("repeat") ?: 1) == 1
+            }
+        }?.map { checkNotNull(it.gestureRegion) }
+        val independentRegions = regionalDrags != null && regionalDrags.indices.all { index ->
+            regionalDrags.drop(index + 1).all { other ->
+                val region = regionalDrags[index]
+                region.right < other.left || other.right < region.left ||
+                    region.bottom < other.top || other.bottom < region.top
+            }
+        }
         mapped.forEachIndexed { index, action ->
             if (action.operation.name.lowercase() in policy.decisionBoundaryOperations &&
-                mapped.drop(index + 1).any { it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT) }) {
+                mapped.drop(index + 1).any { it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT) } &&
+                !(action.operation == ScreenBatchOperation.DRAG && independentRegions)) {
                 return rejected("action[$index] op=${action.sourceOperation} requires a new model observation before further actions")
             }
         }
@@ -394,7 +411,18 @@ object ScreenActionBatchPlanner {
             }.toString(), waitMs)
         }
         "swipe", "drag", "path" -> {
-            val payload = action.filterKeys { it != "op" }
+            // Region is a precondition owned by the batch, not a touch-driver argument.
+            val payload = action.filterKeys { it != "op" && it != "region" }
+            val region = action["region"]?.let { value ->
+                val bounds = value as? JsonObject ?: invalid("region must be an object")
+                if (bounds.keys != setOf("left", "top", "right", "bottom"))
+                    invalid("region requires exactly left, top, right and bottom")
+                ModelCoordinateMapper.Bounds(bounds.normalized("left")!!, bounds.normalized("top")!!,
+                    bounds.normalized("right")!!, bounds.normalized("bottom")!!).also {
+                    if (it.left >= it.right || it.top >= it.bottom)
+                        invalid("region requires left < right and top < bottom")
+                }
+            }
             if (type == "drag" && "repeat" in action) {
                 val repeat = action.int("repeat") ?: invalid("repeat must be an integer")
                 if (repeat !in 1..policy.maxDragRepeat) invalid("repeat=$repeat is outside 1..${policy.maxDragRepeat}")
@@ -412,12 +440,15 @@ object ScreenActionBatchPlanner {
             } else listOf("startX", "startY", "endX", "endY").forEach {
                 action.normalized(it) ?: invalid("$it is required")
             }
+            if (region != null && (listOf("startX", "endX").any { checkNotNull(action.int(it)) !in region.left..region.right } ||
+                    listOf("startY", "endY").any { checkNotNull(action.int(it)) !in region.top..region.bottom }))
+                invalid("drag endpoints must stay inside region")
             val operation = when (type) {
                 "swipe" -> ScreenBatchOperation.SWIPE
                 "drag" -> ScreenBatchOperation.DRAG
                 else -> ScreenBatchOperation.PATH
             }
-            MappedScreenAction(type, operation, JsonObject(payload).toString())
+            MappedScreenAction(type, operation, JsonObject(payload).toString(), gestureRegion = region)
         }
         "screenshot" -> MappedScreenAction(type, ScreenBatchOperation.SCREENSHOT, "{}")
             else -> invalid("is not supported")
@@ -659,6 +690,17 @@ class ScreenActionBatchExecutor(
             }
             completed += attempted
             recordProgress(index + 1)
+            if (action.operation == ScreenBatchOperation.TYPE_TEXT &&
+                result.metrics["text_input_current_editor_readback_verified"] != 1L &&
+                actions.drop(index + 1).any {
+                    it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT)
+                }) {
+                // Preserve the delivered input as completed. A fresh view must precede any later
+                // action when the runtime could not read the requested text back from the editor.
+                return ToolProtocolResult.failed("BATCH_TEXT_READBACK_REQUIRED", true, details = progressDetails(
+                    actions, completed, null, actions.drop(index + 1), "TEXT_READBACK_REQUIRED"
+                )).withProgress(actions.size, completed.size, index + 1)
+            }
         }
         return (lastActionResult ?: ToolProtocolResult.success("")).copy(outputText =
             "[SCREEN_ACT_BATCH_COMPLETED] completed=" + actions.size + "/" + actions.size +

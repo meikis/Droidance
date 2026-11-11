@@ -1312,7 +1312,8 @@ class ToolExecutor @Inject constructor(
         return readiness.copy(elapsedMs = SystemClock.elapsedRealtime() - started)
     }
 
-    private suspend fun executeRepeatedDrag(arguments: String, touchInput: TouchInputService): ToolExecutionResult {
+    private suspend fun executeRepeatedDrag(arguments: String, touchInput: TouchInputService,
+                                          region: ModelCoordinateMapper.Bounds? = null): ToolExecutionResult {
         val action = runCatching { Json.parseToJsonElement(arguments).jsonObject }.getOrNull()
             ?: return ToolProtocolResult.invalidArguments()
         val repeat = if ("repeat" in action) (action["repeat"] as? JsonPrimitive)
@@ -1349,7 +1350,13 @@ class ToolExecutor @Inject constructor(
                 }
             },
             drag = {
-                touchInput.path(primitive, drag = true, observeAfter = false).also {
+                // The baseline capture can take time. Recheck a declared control immediately before
+                // dispatch as well, without adopting that runtime frame as new model grounding.
+                val check = region?.let { observationSession.checkPreActionObservation(
+                    execution, usePendingTarget = false, targetRegion = it) }
+                (check?.rejection ?: touchInput.path(primitive, drag = true, observeAfter = false)).let {
+                    it.copy(metrics = it.metrics + check?.metrics.orEmpty())
+                }.also {
                     progress?.lastActionEndedAtElapsedMs = SystemClock.elapsedRealtime()
                 }
             },
@@ -1465,7 +1472,8 @@ class ToolExecutor @Inject constructor(
                             targetX = click?.x ?: mappedAction.targetX,
                             targetY = click?.y ?: mappedAction.targetY,
                             usePendingTarget = false,
-                            surfaceGesture = operation in VIEWPORT_GESTURES
+                            surfaceGesture = operation in VIEWPORT_GESTURES,
+                            targetRegion = mappedAction.gestureRegion
                         )
                         var observationCheck = checkTarget()
                         // A click delivered just before in this batch can leave its press feedback on or
@@ -1497,7 +1505,7 @@ class ToolExecutor @Inject constructor(
                                 touchInput.click(click.arguments, observeAfter = false)
                             }
                             ScreenBatchOperation.SWIPE -> touchInput.swipe(payload, observeAfter = false)
-                            ScreenBatchOperation.DRAG -> executeRepeatedDrag(payload, touchInput)
+                            ScreenBatchOperation.DRAG -> executeRepeatedDrag(payload, touchInput, mappedAction.gestureRegion)
                             ScreenBatchOperation.PATH -> touchInput.path(payload, drag = false, observeAfter = false)
                             ScreenBatchOperation.TYPE_TEXT -> if (usesFocus &&
                                 (focusTarget == null || focusActionIndex != mappedAction.focusFrom)) {

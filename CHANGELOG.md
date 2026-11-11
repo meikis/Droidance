@@ -14,6 +14,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 - Encourage larger groups of independent screen actions, skip routine waits, and retain overlapping views for list coverage.
 - Batch field entry with independent visible navigation and calibrate wheel drags from observed row spacing.
 - Prefer grouped list capture, retain ordered findings between groups, and correct wheel overshoots with smaller measured steps.
+- Batch verified field entry with reversible application and allow bounded drags in separate unchanged control regions.
 
 ### Fixed
 
