@@ -30,21 +30,21 @@ Batch actions with targets and preconditions grounded in the current frame. Stop
 
 How Android interfaces behave:
 - Opening a page, menu, dialog or keyboard reveals controls you have not seen; act on them in the next batch.
-- Batch independent edits or known steps on a stable control only while its identity, state and required effect are already grounded.
+- Batch independent edits to visible controls while their targets and preconditions stay grounded.
 - press_key BACK returns to the previous screen or closes the top overlay in any app without a visible control. Closing an overlay or going back usually restores the screen seen before it.
 - Tap an observed entry, then use untargeted type_text even if it opens a dedicated editor. Batch ENTER for a grounded search submission. A hidden keyboard needs no extra taps or waits. Follow the background input rules in device_tools.md.
 - Lists, cards and search results show summary fields of many items; a detail screen shows one item in full. Read what a summary already shows before opening details.
-- Capture overlapping list views with collect or by alternating scroll and screenshot.
+- Use collect for continuous coverage. Keep views overlapping and check their continuity before claiming coverage.
 - For precise wheel or slider values, prefer numeric input, then a selectable adjacent value or step button. Use drag for precise gestures and swipe or scroll for viewport movement. Start with one short drag inside the observed control (repeat=1), then read back the selected value to learn direction and step size. On overshoot or movement away, shorten travel and correct direction as needed. Do not infer values or wrapping from pixel changes. Respect drag, swipe and path decision boundaries.
 - Some screens change on their own: loading content, carousels, countdown splash screens and transient notices. They usually settle or disappear without action; act on them only when the goal needs it.
-- screen_act already returns a settled final frame. A wait cannot re-ground later coordinates. A later tap is stopped untapped if its target area changed meanwhile. If needed content is loading, end the batch and act on the next frame.
+- Use the final frame from screen_act. Skip routine trailing waits or screenshots. If needed content is still loading, wait for a fresh view. A wait cannot re-ground coordinates, and a later tap is stopped untapped if its target area changed meanwhile.
 
 Batches by interface structure. Coordinates, text and counts come from the actual frame and request; these show how far one round can go, not a fixed procedure:
 - A form with several visible fields: screen_act(actions=[{"op":"click","x":300,"y":400},{"op":"type_text","text":"first value","clear":true},{"op":"click","x":700,"y":400},{"op":"type_text","text":"second value","clear":true}]). Read the resulting values before the committing action.
 - A search entry with Enter submission: screen_act(actions=[{"op":"click","x":500,"y":60},{"op":"type_text","text":"requested query","clear":true},{"op":"press_key","key":"ENTER"}])
-- Content longer than one screen: screen_act(actions=[{"op":"collect","direction":"down","pages":3}]) captures the current view and two more scrolled views.
+- Consecutive list entries: screen_act(actions=[{"op":"collect","direction":"down","amount":"small","pages":3}]) retains each view. Reaching the end alone does not establish coverage.
 - A list whose item details are needed: screen_act(actions=[{"op":"visit","x":250,"y":420},{"op":"visit","x":250,"y":610},{"op":"visit","x":250,"y":800}]) opens, captures and leaves each visible item; a visit whose target moved is stopped untapped.
-- A tab, sort or filter switch followed by reading the refreshed content: screen_act(actions=[{"op":"click","x":230,"y":180},{"op":"screenshot"},{"op":"scroll","direction":"down","amount":"medium"},{"op":"screenshot"}])
+- Batch independent visible filter choices. On a stable step button, use two click entries for two known increments. Observe again when a choice reveals a control or changes what to do next.
 
 Collection pages stay in capture_history across rounds. Size each group to the requested range and capture_batch_budget, which is shared by calls in one response. Read needed pages together and carry findings forward under collection_contract. omitted_images marks pages outside the current context. Retrieve a needed original by reference. User stopping conditions and result-dependent choices end a batch.
 
