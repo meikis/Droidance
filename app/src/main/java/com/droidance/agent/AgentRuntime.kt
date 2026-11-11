@@ -106,6 +106,7 @@ class AgentRuntime @Inject constructor(
     private val taskLifecycle: TaskLifecycle,
     private val conversationHistoryReader: ConversationHistoryReader,
     private val eventStore: AgentEventStore,
+    private val cacheMaintenance: RuntimeCacheMaintenance,
     private val appTakeoverStore: AppTakeoverStore,
     private val appTakeoverPromptBuilder: com.droidance.automation.AppTakeoverPromptBuilder,
     private val processRecoveryCoordinator: AgentProcessRecoveryCoordinator,
@@ -1470,8 +1471,10 @@ class AgentRuntime @Inject constructor(
                     }
                 }
             } finally {
-                if (currentJob != null) {
-                    unregisterActiveJob(runtimeTaskId, currentJob)
+                try {
+                    cacheMaintenance.afterTask()
+                } finally {
+                    if (currentJob != null) unregisterActiveJob(runtimeTaskId, currentJob)
                 }
             }
         }
@@ -1785,6 +1788,8 @@ host = object : com.droidance.core.agent.TurnHost {
         } catch (error: Exception) {
             debugLogManager.appendEvent("Background skill draft failed: ${error.javaClass.simpleName}")
             throw error
+        } finally {
+            cacheMaintenance.afterTask()
         }
     }
 

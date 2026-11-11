@@ -23,6 +23,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 - Confirm or deny high-risk tool calls in chat without opening the device viewer.
 - Reload model lists when opening the picker, support lists that require no API key, and show refreshed results without the previous search filter.
 - Let models finish loading and processing the prompt within the request budget without a separate first-event timeout.
+- Reclaim unreferenced attachments, expired exports and duplicate diagnostic images after tasks while preserving conversation screenshots and rebuilding diagnostic copies only during export.
 
 ## [0.2.2] - 2026-11-09
 
