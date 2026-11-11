@@ -45,6 +45,14 @@
     <string name="manual_takeover_resumed_action">Resumed, observing the current screen</string>
     <string name="chat_takeover_title">Handle the current screen</string>
     <string name="chat_takeover_handle">Handle now</string>
+    <string name="tool_confirmation_title">Allow %1$s to run?</string>
+    <string name="tool_confirmation_reason">This action may affect device state or access sensitive data.</string>
+    <string name="tool_confirmation_allow_once">Allow once</string>
+    <string name="tool_confirmation_deny">Deny</string>
+    <string name="tool_confirmation_denied">Tool call denied</string>
+    <string name="tool_confirmation_expired">Tool confirmation expired</string>
+    <string name="tool_confirmation_waiting">Waiting for tool confirmation</string>
+    <string name="tool_confirmation_notification_text">Open the conversation to review the tool request.</string>
     <string name="chat_takeover_resolved">Handled on device. The task has resumed.</string>
     <string name="chat_takeover_closed">This takeover request has ended</string>
     <string name="chat_permission_title">Permission Authorization Required</string>

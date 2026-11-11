@@ -45,6 +45,14 @@
     <string name="manual_takeover_resumed_action">已恢复，重新观察当前页面</string>
     <string name="chat_takeover_title">处理当前页面</string>
     <string name="chat_takeover_handle">去处理</string>
+    <string name="tool_confirmation_title">是否允许执行 %1$s？</string>
+    <string name="tool_confirmation_reason">此操作可能改变设备状态或访问敏感数据。</string>
+    <string name="tool_confirmation_allow_once">允许一次</string>
+    <string name="tool_confirmation_deny">拒绝</string>
+    <string name="tool_confirmation_denied">已拒绝执行工具</string>
+    <string name="tool_confirmation_expired">工具确认已过期</string>
+    <string name="tool_confirmation_waiting">等待工具确认</string>
+    <string name="tool_confirmation_notification_text">请打开对话查看工具确认请求。</string>
     <string name="chat_takeover_resolved">已在设备端处理，任务已继续</string>
     <string name="chat_takeover_closed">此次接管已结束</string>
     <string name="chat_permission_title">需要你授权系统权限</string>

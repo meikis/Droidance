@@ -7,6 +7,8 @@ import com.droidance.ui.icons.DroidanceIcons
 import com.droidance.ui.theme.AppShapes
 import android.content.Context
 import com.droidance.ui.execution.PendingPermissionUiState
+import com.droidance.core.agent.UserInteractionRequest
+import com.droidance.core.agent.UserInteractionState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -56,6 +58,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -148,7 +151,9 @@ private fun EventStoreTaskCardBubble(
     onStop: () -> Unit,
     onExecutionLayoutChange: () -> Unit,
     pendingPermission: PendingPermissionUiState? = null,
-    onRequestPermission: () -> Unit = {}
+    onRequestPermission: () -> Unit = {},
+    toolConfirmation: UserInteractionRequest? = null,
+    onToolConfirmation: (String, Boolean) -> Unit = { _, _ -> }
 ) {
     val activity = presentation.activity
     val paused = isPaused || presentation.isPaused(isPaused)
@@ -307,7 +312,9 @@ private fun EventStoreTaskCardBubble(
             }
         }
 
-        if (paused && pendingPermission == null) {
+        if (toolConfirmation != null) {
+            ToolConfirmationActionBlock(toolConfirmation, onToolConfirmation)
+        } else if (paused && pendingPermission == null) {
             TakeoverActionBlock(
                 action = TakeoverActionPresentation(
                     interactionId = presentation.turnId,
@@ -537,7 +544,8 @@ private fun TakeoverStyleActionCard(
     hint: String = "",
     buttonText: String? = null,
     buttonEnabled: Boolean = true,
-    onButtonClick: () -> Unit = {}
+    onButtonClick: () -> Unit = {},
+    actions: @Composable ColumnScope.() -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -603,6 +611,35 @@ private fun TakeoverStyleActionCard(
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Start
                     )
+                }
+            }
+            actions()
+        }
+    }
+}
+
+@Composable
+internal fun ToolConfirmationActionBlock(
+    request: UserInteractionRequest,
+    onResponse: (String, Boolean) -> Unit
+) {
+    val title = when (request.state) {
+        UserInteractionState.PENDING -> stringResource(R.string.tool_confirmation_title, request.toolName.orEmpty())
+        UserInteractionState.DENIED -> stringResource(R.string.tool_confirmation_denied)
+        UserInteractionState.EXPIRED -> stringResource(R.string.tool_confirmation_expired)
+        else -> return
+    }
+    TakeoverStyleActionCard(
+        title = title,
+        reason = if (request.state == UserInteractionState.PENDING) stringResource(R.string.tool_confirmation_reason) else ""
+    ) {
+        if (request.state == UserInteractionState.PENDING) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                TextButton(onClick = { onResponse(request.requestId, false) }) {
+                    Text(stringResource(R.string.tool_confirmation_deny))
+                }
+                Button(onClick = { onResponse(request.requestId, true) }) {
+                    Text(stringResource(R.string.tool_confirmation_allow_once))
                 }
             }
         }
@@ -1085,7 +1122,9 @@ internal fun ChatBubble(
     onStop: () -> Unit = {},
     onExecutionLayoutChange: () -> Unit = {},
     pendingPermission: PendingPermissionUiState? = null,
-    onRequestPermission: () -> Unit = {}
+    onRequestPermission: () -> Unit = {},
+    toolConfirmation: UserInteractionRequest? = null,
+    onToolConfirmation: (String, Boolean) -> Unit = { _, _ -> }
 ) {
     val clipboardManager = LocalClipboardManager.current
     val haptics = rememberAppHaptics()
@@ -1134,7 +1173,9 @@ internal fun ChatBubble(
                 onStop = onStop,
                 onExecutionLayoutChange = onExecutionLayoutChange,
                 pendingPermission = pendingPermission,
-                onRequestPermission = onRequestPermission
+                onRequestPermission = onRequestPermission,
+                toolConfirmation = toolConfirmation,
+                onToolConfirmation = onToolConfirmation
             )
             if (copyText.isNotBlank() || tokenUsage != null) {
                 Row(
@@ -1260,6 +1301,9 @@ internal fun ChatBubble(
                     }
                 }
             }
+        }
+        if (toolConfirmation != null) {
+            ToolConfirmationActionBlock(toolConfirmation, onToolConfirmation)
         }
         Row(
             modifier = (if (tokenUsage != null) Modifier.fillMaxWidth() else Modifier).padding(start = 4.dp, top = 0.dp, end = 4.dp),

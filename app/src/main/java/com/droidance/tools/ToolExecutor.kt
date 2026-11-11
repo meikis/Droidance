@@ -27,6 +27,8 @@ import com.droidance.core.agent.event.ToolBinding
 import com.droidance.core.device.debug.DiagnosticsCollector
 import com.droidance.debug.ExecutionPathClassifier
 import com.droidance.core.model.llm.models.ToolCall
+import com.droidance.core.agent.UserInteractionState
+import com.droidance.core.agent.event.TurnEventScope
 import com.droidance.core.model.llm.models.ToolDefinition
 import com.droidance.settings.ExecutionSettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -297,6 +299,17 @@ class ToolExecutor @Inject constructor(
         binding = ToolBinding.TURN_LOCAL
     )
 
+    override suspend fun awaitToolConfirmation(toolCall: ToolCall, result: ToolExecutionResult): ToolExecutionResult? {
+        if (result.diagnosticCode != ToolRiskPolicy.CONFIRMATION_REQUIRED) return result
+        val turn = toolTurnServices.requireCurrent()
+        val scope = TurnEventScope(turn.sessionContext.threadId, turn.sessionContext.turnId)
+        return when (val response = turn.interaction.awaitHighRiskConfirmation(scope, toolCall.id, toolCall.name)) {
+            UserInteractionState.RESOLVED -> null
+            UserInteractionState.CANCELED -> ToolProtocolResult.notExecuted("USER_CONTEXT_CHANGED", retryable = true)
+            else -> ToolRiskPolicy.confirmationRejection(response)
+        }
+    }
+
     private suspend fun execute(
         toolCall: ToolCall,
         autoCaptureAfterTool: Boolean,
@@ -462,12 +475,13 @@ class ToolExecutor @Inject constructor(
                 toolName = toolCall.name,
                 arguments = toolCall.arguments,
                 policy = ruleConfigManager.harnessPolicy().toolSafety,
-                scope = com.droidance.core.agent.event.TurnEventScope(
-                    turnBinding.sessionContext.threadId, turnBinding.sessionContext.turnId)
+                scope = TurnEventScope(turnBinding.sessionContext.threadId, turnBinding.sessionContext.turnId),
+                callId = eventToolCallId
             )
             if (!riskDecision.allowed) {
+                val rejection = checkNotNull(riskDecision.rejection)
                 if (riskDecision.requiresConfirmation) {
-                    turnBinding.interaction.requestHighRiskConfirmation(riskDecision.reason)
+                    return rejection
                 }
                 val durationMs = System.currentTimeMillis() - started
                 timingRecorder.record(
@@ -476,7 +490,7 @@ class ToolExecutor @Inject constructor(
                     success = false,
                     detail = riskDecision.reason
                 )
-                return finishEvent(checkNotNull(riskDecision.rejection))
+                return finishEvent(rejection)
             }
             turnBinding.progress.updateCurrentToolDetail(toolCall.name, toolCall.arguments)
             val executionPath = ExecutionPathClassifier.classify(toolCall.name, toolCall.arguments)
