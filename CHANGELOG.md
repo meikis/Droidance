@@ -19,6 +19,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 - Use the lowercase GitHub owner name in app links.
 - Confirm or deny high-risk tool calls in chat without opening the device viewer.
 - Reload model lists when opening the picker, support lists that require no API key, and show refreshed results without the previous search filter.
+- Let models finish loading and processing the prompt within the request budget without a separate first-event timeout.
 
 ## [0.2.2] - 2026-11-09
 

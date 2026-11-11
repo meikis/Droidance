@@ -32,12 +32,10 @@ runtime_thresholds:
   llm_transient_retry_backoff_ms: 2000
   # A decision and its transient retries share one monotonic recovery budget.
   llm_recovery_timeout_ms: 600000
-  # Provider reasoning renews stream liveness. Only silence or the total request budget
-  # ends a request; a first-output deadline must not interrupt continuing reasoning.
-  # One minute of provider silence is treated as a stalled connection and retried, so a
-  # dropped stream does not hold the task for minutes.
+  # Let providers finish loading and processing the prompt within the round budget.
+  # Once stream events arrive, provider activity renews the idle deadline.
   llm_round_timeout_ms: 600000
-  llm_first_event_timeout_ms: 60000
+  llm_first_event_timeout_ms: 0
   llm_stream_idle_timeout_ms: 60000
   llm_first_output_timeout_ms: 0
   # Reserve space for reasoning and complete structured calls; the model may finish early.
