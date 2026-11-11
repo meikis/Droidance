@@ -422,7 +422,7 @@
     <string name="provider_models_add">添加</string>
     <string name="provider_models_done">完成（%1$d）</string>
     <string name="provider_models_empty">没有找到模型</string>
-    <string name="provider_models_connection_required">请先填写 API 地址和密钥。</string>
+    <string name="provider_models_connection_required">请先填写 API 地址。</string>
     <string name="provider_models_unsupported">此地址不提供模型列表。</string>
     <string name="provider_models_fetch_failed">无法获取模型，请重试。</string>
     <string name="provider_models_none_returned">未返回模型。</string>

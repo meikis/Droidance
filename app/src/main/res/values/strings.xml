@@ -422,7 +422,7 @@
     <string name="provider_models_add">Add</string>
     <string name="provider_models_done">Done (%1$d)</string>
     <string name="provider_models_empty">No models found</string>
-    <string name="provider_models_connection_required">Enter an API address and key to fetch models.</string>
+    <string name="provider_models_connection_required">Enter an API address to fetch models.</string>
     <string name="provider_models_unsupported">This address does not provide a model list.</string>
     <string name="provider_models_fetch_failed">Could not fetch models. Try again.</string>
     <string name="provider_models_none_returned">No models were returned.</string>

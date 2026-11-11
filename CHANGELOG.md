@@ -18,6 +18,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 - Check updates directly from the release manifest instead of the GitHub API, retain known updates offline, and respect retry cooldowns.
 - Use the lowercase GitHub owner name in app links.
 - Confirm or deny high-risk tool calls in chat without opening the device viewer.
+- Reload model lists when opening the picker, support lists that require no API key, and show refreshed results without the previous search filter.
 
 ## [0.2.2] - 2026-11-09
 
