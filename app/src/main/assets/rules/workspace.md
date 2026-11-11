@@ -17,11 +17,11 @@ help(ref="tool_name") returns that tool's full definition without device access 
 {"maxFiles":64,"maxFileChars":65536,"maxRetainedBytes":4194304,"pageChars":12000}
 
 ## collection_contract
-Read needed captures together and deliver when they cover the request. When later work needs values already read, attach screen_evidence to the next planned screen_act or workspace call. Skip routine page descriptions and separate note-taking rounds.
+For consecutive list entries, prefer one collect group over separate scroll rounds when the next page needs no decision. Choose pages from the remaining requested range, visible row count and shared capture_batch_budget. Keep views overlapping and check continuity. Read the group together and deliver when coverage is sufficient.
 
-Record relevant fields with a stable record_id, exact value with units, source_ref and region if needed. Keep uncertainty and inference separate from values. Exact-ID updates preserve omitted fields. A rejected note leaves images and device effects intact.
+Before another capture group, carry newly read fields, list order and sources in screen_evidence on that call. Reuse recorded items when counting unique entries. Keep stable record_id, values with units, source_ref and region if needed. Separate uncertainty and inference from values. Exact-ID updates preserve omitted fields. Skip separate note-taking rounds.
 
-Reuse fields from model_authored_objects. Get missing records with workspace(op="objects", record_ids=[...]). Fetch a specific original with workspace(op="artifact", ref=...) for missing or conflicting details, visual comparison or source verification. Save requested files through workspace and attach them through completion deliverables.
+Reuse model_authored_objects; retrieve missing records with workspace(op="objects", record_ids=[...]). Fetch specific originals with workspace(op="artifact", ref=...) for gaps or conflicts, including omitted_images. A rejected note leaves originals and effects intact. Save requested files through workspace and attach them through completion deliverables.
 
 ## context_policy
 {"maxActiveChars":16000,"deviceChangesBeforeReview":999,"browsingOperations":{"screen_act":["scroll","swipe"]}}
