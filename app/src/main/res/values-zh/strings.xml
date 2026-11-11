@@ -552,7 +552,7 @@
     <string name="settings_limit_minutes">分钟</string>
     <string name="settings_limit_value">%1$d %2$s · 修改</string>
     <string name="automation_next_preview">下次执行：%1$s（%2$s）</string>
-    <string name="settings_repository_url" translatable="false">https://github.com/YbbLab/Droidance</string>
+    <string name="settings_repository_url" translatable="false">https://github.com/ybblab/Droidance</string>
     <string name="connection_unpaired_title">设备尚未连接</string>
     <string name="connection_unpaired_description">目前无法操作手机。请通过无线调试配对这台手机，以建立设备连接。</string>
     <string name="connection_pairing_required_title">需要重新配对</string>

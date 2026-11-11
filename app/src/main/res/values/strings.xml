@@ -552,7 +552,7 @@
     <string name="settings_limit_minutes">minutes</string>
     <string name="settings_limit_value">%1$d %2$s · Edit</string>
     <string name="automation_next_preview">Next run: %1$s (%2$s)</string>
-    <string name="settings_repository_url" translatable="false">https://github.com/YbbLab/Droidance</string>
+    <string name="settings_repository_url" translatable="false">https://github.com/ybblab/Droidance</string>
     <string name="connection_unpaired_title">Device not connected</string>
     <string name="connection_unpaired_description">Phone operations are unavailable. Pair this phone using wireless debugging to connect the device.</string>
     <string name="connection_pairing_required_title">Pairing required</string>
