@@ -8,6 +8,10 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
+### Changed
+
+- Group screen actions that can run together, check form values before saving, and carry source-linked findings across screens.
+
 ### Fixed
 
 - Check updates directly from the release manifest instead of the GitHub API, retain known updates offline, and respect retry cooldowns.

@@ -64,7 +64,7 @@ Tool summaries and parameter descriptions are concise request documentation; the
   ],
   "parameterDescriptions": {
     "screen_act": {
-      "actions[].op": "Screen operation. visit opens, captures and returns with BACK. collect captures successive list views. swipe flicks with inertia; drag moves precisely and rests before release. For a wheel, make one short adjacent-row drag with repeat=1 and inspect the resulting value before another action. Calibrate direction and step size; reduce travel after overshooting. Policy decision boundaries end drag/swipe/path groups before further actions. Observe all final values before saving. Gesture receipt coordinates labeled physical_pixels are device pixels, not normalized input coordinates.",
+      "actions[].op": "Screen operation. visit opens, captures and returns with BACK. collect captures successive list views. swipe flicks with inertia; drag moves precisely and rests before release. Follow batch_contract for precise controls and decision boundaries. Gesture receipt coordinates labeled physical_pixels are device pixels, not normalized input coordinates.",
       "actions[].ms": "Pause for op=wait, defaulting to policy default_wait_ms.",
       "wait_for_frame_ms": "Optional extra pause before the final frame, which already waits for rendering to settle.",
       "screen_evidence": "Optional record deltas per collection_contract; a rejection never blocks the call.",
