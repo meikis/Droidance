@@ -222,18 +222,26 @@ object ScreenActionBatchPlanner {
             return rejected("effect_key identifies one committing action; observe preparatory edits in an earlier call")
         }
         val active = mapped.filter { it.operation !in setOf(ScreenBatchOperation.SCREENSHOT, ScreenBatchOperation.WAIT) }
-        val regionalDrags = active.takeIf { group ->
-            group.size in 2..policy.maxRegionalDrags && group.all {
-                it.operation == ScreenBatchOperation.DRAG && it.gestureRegion != null &&
-                    (Json.parseToJsonElement(it.argumentsJson).jsonObject.int("repeat") ?: 1) == 1
+        // A drag-only batch names its exact defect so the same Agent can repair it in one step.
+        if (active.size > 1 && active.all { it.operation == ScreenBatchOperation.DRAG }) {
+            if (active.any { it.gestureRegion == null })
+                return rejected("action[${active.first().actionIndex - 1}] op=drag requires a new model observation before " +
+                    "further actions; only drags with a declared region on every control may share a batch")
+            active.firstOrNull { (Json.parseToJsonElement(it.argumentsJson).jsonObject.int("repeat") ?: 1) != 1 }?.let {
+                return rejected("action[${it.actionIndex - 1}] op=drag needs repeat=1 to share a drag-only batch")
             }
-        }?.map { checkNotNull(it.gestureRegion) }
-        val independentRegions = regionalDrags != null && regionalDrags.indices.all { index ->
-            regionalDrags.drop(index + 1).all { other ->
-                val region = regionalDrags[index]
-                region.right < other.left || other.right < region.left ||
-                    region.bottom < other.top || other.bottom < region.top
+            if (active.size > policy.maxRegionalDrags)
+                return rejected("drag-only batch has ${active.size} drags; max_regional_drags=${policy.maxRegionalDrags}")
+            active.forEachIndexed { index, action ->
+                active.drop(index + 1).firstOrNull { other -> overlaps(checkNotNull(action.gestureRegion),
+                    checkNotNull(other.gestureRegion)) }?.let { other ->
+                    return rejected("action[${action.actionIndex - 1}] and action[${other.actionIndex - 1}] " +
+                        "regions overlap; regional drags need non-overlapping regions")
+                }
             }
+        }
+        val independentRegions = active.size in 2..policy.maxRegionalDrags && active.all {
+            it.operation == ScreenBatchOperation.DRAG && it.gestureRegion != null
         }
         mapped.forEachIndexed { index, action ->
             if (action.operation.name.lowercase() in policy.decisionBoundaryOperations &&
@@ -294,6 +302,9 @@ object ScreenActionBatchPlanner {
         }
 
     private const val DEFAULT_COLLECT_PAGES = 3
+
+    private fun overlaps(a: ModelCoordinateMapper.Bounds, b: ModelCoordinateMapper.Bounds): Boolean =
+        !(a.right < b.left || b.right < a.left || a.bottom < b.top || b.bottom < a.top)
 
     /** The exact field and value let the same Agent repair a rejected batch in one step. */
     private class InvalidActionArgument(message: String) : Exception(message)
@@ -440,9 +451,16 @@ object ScreenActionBatchPlanner {
             } else listOf("startX", "startY", "endX", "endY").forEach {
                 action.normalized(it) ?: invalid("$it is required")
             }
-            if (region != null && (listOf("startX", "endX").any { checkNotNull(action.int(it)) !in region.left..region.right } ||
-                    listOf("startY", "endY").any { checkNotNull(action.int(it)) !in region.top..region.bottom }))
-                invalid("drag endpoints must stay inside region")
+            if (region != null) {
+                listOf("startX", "endX").firstOrNull { checkNotNull(action.int(it)) !in region.left..region.right }?.let {
+                    invalid("$it=${action.int(it)} is outside region left..right ${region.left}..${region.right}; " +
+                        "drag endpoints must stay inside region")
+                }
+                listOf("startY", "endY").firstOrNull { checkNotNull(action.int(it)) !in region.top..region.bottom }?.let {
+                    invalid("$it=${action.int(it)} is outside region top..bottom ${region.top}..${region.bottom}; " +
+                        "drag endpoints must stay inside region")
+                }
+            }
             val operation = when (type) {
                 "swipe" -> ScreenBatchOperation.SWIPE
                 "drag" -> ScreenBatchOperation.DRAG
