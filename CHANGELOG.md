@@ -19,6 +19,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Make the running-status text shimmer slightly clearer in light and dark themes.
 - Wait until a screen has stayed still for a minimum time before acting on it, so mid-transition frames no longer drive the next action.
 - Stop repeating drags that leave the screen unchanged and require a different method after the retry limit.
 - Name the out-of-range coordinate, regional drag limit or overlapping regions when a grouped drag is rejected.

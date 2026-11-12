@@ -5,6 +5,7 @@ package com.droidance.ui.screens.home
 
 import com.droidance.ui.icons.DroidanceIcons
 import com.droidance.ui.theme.AppShapes
+import com.droidance.ui.theme.LocalAppIsDark
 import android.content.Context
 import com.droidance.ui.execution.PendingPermissionUiState
 import com.droidance.core.agent.UserInteractionRequest
@@ -473,6 +474,7 @@ private fun ShimmeringRunningLogText(text: String, modifier: Modifier = Modifier
         FlatMarkdown(content = mobileMarkdownContent(text), modifier = modifier)
         return
     }
+    val baseAlpha = if (LocalAppIsDark.current) 0.66f else 0.64f
     val transition = rememberInfiniteTransition(label = "runningLogShimmer")
     val progress by transition.animateFloat(
         initialValue = 0f,
@@ -484,7 +486,7 @@ private fun ShimmeringRunningLogText(text: String, modifier: Modifier = Modifier
         label = "shimmerProgress"
     )
 
-    // Keep the ordinary reply's Markdown layout. Only its opacity changes across the light band.
+    // A slightly wider opacity range keeps the neutral sweep visible on both backgrounds.
     FlatMarkdown(
         content = mobileMarkdownContent(text),
         modifier = modifier
@@ -495,8 +497,8 @@ private fun ShimmeringRunningLogText(text: String, modifier: Modifier = Modifier
                 val startX = -bandWidth + progress * (size.width + bandWidth * 2f)
                 drawRect(
                     brush = Brush.linearGradient(
-                        colors = listOf(Color.Black.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.95f),
-                            Color.Black.copy(alpha = 0.72f)),
+                        colors = listOf(Color.Black.copy(alpha = baseAlpha), Color.Black,
+                            Color.Black.copy(alpha = baseAlpha)),
                         start = Offset(startX, 0f),
                         end = Offset(startX + bandWidth, 0f)
                     ),
