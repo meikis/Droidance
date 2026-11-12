@@ -8,27 +8,19 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ## [Unreleased]
 
-### Changed
+## [0.2.3] - 2026-11-12
 
-- Group screen actions that can run together, check form values before saving, and carry source-linked findings across screens.
-- Encourage larger groups of independent screen actions, skip routine waits, and retain overlapping views for list coverage.
-- Batch field entry with independent visible navigation and calibrate wheel drags from observed row spacing.
-- Prefer grouped list capture, retain ordered findings between groups, and correct wheel overshoots with smaller measured steps.
-- Batch verified field entry with reversible application and allow bounded drags in separate unchanged control regions.
-- Reserve effect keys for verified persistent commits instead of navigation, focus or reversible input.
+Refine multi-step screen actions, list collection, and date/time wheel controls.
 
-### Fixed
+Improve waits after page transitions and feedback when actions need recovery.
 
-- Make the running-status text shimmer slightly clearer in light and dark themes.
-- Wait until a screen has stayed still for a minimum time before acting on it, so mid-transition frames no longer drive the next action.
-- Stop repeating drags that leave the screen unchanged and require a different method after the retry limit.
-- Name the out-of-range coordinate, regional drag limit or overlapping regions when a grouped drag is rejected.
-- Check updates directly from the release manifest instead of the GitHub API, retain known updates offline, and respect retry cooldowns.
-- Use the lowercase GitHub owner name in app links.
-- Confirm or deny high-risk tool calls in chat without opening the device viewer.
-- Reload model lists when opening the picker, support lists that require no API key, and show refreshed results without the previous search filter.
-- Let models finish loading and processing the prompt within the request budget without a separate first-event timeout.
-- Reclaim unreferenced attachments, expired exports and duplicate diagnostic images after tasks while preserving conversation screenshots and rebuilding diagnostic copies only during export.
+Allow slower models to begin responding within the request budget, and refresh model lists when opened.
+
+Confirm or decline actions directly in chat.
+
+Fix update checks and clean unused attachments and expired caches while preserving conversation screenshots.
+
+Make running-status text shimmer clearer in light and dark themes.
 
 ## [0.2.2] - 2026-11-09
 
