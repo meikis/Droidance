@@ -15,6 +15,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 - Batch field entry with independent visible navigation and calibrate wheel drags from observed row spacing.
 - Prefer grouped list capture, retain ordered findings between groups, and correct wheel overshoots with smaller measured steps.
 - Batch verified field entry with reversible application and allow bounded drags in separate unchanged control regions.
+- Reserve effect keys for verified persistent commits instead of navigation, focus or reversible input.
 
 ### Fixed
 

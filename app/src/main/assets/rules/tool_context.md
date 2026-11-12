@@ -63,7 +63,11 @@ Tool summaries and parameter descriptions are concise request documentation; the
     "done"
   ],
   "parameterDescriptions": {
+    "android_act": {
+      "effect_key": "Only for a persistent effect being committed; omit for opening apps or other navigation. Preserve the same key across recovery of that effect."
+    },
     "screen_act": {
+      "effect_key": "Only for one persistent commit after its prepared values are verified; omit for navigation, focus and reversible input batches. Preserve the same key across recovery of that commit.",
       "actions[].op": "Screen operation. Prefer collect for consecutive views when further movement needs no new decision. scroll navigates one view. visit opens, captures and returns with BACK. swipe flicks with inertia; drag moves precisely. Follow batch_contract for calibration, correction and decision boundaries. Receipts labeled physical_pixels use device pixels.",
       "actions[].ms": "Pause for op=wait, defaulting to policy default_wait_ms.",
       "wait_for_frame_ms": "Extra pause for a known slow transition. Omit for routine rendering, which already settles before the final frame.",
