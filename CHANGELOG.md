@@ -18,6 +18,7 @@ Record a notable change in `Unreleased` within the same pull request that implem
 
 ### Fixed
 
+- Wait until a screen has stayed still for a minimum time before acting on it, so mid-transition frames no longer drive the next action.
 - Check updates directly from the release manifest instead of the GitHub API, retain known updates offline, and respect retry cooldowns.
 - Use the lowercase GitHub owner name in app links.
 - Confirm or deny high-risk tool calls in chat without opening the device viewer.

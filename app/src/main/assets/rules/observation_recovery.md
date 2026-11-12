@@ -30,16 +30,16 @@ Choose a materially different grounded method for the remaining requirement, or 
 
 
 ## gesture_capture_policy
-{"initialWaitMs":250,"timeoutMs":600,"intervalMs":120,"stableSamples":2,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":1500,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0}
+{"initialWaitMs":250,"timeoutMs":600,"intervalMs":120,"stableSamples":2,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":1500,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0,"minStableMs":120}
 
 ## drag_capture_policy
-{"initialWaitMs":150,"timeoutMs":1500,"intervalMs":100,"stableSamples":3,"pixelDelta":8,"changedFraction":0.001,"localizedMotionMaxFraction":0.0,"localizedMotionSamples":3,"settleExtensionMs":1500,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0}
+{"initialWaitMs":150,"timeoutMs":1500,"intervalMs":100,"stableSamples":3,"pixelDelta":8,"changedFraction":0.001,"localizedMotionMaxFraction":0.0,"localizedMotionSamples":3,"settleExtensionMs":1500,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0,"minStableMs":200}
 
 ## action_capture_policy
-{"initialWaitMs":350,"timeoutMs":800,"intervalMs":120,"stableSamples":3,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":2500,"lateChangeProbeMs":600,"newViewChangedFraction":0.3,"quietViewChangedFraction":0.01}
+{"initialWaitMs":350,"timeoutMs":800,"intervalMs":120,"stableSamples":3,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":2500,"lateChangeProbeMs":600,"newViewChangedFraction":0.3,"quietViewChangedFraction":0.01,"minStableMs":240}
 
 ## collection_capture_policy
-{"initialWaitMs":350,"timeoutMs":2000,"intervalMs":120,"stableSamples":3,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":1500,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0}
+{"initialWaitMs":350,"timeoutMs":2000,"intervalMs":120,"stableSamples":3,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":1500,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0,"minStableMs":240}
 
 ## input_settle_policy
-{"initialWaitMs":0,"timeoutMs":1500,"intervalMs":100,"stableSamples":3,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":0,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0}
+{"initialWaitMs":0,"timeoutMs":1500,"intervalMs":100,"stableSamples":3,"pixelDelta":8,"changedFraction":0.005,"localizedMotionMaxFraction":0.15,"localizedMotionSamples":3,"settleExtensionMs":0,"lateChangeProbeMs":0,"newViewChangedFraction":1.0,"quietViewChangedFraction":0.0,"minStableMs":200}

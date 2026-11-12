@@ -671,7 +671,7 @@ internal class ToolObservationSession(
         return com.droidance.core.device.tools.VisualFrameSampler(
             capture = { deviceBackend.sampleScreen() }, elapsedMillis = { SystemClock.elapsedRealtime() })
             .sample(policy.timeoutMs, policy.intervalMs, policy.stableSamples, policy.pixelDelta,
-                policy.changedFraction, policy.localizedMotionMaxFraction, policy.localizedMotionSamples)
+                policy.changedFraction, policy.localizedMotionMaxFraction, policy.localizedMotionSamples, policy.minStableMs)
     }
 
     private fun capturePolicy(section: String): com.droidance.core.device.tools.PostActionFrameCapture.Policy {
@@ -689,7 +689,8 @@ internal class ToolObservationSession(
             settleExtensionMs = checkNotNull(config["settleExtensionMs"]?.jsonPrimitive?.longOrNull),
             lateChangeProbeMs = checkNotNull(config["lateChangeProbeMs"]?.jsonPrimitive?.longOrNull),
             newViewChangedFraction = checkNotNull(config["newViewChangedFraction"]?.jsonPrimitive?.doubleOrNull),
-            quietViewChangedFraction = checkNotNull(config["quietViewChangedFraction"]?.jsonPrimitive?.doubleOrNull)
+            quietViewChangedFraction = checkNotNull(config["quietViewChangedFraction"]?.jsonPrimitive?.doubleOrNull),
+            minStableMs = checkNotNull(config["minStableMs"]?.jsonPrimitive?.longOrNull)
         )
     }
 
